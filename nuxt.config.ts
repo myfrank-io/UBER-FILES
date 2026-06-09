@@ -25,6 +25,7 @@ export default defineNuxtConfig({
       cookieKey: 'i18n_locale',
       redirectOn: 'root',
     },
+    bundle: { optimizeTranslationDirective: false },
   },
 
   // Configuration runtime. Les valeurs sensibles ne sont JAMAIS exposées au client :
@@ -48,6 +49,8 @@ export default defineNuxtConfig({
     telegramWebhookSecret: '',
     // INSEE Sirene
     inseeApiKey: '',
+    // Secret du déclencheur de tâches planifiées (rappels J-1)
+    cronSecret: '',
     public: {
       appBaseUrl: 'http://localhost:3000',
     },

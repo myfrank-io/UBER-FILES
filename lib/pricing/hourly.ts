@@ -59,7 +59,7 @@ export function priceHourly(input: HourlyPricingInput): PriceResult {
     subtotal = params.minimumFareCents
   }
 
-  const { lines, addedCents } = applySurcharges(subtotal, surcharges, params.currency)
+  const { lines, addedCents } = applySurcharges(subtotal, surcharges)
   breakdown.push(...lines)
 
   return {

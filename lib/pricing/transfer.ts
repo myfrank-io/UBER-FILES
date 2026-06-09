@@ -16,7 +16,6 @@ export class PricingError extends Error {
 export function applySurcharges(
   subtotalCents: number,
   surcharges: SurchargeInput[],
-  currency: string,
 ): { lines: BreakdownLine[]; addedCents: number } {
   const lines: BreakdownLine[] = []
   let addedCents = 0
@@ -83,7 +82,7 @@ export function priceTransfer(input: TransferPricingInput): PriceResult {
     subtotal = params.minimumFareCents
   }
 
-  const { lines, addedCents } = applySurcharges(subtotal, surcharges, params.currency)
+  const { lines, addedCents } = applySurcharges(subtotal, surcharges)
   breakdown.push(...lines)
 
   return {
