@@ -1,11 +1,12 @@
 # Dependencies
 node_modules
 
-# Nuxt
+# Nuxt / Nitro
 .nuxt
 .output
 .nitro
 .cache
+.data
 dist
 
 # Logs
@@ -19,6 +20,15 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+
+# Prisma
+prisma/*.db
+
+# Tests
+coverage
+test-results
+playwright-report
+.playwright
 
 # Divers
 .DS_Store

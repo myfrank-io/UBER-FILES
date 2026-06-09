@@ -1,0 +1,491 @@
+// Plateforme de réservation VTC en clientèle privée — schéma de données.
+// Multi-tenant par `driverId` (row-level). Tous les montants sont en CENTIMES (Int), EUR.
+// La synchronisation Google Calendar (V1.5/V2) est prévue dans le modèle mais non implémentée.
+
+generator client {
+  provider      = "prisma-client-js"
+  // "native" pour le dev local ; "rhel-openssl-3.0.x" pour l'environnement Vercel (Amazon Linux).
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Authentification & comptes
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  DRIVER
+}
+
+/// Compte de connexion au back-office (admin Chams ou chauffeur).
+/// Le client final n'a PAS de compte (liens signés par email).
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(DRIVER)
+  driver       Driver?  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId     String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chauffeur (tenant) & configuration
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum DriverStatus {
+  PENDING // créé, onboarding incomplet
+  ACTIVE
+  SUSPENDED
+}
+
+/// Un chauffeur = un tenant. Sa page publique est servie sur /{slug}.
+model Driver {
+  id     String       @id @default(cuid())
+  slug   String       @unique
+  status DriverStatus @default(PENDING)
+
+  // Présentation publique (marque blanche)
+  displayName  String
+  tagline      String?
+  bio          String? @db.Text
+  photoUrl     String?
+  vehicleMake  String?
+  vehicleModel String?
+  vehicleClass String? // Berline, Van, Premium...
+  vehicleSeats Int?
+  services     String? @db.Text // description libre des prestations
+  serviceArea  String? @db.Text // zone desservie (texte)
+  phone        String?
+  contactEmail String?
+
+  // Identité légale
+  siren         String?
+  sirenVerified Boolean @default(false)
+  companyName   String?
+
+  // Paiement (Stripe Connect Express)
+  stripeAccountId       String? @unique
+  stripeOnboarded       Boolean @default(false)
+  stripePayoutsEnabled  Boolean @default(false)
+  stripeChargesEnabled  Boolean @default(false)
+
+  // Notifications
+  telegramChatId String?
+  telegramLinkCode String? @unique // code d'appairage du bot
+
+  // Paramètres métier (centimes / minutes)
+  currency             String @default("eur")
+  minimumFareCents     Int    @default(2500) // prix minimum de course
+  minLeadTimeMinutes   Int    @default(120)  // délai mini de réservation (ex: 2h)
+  quoteExpiryHours     Int    @default(24)   // durée de validité d'un devis
+  approachBufferMinutes Int   @default(30)   // trajet d'approche estimé bloqué au calendrier
+  commissionBps        Int    @default(0)    // commission plateforme en points de base (0 = 0%)
+  timezone             String @default("Europe/Paris")
+  locale               String @default("fr")
+
+  // Relations
+  user             User?
+  transferBands    TransferRateBand[]
+  hourlyTiers      HourlyRateTier[]
+  surcharges       Surcharge[]
+  cancellationPolicy CancellationPolicy?
+  customers        Customer[]
+  rideRequests     RideRequest[]
+  quotes           Quote[]
+  bookings         Booking[]
+  calendarEvents   CalendarEvent[]
+  payments         Payment[]
+  subscription     Subscription?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Grilles tarifaires
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Transfert A→B : tarif €/km variable selon l'horaire (jour / nuit / heures de pointe).
+/// Chaque bande couvre des jours de la semaine et une plage horaire ; on choisit
+/// la bande applicable au départ de la course selon `priority` (plus haut = prioritaire).
+model TransferRateBand {
+  id       String @id @default(cuid())
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String
+
+  name           String // "Jour", "Nuit", "Heures de pointe"...
+  pricePerKmCents Int
+  // Jours de semaine couverts (0 = dimanche ... 6 = samedi). Vide = tous les jours.
+  daysOfWeek     Int[]  @default([])
+  startMinute    Int    @default(0)    // minute de début dans la journée (0..1439)
+  endMinute      Int    @default(1440) // minute de fin (exclue, peut être > 1440 pour chevaucher minuit)
+  priority       Int    @default(0)
+  isDefault      Boolean @default(false) // bande de repli si aucune autre ne matche
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([driverId])
+}
+
+/// Mise à disposition : tarif horaire dégressif par paliers de durée.
+/// Ex: minHours=1 -> 6000 c/h ; minHours=4 -> 5500 c/h. On applique le palier
+/// dont `minHours` est le plus grand <= durée demandée.
+model HourlyRateTier {
+  id       String @id @default(cuid())
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String
+
+  minHours        Int // seuil de durée (heures) à partir duquel ce tarif s'applique
+  pricePerHourCents Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([driverId, minHours])
+  @@index([driverId])
+}
+
+enum SurchargeKind {
+  FIXED   // montant fixe en centimes
+  PERCENT // pourcentage du sous-total (en points de base)
+}
+
+/// Majorations optionnelles (bagages, aéroport, jours fériés...).
+model Surcharge {
+  id       String @id @default(cuid())
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String
+
+  name      String
+  kind      SurchargeKind
+  amount    Int // centimes si FIXED, points de base si PERCENT
+  autoApply Boolean @default(false) // appliquée automatiquement à toute course
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([driverId])
+}
+
+/// Politique d'annulation paramétrable (par chauffeur).
+model CancellationPolicy {
+  id       String @id @default(cuid())
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String @unique
+
+  freeUntilHours  Int @default(24) // annulation gratuite jusqu'à X h avant la course
+  retainedPercent Int @default(50) // % retenu si annulation tardive (0..100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Clientèle privée
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Base clients du chauffeur = « portefeuille clientèle privée ».
+model Customer {
+  id       String @id @default(cuid())
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String
+
+  name  String
+  phone String
+  email String
+
+  rideRequests RideRequest[]
+  bookings     Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([driverId, email])
+  @@index([driverId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Demande de course → Devis → Réservation
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ServiceType {
+  TRANSFER // A → B (option aller-retour)
+  HOURLY   // mise à disposition
+}
+
+enum RideRequestStatus {
+  PENDING   // soumise par le client, en attente de devis chauffeur
+  QUOTED    // un devis a été émis
+  CANCELLED
+}
+
+model RideRequest {
+  id       String @id @default(cuid())
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String
+
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  customerId String?
+
+  type   ServiceType
+  status RideRequestStatus @default(PENDING)
+
+  // Coordonnées client (capturées même si Customer pas encore créé)
+  customerName  String
+  customerPhone String
+  customerEmail String
+
+  scheduledAt DateTime // date/heure de prise en charge souhaitée
+
+  // Transfert
+  pickupAddress  String?
+  pickupLat      Float?
+  pickupLng      Float?
+  dropoffAddress String?
+  dropoffLat     Float?
+  dropoffLng     Float?
+  roundTrip      Boolean @default(false)
+  distanceMeters Int?    // calculé via Google Routes
+  durationSeconds Int?   // calculé via Google Routes
+
+  // Mise à disposition
+  durationHours Int?
+
+  notes String? @db.Text
+
+  quotes Quote[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([driverId, status])
+}
+
+enum QuoteStatus {
+  DRAFT     // calculé automatiquement, pas encore validé par le chauffeur
+  SENT      // validé/ajusté par le chauffeur, envoyé au client
+  ACCEPTED  // payé → réservation confirmée
+  EXPIRED
+  REJECTED  // refusé par le chauffeur
+  CANCELLED
+}
+
+model Quote {
+  id            String      @id @default(cuid())
+  driver        Driver      @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId      String
+  rideRequest   RideRequest @relation(fields: [rideRequestId], references: [id], onDelete: Cascade)
+  rideRequestId String
+
+  status QuoteStatus @default(DRAFT)
+
+  // Montants (centimes). `amountCents` est le prix final facturé au client.
+  computedAmountCents Int  // prix calculé automatiquement par le moteur
+  amountCents         Int  // prix final (ajusté éventuellement par le chauffeur)
+  breakdown           Json // détail du calcul (lignes, taux appliqués)
+  currency            String @default("eur")
+
+  // Part chauffeur / commission plateforme (destination charges)
+  applicationFeeCents Int @default(0)
+
+  expiresAt   DateTime
+  sentAt      DateTime?
+  acceptedAt  DateTime?
+
+  // Jeton signé pour les actions client (voir devis, payer) — défense en profondeur
+  // en plus du JWT signé envoyé par email.
+  publicToken String @unique @default(cuid())
+
+  booking Booking?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([driverId, status])
+  @@index([rideRequestId])
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model Booking {
+  id       String @id @default(cuid())
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String
+
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quoteId String @unique
+
+  customer   Customer @relation(fields: [customerId], references: [id])
+  customerId String
+
+  status BookingStatus @default(PENDING_PAYMENT)
+
+  scheduledAt DateTime
+  amountCents Int
+
+  // Jeton signé permettant au client de modifier/annuler depuis son email.
+  manageToken String @unique @default(cuid())
+
+  calendarEvent CalendarEvent?
+  payments      Payment[]
+  refunds       Refund[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([driverId, status])
+  @@index([scheduledAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Calendrier (interne en V1, prêt pour la sync Google en V1.5/V2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum CalendarEventType {
+  BOOKING        // course confirmée (inclut le trajet d'approche dans la plage)
+  UNAVAILABILITY // indisponibilité saisie par le chauffeur (jour off, RDV perso)
+  WORKING_BLOCK  // plage de travail (informatif)
+}
+
+enum CalendarSource {
+  INTERNAL
+  GOOGLE
+}
+
+model CalendarEvent {
+  id       String @id @default(cuid())
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String
+
+  type   CalendarEventType
+  source CalendarSource    @default(INTERNAL)
+
+  // Identifiant de l'événement côté Google (rempli lors de la sync future).
+  externalEventId String?
+
+  title  String?
+  startAt DateTime
+  endAt   DateTime
+
+  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId String?  @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([driverId, startAt, endAt])
+  @@index([source, externalEventId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Paiements & remboursements (Stripe)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+model Payment {
+  id       String @id @default(cuid())
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String
+
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId String
+
+  stripeCheckoutSessionId String? @unique
+  stripePaymentIntentId   String? @unique
+  stripeChargeId          String?
+
+  amountCents         Int
+  applicationFeeCents Int @default(0)
+  currency            String @default("eur")
+  status              PaymentStatus @default(PENDING)
+
+  refunds Refund[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([driverId])
+  @@index([bookingId])
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+model Refund {
+  id        String  @id @default(cuid())
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  paymentId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId String
+
+  stripeRefundId String? @unique
+  amountCents    Int
+  reason         String?
+  status         RefundStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([paymentId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Idempotence des webhooks & facturation des forfaits
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Garantit le traitement unique d'un événement webhook (Stripe, Telegram).
+model WebhookEvent {
+  id         String   @id // identifiant de l'événement fournisseur (ex: evt_...)
+  provider   String   // "stripe" | "telegram"
+  type       String
+  receivedAt DateTime @default(now())
+  processedAt DateTime?
+
+  @@index([provider, type])
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+/// Forfait mensuel fixe facturé par Chams au chauffeur (suivi interne).
+model Subscription {
+  id       String @id @default(cuid())
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String @unique
+
+  planName        String @default("Standard")
+  monthlyFeeCents Int    @default(0)
+  status          SubscriptionStatus @default(ACTIVE)
+  startedAt       DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
