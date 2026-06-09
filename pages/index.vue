@@ -1,80 +1,47 @@
 <script setup lang="ts">
-// Page d'accueil avec une section hero.
-useHead({
-  title: 'UBER FILES — Accueil',
-})
+// Page d'accueil de la plateforme (présentation produit + accès back-office).
+useHead({ title: 'Réservation VTC — Plateforme pour chauffeurs privés' })
 
-const features = [
-  {
-    title: 'Rapide',
-    description: 'Propulsé par Nuxt 3 et Vite pour un rendu instantané.',
-  },
-  {
-    title: 'Typé',
-    description: 'TypeScript de bout en bout pour un code fiable.',
-  },
-  {
-    title: 'Élégant',
-    description: 'Une interface soignée grâce à Tailwind CSS.',
-  },
+const steps = [
+  { title: 'Demandez', text: 'Saisissez votre trajet ou votre mise à disposition.' },
+  { title: 'Devis validé', text: 'Le chauffeur confirme le prix, vous recevez le lien de paiement.' },
+  { title: 'Payez & confirmez', text: 'Le créneau est bloqué dans son agenda après paiement.' },
 ]
 </script>
 
 <template>
-  <section class="relative overflow-hidden">
-    <!-- Dégradé de fond -->
-    <div
-      class="pointer-events-none absolute inset-0 bg-gradient-to-b from-brand-50 to-white"
-      aria-hidden="true"
-    />
+  <div class="relative overflow-hidden">
+    <div class="pointer-events-none absolute inset-0 bg-gradient-to-b from-brand-50 to-slate-50" />
+    <header class="relative mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
+      <span class="text-lg font-bold text-slate-900">Réservation VTC</span>
+      <NuxtLink to="/dashboard/login" class="text-sm font-semibold text-brand-700 hover:underline">
+        Espace chauffeur →
+      </NuxtLink>
+    </header>
 
-    <div class="relative mx-auto max-w-6xl px-6 py-24 text-center sm:py-32">
-      <span
-        class="inline-flex items-center rounded-full border border-brand-500/20 bg-brand-50 px-4 py-1 text-sm font-medium text-brand-700"
-      >
-        Nuxt 3 · TypeScript · Tailwind CSS
-      </span>
-
-      <h1 class="mt-6 text-4xl font-extrabold tracking-tight text-slate-900 sm:text-6xl">
-        Gérez vos fichiers,<br />
-        <span class="text-brand-600">simplement.</span>
+    <section class="relative mx-auto max-w-4xl px-6 py-16 text-center sm:py-24">
+      <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
+        Votre clientèle privée,<br /><span class="text-brand-600">sans intermédiaire.</span>
       </h1>
-
       <p class="mx-auto mt-6 max-w-2xl text-lg text-slate-600">
-        UBER FILES est le point de départ d'une web app moderne et performante.
-        Un squelette propre, prêt à accueillir vos idées.
+        Chaque chauffeur dispose de sa page de réservation à son nom. Devis instantané,
+        validation du chauffeur, paiement sécurisé, créneau garanti dans son agenda.
       </p>
 
-      <div class="mt-10 flex items-center justify-center gap-4">
-        <NuxtLink
-          to="/about"
-          class="rounded-lg bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
-        >
-          Commencer
-        </NuxtLink>
-        <a
-          href="https://nuxt.com"
-          target="_blank"
-          rel="noopener"
-          class="rounded-lg px-6 py-3 text-sm font-semibold text-slate-700 transition hover:text-brand-600"
-        >
-          Documentation →
-        </a>
-      </div>
-    </div>
-
-    <!-- Cartes de fonctionnalités -->
-    <div class="relative mx-auto max-w-6xl px-6 pb-24">
-      <div class="grid gap-6 sm:grid-cols-3">
-        <div
-          v-for="feature in features"
-          :key="feature.title"
-          class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md"
-        >
-          <h3 class="text-lg font-semibold text-slate-900">{{ feature.title }}</h3>
-          <p class="mt-2 text-sm text-slate-600">{{ feature.description }}</p>
+      <div class="mt-12 grid gap-5 text-left sm:grid-cols-3">
+        <div v-for="(s, i) in steps" :key="s.title" class="card">
+          <div class="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 font-bold text-white">
+            {{ i + 1 }}
+          </div>
+          <h3 class="font-semibold text-slate-900">{{ s.title }}</h3>
+          <p class="mt-1 text-sm text-slate-600">{{ s.text }}</p>
         </div>
       </div>
-    </div>
-  </section>
+
+      <p class="mt-12 text-sm text-slate-500">
+        Vous êtes chauffeur et avez reçu votre carte ?
+        Votre page est accessible sur <code class="rounded bg-slate-200 px-1">/votre-nom</code>.
+      </p>
+    </section>
+  </div>
 </template>
