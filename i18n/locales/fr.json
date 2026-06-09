@@ -1,0 +1,55 @@
+{
+  "common": {
+    "brand": "Réservation VTC",
+    "book": "Réserver",
+    "next": "Suivant",
+    "back": "Retour",
+    "submit": "Envoyer la demande",
+    "loading": "Chargement…",
+    "error": "Une erreur est survenue",
+    "from": "à partir de",
+    "perKm": "/km",
+    "perHour": "/h",
+    "hours": "heures",
+    "cancel": "Annuler",
+    "modify": "Modifier",
+    "confirm": "Confirmer"
+  },
+  "booking": {
+    "title": "Réservez votre course",
+    "serviceType": "Type de prestation",
+    "transfer": "Transfert (A → B)",
+    "hourly": "Mise à disposition",
+    "pickup": "Adresse de départ",
+    "dropoff": "Adresse d'arrivée",
+    "roundTrip": "Aller-retour",
+    "datetime": "Date et heure",
+    "duration": "Durée souhaitée",
+    "yourName": "Votre nom",
+    "yourPhone": "Téléphone",
+    "yourEmail": "Email",
+    "notes": "Précisions (optionnel)",
+    "estimate": "Estimation",
+    "getEstimate": "Estimer le prix",
+    "cgvAccept": "J'accepte les conditions générales de vente et reconnais que, s'agissant d'un service daté, le droit de rétractation de 14 jours ne s'applique pas (art. L221-28 du Code de la consommation).",
+    "submitted": "Demande envoyée ! Le chauffeur va valider votre devis et vous recevrez un email avec le lien de paiement.",
+    "minLeadTime": "Réservation possible au plus tôt {hours}h à l'avance.",
+    "minFare": "Course minimum : {amount}."
+  },
+  "quote": {
+    "title": "Votre devis",
+    "expiresAt": "Valable jusqu'au {date}",
+    "pay": "Payer et confirmer la course",
+    "total": "Total à régler",
+    "expired": "Ce devis a expiré. Merci de refaire une demande.",
+    "alreadyPaid": "Cette course est déjà confirmée."
+  },
+  "manage": {
+    "title": "Gérer ma réservation",
+    "cancelBooking": "Annuler la course",
+    "cancelFree": "Annulation gratuite jusqu'au {date}.",
+    "cancelFee": "Passé ce délai, {percent}% du montant est retenu.",
+    "cancelled": "Votre course a été annulée.",
+    "refundInfo": "Remboursement de {amount} en cours."
+  }
+}

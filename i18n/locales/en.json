@@ -1,0 +1,55 @@
+{
+  "common": {
+    "brand": "VTC Booking",
+    "book": "Book",
+    "next": "Next",
+    "back": "Back",
+    "submit": "Send request",
+    "loading": "Loading…",
+    "error": "An error occurred",
+    "from": "from",
+    "perKm": "/km",
+    "perHour": "/hr",
+    "hours": "hours",
+    "cancel": "Cancel",
+    "modify": "Modify",
+    "confirm": "Confirm"
+  },
+  "booking": {
+    "title": "Book your ride",
+    "serviceType": "Service type",
+    "transfer": "Transfer (A → B)",
+    "hourly": "Hourly hire",
+    "pickup": "Pickup address",
+    "dropoff": "Drop-off address",
+    "roundTrip": "Round trip",
+    "datetime": "Date and time",
+    "duration": "Desired duration",
+    "yourName": "Your name",
+    "yourPhone": "Phone",
+    "yourEmail": "Email",
+    "notes": "Notes (optional)",
+    "estimate": "Estimate",
+    "getEstimate": "Estimate price",
+    "cgvAccept": "I accept the terms of sale and acknowledge that, as a dated service, the 14-day right of withdrawal does not apply (art. L221-28 French Consumer Code).",
+    "submitted": "Request sent! The driver will validate your quote and you'll receive an email with the payment link.",
+    "minLeadTime": "Bookings can be made at most {hours}h in advance.",
+    "minFare": "Minimum fare: {amount}."
+  },
+  "quote": {
+    "title": "Your quote",
+    "expiresAt": "Valid until {date}",
+    "pay": "Pay and confirm the ride",
+    "total": "Total to pay",
+    "expired": "This quote has expired. Please submit a new request.",
+    "alreadyPaid": "This ride is already confirmed."
+  },
+  "manage": {
+    "title": "Manage my booking",
+    "cancelBooking": "Cancel ride",
+    "cancelFree": "Free cancellation until {date}.",
+    "cancelFee": "After that, {percent}% of the amount is retained.",
+    "cancelled": "Your ride has been cancelled.",
+    "refundInfo": "Refund of {amount} in progress."
+  }
+}
