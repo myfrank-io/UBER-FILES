@@ -33,6 +33,14 @@ export default defineNuxtConfig({
   runtimeConfig: {
     databaseUrl: '',
     sessionPassword: '',
+    // Session scellée (nuxt-auth-utils). Le cookie n'est `Secure` qu'en production :
+    // en local (http://localhost), `Secure` empêcherait les navigateurs (Safari) de le stocker.
+    session: {
+      password: '',
+      cookie: {
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
     appBaseUrl: 'http://localhost:3000',
     linkTokenSecret: '',
     // Stripe
