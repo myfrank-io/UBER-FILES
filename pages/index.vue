@@ -13,7 +13,26 @@ const steps = [
   <div class="relative overflow-hidden">
     <div class="pointer-events-none absolute inset-0 bg-gradient-to-b from-brand-50 to-slate-50" />
     <header class="relative mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-      <span class="text-lg font-bold text-slate-900">Réservation VTC</span>
+      <span class="flex items-center gap-2 text-lg font-bold text-slate-900">
+        <svg
+          class="h-6 w-6 text-brand-600"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path
+            d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"
+          />
+          <circle cx="7" cy="17" r="2" />
+          <path d="M9 17h6" />
+          <circle cx="17" cy="17" r="2" />
+        </svg>
+        Réservation VTC
+      </span>
       <NuxtLink to="/dashboard/login" class="text-sm font-semibold text-brand-700 hover:underline">
         Espace chauffeur →
       </NuxtLink>
