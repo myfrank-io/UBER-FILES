@@ -30,37 +30,38 @@ export default defineNuxtConfig({
 
   // Configuration runtime. Les valeurs sensibles ne sont JAMAIS exposées au client :
   // seules celles sous `public` le sont.
+  // Les valeurs sont lues depuis les variables d'environnement (fichier .env en local,
+  // réglages du projet sur Vercel). On les câble explicitement pour accepter des noms
+  // simples (DATABASE_URL, STRIPE_SECRET_KEY…) sans préfixe NUXT_.
   runtimeConfig: {
-    databaseUrl: '',
-    sessionPassword: '',
+    databaseUrl: process.env.DATABASE_URL || '',
     // Session scellée (nuxt-auth-utils). Le cookie n'est `Secure` qu'en production :
     // en local (http://localhost), `Secure` empêcherait les navigateurs (Safari) de le stocker.
     session: {
-      password: '',
+      password: process.env.NUXT_SESSION_PASSWORD || '',
       cookie: {
         secure: process.env.NODE_ENV === 'production',
       },
     },
-    appBaseUrl: 'http://localhost:3000',
-    linkTokenSecret: '',
+    linkTokenSecret: process.env.LINK_TOKEN_SECRET || '',
     // Stripe
-    stripeSecretKey: '',
-    stripeWebhookSecret: '',
-    stripeConnectWebhookSecret: '',
+    stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
+    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+    stripeConnectWebhookSecret: process.env.STRIPE_CONNECT_WEBHOOK_SECRET || '',
     // Google Maps (serveur uniquement — proxifié)
-    googleMapsApiKey: '',
+    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
     // Resend
-    resendApiKey: '',
-    emailFrom: 'Réservation VTC <onboarding@resend.dev>',
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    emailFrom: process.env.EMAIL_FROM || 'Réservation VTC <onboarding@resend.dev>',
     // Telegram
-    telegramBotToken: '',
-    telegramWebhookSecret: '',
+    telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
+    telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || '',
     // INSEE Sirene
-    inseeApiKey: '',
+    inseeApiKey: process.env.INSEE_API_KEY || '',
     // Secret du déclencheur de tâches planifiées (rappels J-1)
-    cronSecret: '',
+    cronSecret: process.env.CRON_SECRET || '',
     public: {
-      appBaseUrl: 'http://localhost:3000',
+      appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:3000',
     },
   },
 
