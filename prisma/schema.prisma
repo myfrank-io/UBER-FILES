@@ -3,7 +3,9 @@
 // La synchronisation Google Calendar (V1.5/V2) est prévue dans le modèle mais non implémentée.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // "native" pour le dev local ; "rhel-openssl-3.0.x" pour l'environnement Vercel (Amazon Linux).
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
