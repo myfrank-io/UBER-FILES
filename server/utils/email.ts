@@ -89,4 +89,15 @@ export const emailTemplates = {
       ),
     }
   },
+  passwordReset(opts: { resetUrl: string }) {
+    return {
+      subject: 'Réinitialisation de votre mot de passe',
+      html: wrap(
+        'Réinitialisation de mot de passe',
+        `<p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
+         ${button(opts.resetUrl, 'Choisir un nouveau mot de passe')}
+         <p style="font-size:13px;color:#6b7280">Ce lien est valable 1 heure. Si vous n'avez pas fait cette demande, ignorez cet email.</p>`,
+      ),
+    }
+  },
 }
