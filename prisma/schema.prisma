@@ -31,8 +31,12 @@ model User {
   role         UserRole @default(DRIVER)
   driver       Driver?  @relation(fields: [driverId], references: [id], onDelete: Cascade)
   driverId     String?  @unique
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+
+  passwordResetToken  String?   @unique
+  passwordResetExpiry DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
