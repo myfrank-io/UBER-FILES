@@ -4,6 +4,8 @@ const { user, clear } = useUserSession()
 
 const nav = [
   { to: '/dashboard', label: 'Accueil', icon: '🏠' },
+  { to: '/dashboard/reservations', label: 'Réservations', icon: '🗂️' },
+  { to: '/dashboard/gains', label: 'Gains', icon: '💶' },
   { to: '/dashboard/calendrier', label: 'Calendrier', icon: '📅' },
   { to: '/dashboard/clients', label: 'Clients', icon: '👥' },
   { to: '/dashboard/profil', label: 'Profil', icon: '👤' },
