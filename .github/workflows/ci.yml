@@ -26,6 +26,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://vtc:vtc@localhost:5432/vtc?schema=public
+      DATABASE_URL_UNPOOLED: postgresql://vtc:vtc@localhost:5432/vtc?schema=public
       NUXT_SESSION_PASSWORD: ci-session-password-at-least-32-characters
       LINK_TOKEN_SECRET: ci-link-token-secret-at-least-32-characters
 
