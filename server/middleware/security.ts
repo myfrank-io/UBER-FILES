@@ -103,6 +103,31 @@ function handleCors(event: H3Event): boolean {
 export default defineEventHandler((event) => {
   const path = getRequestURL(event).pathname
 
+  // Security headers sur toutes les réponses HTML + API
+  setHeader(event, 'X-Content-Type-Options', 'nosniff')
+  setHeader(event, 'X-Frame-Options', 'DENY')
+  setHeader(event, 'Referrer-Policy', 'strict-origin-when-cross-origin')
+  setHeader(event, 'Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  if (process.env.NODE_ENV === 'production') {
+    setHeader(event, 'Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  }
+  // CSP permissif mais protège contre XSS et clickjacking
+  setHeader(
+    event,
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",   // Nuxt hydration nécessite unsafe-inline
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https:",
+      "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://api.resend.com",
+      "frame-src https://js.stripe.com https://hooks.stripe.com",
+      "font-src 'self'",
+      "object-src 'none'",
+      "base-uri 'self'",
+    ].join('; '),
+  )
+
   // CORS (uniquement pour les routes API)
   if (path.startsWith('/api/')) {
     const handled = handleCors(event)

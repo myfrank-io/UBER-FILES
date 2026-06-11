@@ -1,0 +1,22 @@
+name: Rappels J-1
+
+on:
+  schedule:
+    # Tous les jours à 08h00 UTC (10h Paris été, 09h hiver)
+    - cron: '0 8 * * *'
+  workflow_dispatch: # déclenchement manuel possible
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Déclencher les rappels
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${{ vars.APP_BASE_URL }}/api/cron/reminders" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Erreur : statut HTTP $STATUS"
+            exit 1
+          fi
