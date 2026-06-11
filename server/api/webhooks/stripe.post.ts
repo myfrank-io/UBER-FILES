@@ -120,6 +120,8 @@ async function confirmBookingFromSession(
     currency: quote.currency,
     scheduledAt: req.scheduledAt,
     manageUrl: `${appBaseUrl}/reservation/${manageToken}`,
+    driverPhone: quote.driver.phone,
+    driverEmail: quote.driver.contactEmail,
   })
   await sendEmail({ to: req.customerEmail, ...tpl })
 }

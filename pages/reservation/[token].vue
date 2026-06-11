@@ -56,6 +56,13 @@ async function cancel() {
         <p class="font-semibold text-slate-900">{{ formatMoney(booking.amountCents, booking.currency) }}</p>
       </div>
 
+      <!-- Coordonnées chauffeur -->
+      <div v-if="booking.driver.phone || booking.driver.contactEmail" class="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
+        <p class="mb-1 font-medium text-slate-800">Contact chauffeur</p>
+        <p v-if="booking.driver.phone">📞 <a :href="`tel:${booking.driver.phone}`" class="text-brand-600 hover:underline">{{ booking.driver.phone }}</a></p>
+        <p v-if="booking.driver.contactEmail">✉️ <a :href="`mailto:${booking.driver.contactEmail}`" class="text-brand-600 hover:underline">{{ booking.driver.contactEmail }}</a></p>
+      </div>
+
       <template v-if="booking.status === 'CONFIRMED'">
         <div class="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
           <p v-if="booking.cancellation.isFreeNow">

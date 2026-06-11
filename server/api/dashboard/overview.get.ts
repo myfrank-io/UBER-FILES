@@ -6,11 +6,17 @@ export default defineEventHandler(async (event) => {
   const driverId = await requireDriverId(event)
   const now = new Date()
 
-  const [pendingQuotes, upcomingBookings, stats, paidSum] = await Promise.all([
+  const [pendingQuotes, expiredQuotes, upcomingBookings, stats, paidSum] = await Promise.all([
     prisma.quote.findMany({
       where: { driverId, status: 'DRAFT' },
       include: { rideRequest: true },
       orderBy: { createdAt: 'desc' },
+    }),
+    prisma.quote.findMany({
+      where: { driverId, status: 'SENT', expiresAt: { lt: now } },
+      include: { rideRequest: true },
+      orderBy: { expiresAt: 'desc' },
+      take: 10,
     }),
     prisma.booking.findMany({
       where: { driverId, status: 'CONFIRMED', scheduledAt: { gte: now } },
@@ -46,6 +52,22 @@ export default defineEventHandler(async (event) => {
         roundTrip: q.rideRequest.roundTrip,
         durationHours: q.rideRequest.durationHours,
         notes: q.rideRequest.notes,
+      },
+    })),
+    expiredQuotes: expiredQuotes.map((q) => ({
+      id: q.id,
+      amountCents: q.amountCents,
+      currency: q.currency,
+      expiresAt: q.expiresAt,
+      ride: {
+        type: q.rideRequest.type,
+        customerName: q.rideRequest.customerName,
+        customerEmail: q.rideRequest.customerEmail,
+        scheduledAt: q.rideRequest.scheduledAt,
+        pickupAddress: q.rideRequest.pickupAddress,
+        dropoffAddress: q.rideRequest.dropoffAddress,
+        roundTrip: q.rideRequest.roundTrip,
+        durationHours: q.rideRequest.durationHours,
       },
     })),
     upcomingBookings: upcomingBookings.map((b) => ({

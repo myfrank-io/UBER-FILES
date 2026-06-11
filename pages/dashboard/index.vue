@@ -34,6 +34,19 @@ async function reject(quoteId: string) {
     busyId.value = null
   }
 }
+
+async function resend(quoteId: string) {
+  busyId.value = quoteId
+  errorMsg.value = ''
+  try {
+    await $fetch(`/api/dashboard/quotes/${quoteId}/resend`, { method: 'POST' })
+    await refresh()
+  } catch (e) {
+    errorMsg.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.'
+  } finally {
+    busyId.value = null
+  }
+}
 </script>
 
 <template>
@@ -115,6 +128,34 @@ async function reject(quoteId: string) {
           />
           <button class="btn-ghost !py-2 text-sm" :disabled="busyId === q.id || !adjustValue[q.id]" @click="validate(q.id, true)">
             Ajuster
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Devis expirés -->
+    <section v-if="data?.expiredQuotes.length" class="mt-8">
+      <h2 class="text-lg font-semibold text-slate-900">Devis expirés sans paiement</h2>
+      <div v-for="q in data.expiredQuotes" :key="q.id" class="card mt-3">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="font-semibold text-slate-900">{{ q.ride.customerName }}</p>
+            <p class="text-xs text-slate-500">{{ q.ride.customerEmail }}</p>
+          </div>
+          <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">Expiré</span>
+        </div>
+        <div class="mt-2 space-y-1 text-sm text-slate-600">
+          <p>📅 {{ formatDateTime(q.ride.scheduledAt) }}</p>
+          <p v-if="q.ride.type === 'TRANSFER'">
+            📍 {{ q.ride.pickupAddress }} → {{ q.ride.dropoffAddress }}
+            <span v-if="q.ride.roundTrip" class="text-xs text-slate-400">(A/R)</span>
+          </p>
+          <p v-else>⏱️ {{ q.ride.durationHours }} h</p>
+        </div>
+        <div class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+          <span class="font-bold text-slate-900">{{ formatMoney(q.amountCents, q.currency) }}</span>
+          <button class="btn-primary text-sm" :disabled="busyId === q.id" @click="resend(q.id)">
+            {{ busyId === q.id ? '…' : '↩ Renvoyer le lien' }}
           </button>
         </div>
       </div>

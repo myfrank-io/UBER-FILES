@@ -58,13 +58,19 @@ export const emailTemplates = {
       ),
     }
   },
-  paymentConfirmed(opts: { driverName: string; amountCents: number; currency: string; scheduledAt: Date; manageUrl: string }) {
+  paymentConfirmed(opts: { driverName: string; amountCents: number; currency: string; scheduledAt: Date; manageUrl: string; driverPhone?: string | null; driverEmail?: string | null }) {
+    const contact = [
+      opts.driverPhone ? `📞 ${opts.driverPhone}` : '',
+      opts.driverEmail ? `✉️ ${opts.driverEmail}` : '',
+    ].filter(Boolean).join('&nbsp;&nbsp;|&nbsp;&nbsp;')
+
     return {
       subject: `Course confirmée — ${opts.driverName}`,
       html: wrap(
         'Votre course est confirmée ✅',
         `<p>Le paiement de <strong>${formatMoney(opts.amountCents, opts.currency)}</strong> a bien été reçu.</p>
          <p>Prise en charge le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
+         ${contact ? `<p style="font-size:13px;color:#374151">Contact : ${contact}</p>` : ''}
          ${button(opts.manageUrl, 'Gérer ma réservation')}`,
       ),
     }

@@ -26,7 +26,11 @@ export default defineEventHandler(async (event) => {
     amountCents: booking.amountCents,
     currency: booking.quote.currency,
     scheduledAt: booking.scheduledAt,
-    driver: { displayName: booking.driver.displayName },
+    driver: {
+      displayName: booking.driver.displayName,
+      phone: booking.driver.phone,
+      contactEmail: booking.driver.contactEmail,
+    },
     ride: {
       type: req.type,
       pickupAddress: req.pickupAddress,
