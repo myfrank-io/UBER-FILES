@@ -26,7 +26,32 @@ const { data: driver, error } = await useFetch<DriverPublic>(`/api/public/${slug
 if (error.value) {
   throw createError({ statusCode: 404, statusMessage: 'Chauffeur introuvable', fatal: true })
 }
-useHead({ title: () => driver.value?.displayName ?? 'Réservation VTC' })
+const appBase = useRuntimeConfig().public.appBaseUrl
+
+useHead(() => {
+  const d = driver.value
+  if (!d) return { title: 'Réservation VTC' }
+  const description = d.tagline ?? `Réservez votre course avec ${d.displayName}. Devis instantané, paiement sécurisé.`
+  const url = `${appBase}/${d.slug}`
+  const image = d.photoUrl ?? `${appBase}/og-default.jpg`
+  return {
+    title: `${d.displayName} — Réservation VTC`,
+    meta: [
+      { name: 'description', content: description },
+      // Open Graph
+      { property: 'og:title', content: d.displayName },
+      { property: 'og:description', content: description },
+      { property: 'og:url', content: url },
+      { property: 'og:image', content: image },
+      { property: 'og:type', content: 'website' },
+      // Twitter Card
+      { name: 'twitter:card', content: 'summary' },
+      { name: 'twitter:title', content: d.displayName },
+      { name: 'twitter:description', content: description },
+    ],
+    link: [{ rel: 'canonical', href: url }],
+  }
+})
 
 // ─── État du formulaire ───
 const type = ref<'TRANSFER' | 'HOURLY'>(driver.value?.hasTransfer ? 'TRANSFER' : 'HOURLY')
