@@ -25,4 +25,23 @@ test.describe('Page de réservation publique', () => {
     const res = await page.goto('/chauffeur-inexistant')
     expect(res?.status()).toBe(404)
   })
+
+  test('affiche le bouton de demande de devis après estimation', async ({ page }) => {
+    await page.goto('/karim-paris')
+
+    await page.getByRole('button', { name: /Mise à disposition/ }).click()
+    await page.getByLabel(/Durée souhaitée/).fill('2')
+    await page.getByRole('button', { name: 'Estimer le prix' }).click()
+
+    await expect(page.getByText('Estimation')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('button', { name: /Demander un devis|Réserver/i })).toBeVisible()
+  })
+
+  test('charge sans erreur JavaScript', async ({ page }) => {
+    const errors: string[] = []
+    page.on('pageerror', (e) => errors.push(e.message))
+    await page.goto('/karim-paris')
+    await page.waitForLoadState('networkidle')
+    expect(errors).toHaveLength(0)
+  })
 })
