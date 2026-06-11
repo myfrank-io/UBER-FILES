@@ -75,12 +75,12 @@ const filteredDrivers = computed(() => {
 
     <!-- Stats -->
     <div v-if="data" class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-      <div class="card !p-4"><p class="text-xs text-slate-500">Chauffeurs</p><p class="mt-1 text-xl font-bold">{{ data.stats.driversTotal }}</p></div>
-      <div class="card !p-4"><p class="text-xs text-slate-500">Actifs</p><p class="mt-1 text-xl font-bold">{{ data.stats.driversActive }}</p></div>
-      <div class="card !p-4"><p class="text-xs text-slate-500">Courses</p><p class="mt-1 text-xl font-bold">{{ data.stats.bookingsConfirmed }}</p></div>
-      <div class="card !p-4"><p class="text-xs text-slate-500">GMV</p><p class="mt-1 text-xl font-bold">{{ formatMoney(data.stats.gmvCents) }}</p></div>
-      <div class="card !p-4"><p class="text-xs text-slate-500">Commission</p><p class="mt-1 text-xl font-bold">{{ formatMoney(data.stats.commissionCents) }}</p></div>
-      <div class="card !p-4"><p class="text-xs text-slate-500">MRR forfaits</p><p class="mt-1 text-xl font-bold">{{ formatMoney(data.stats.mrrCents) }}</p></div>
+      <StatCard title="Chauffeurs" :value="data.stats.driversTotal" />
+      <StatCard title="Actifs" :value="data.stats.driversActive" />
+      <StatCard title="Courses" :value="data.stats.bookingsConfirmed" />
+      <StatCard title="GMV" :value="formatMoney(data.stats.gmvCents)" />
+      <StatCard title="Commission" :value="formatMoney(data.stats.commissionCents)" />
+      <StatCard title="MRR forfaits" :value="formatMoney(data.stats.mrrCents)" />
     </div>
 
     <!-- Création -->
