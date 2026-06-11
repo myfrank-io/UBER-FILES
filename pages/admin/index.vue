@@ -54,6 +54,16 @@ const statusColors: Record<string, string> = {
   SUSPENDED: 'bg-red-100 text-red-700',
   PENDING: 'bg-amber-100 text-amber-800',
 }
+
+const search = ref('')
+const filteredDrivers = computed(() => {
+  if (!data.value?.drivers) return []
+  const q = search.value.toLowerCase().trim()
+  if (!q) return data.value.drivers
+  return data.value.drivers.filter((d) =>
+    d.displayName.toLowerCase().includes(q) || d.slug.toLowerCase().includes(q),
+  )
+})
 </script>
 
 <template>
@@ -103,7 +113,10 @@ const statusColors: Record<string, string> = {
     </div>
 
     <!-- Liste chauffeurs -->
-    <div class="mt-8 overflow-x-auto">
+    <div class="mt-8">
+      <input v-model="search" class="field max-w-sm" placeholder="Rechercher par nom ou slug…" />
+    </div>
+    <div class="mt-3 overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
@@ -111,10 +124,11 @@ const statusColors: Record<string, string> = {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="d in data?.drivers" :key="d.id" class="border-b border-slate-100">
+          <tr v-for="d in filteredDrivers" :key="d.id" class="border-b border-slate-100">
             <td class="py-3">
-              <p class="font-medium text-slate-900">{{ d.displayName }}</p>
-              <NuxtLink :to="`/${d.slug}`" class="text-xs text-brand-600 hover:underline">/{{ d.slug }}</NuxtLink>
+              <NuxtLink :to="`/admin/drivers/${d.id}`" class="font-medium text-slate-900 hover:text-brand-600">{{ d.displayName }}</NuxtLink>
+              <br />
+              <NuxtLink :to="`/${d.slug}`" target="_blank" class="text-xs text-brand-600 hover:underline">/{{ d.slug }}</NuxtLink>
             </td>
             <td><span class="rounded-full px-2 py-0.5 text-xs font-semibold" :class="statusColors[d.status]">{{ d.status }}</span></td>
             <td>{{ d.sirenVerified ? '✅' : '—' }}</td>
@@ -122,12 +136,14 @@ const statusColors: Record<string, string> = {
             <td>{{ d.bookings }}</td>
             <td>{{ formatMoney(d.monthlyFeeCents) }}</td>
             <td class="text-right">
+              <NuxtLink :to="`/admin/drivers/${d.id}`" class="mr-2 text-xs text-slate-500 hover:text-slate-800">Détail →</NuxtLink>
               <button v-if="d.status !== 'ACTIVE'" class="text-xs font-semibold text-green-700 hover:underline" @click="setStatus(d.id, 'ACTIVE')">Activer</button>
               <button v-else class="text-xs font-semibold text-red-600 hover:underline" @click="setStatus(d.id, 'SUSPENDED')">Suspendre</button>
             </td>
           </tr>
         </tbody>
       </table>
+      <p v-if="filteredDrivers.length === 0" class="py-8 text-center text-sm text-slate-400">Aucun chauffeur trouvé.</p>
     </div>
   </div>
 </template>
