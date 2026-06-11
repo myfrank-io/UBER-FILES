@@ -3,7 +3,11 @@
 </script>
 
 <template>
-  <NuxtLayout>
-    <NuxtPage />
-  </NuxtLayout>
+  <div>
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
+    <!-- ⚠️ Outil de dev (commutateur d'espaces) — invisible en production, à retirer en V1 finale -->
+    <DevSwitcher />
+  </div>
 </template>
