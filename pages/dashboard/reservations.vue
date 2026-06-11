@@ -2,6 +2,7 @@
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Réservations' })
 const { formatMoney, formatDateTime } = useFormat()
+const { error: toastError } = useToast()
 
 // ─── Filtres ──────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,6 @@ const selected = ref<string | null>(null)
 const detail = ref<Record<string, unknown> | null>(null)
 const loadingDetail = ref(false)
 const completing = ref<string | null>(null)
-const errorMsg = ref('')
 
 async function openDetail(id: string) {
   selected.value = id
@@ -52,25 +52,15 @@ function closeDetail() { selected.value = null; detail.value = null }
 async function markComplete(id: string) {
   if (!confirm('Marquer cette course comme terminée ?')) return
   completing.value = id
-  errorMsg.value = ''
   try {
     await $fetch(`/api/dashboard/bookings/${id}/complete`, { method: 'POST' })
     await refresh()
     if (selected.value === id) await openDetail(id)
   } catch (e) {
-    errorMsg.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.'
+    toastError((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.')
   } finally {
     completing.value = null
   }
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
-  CONFIRMED: { label: 'Confirmée', cls: 'bg-green-100 text-green-800' },
-  COMPLETED: { label: 'Terminée', cls: 'bg-slate-100 text-slate-600' },
-  CANCELLED: { label: 'Annulée', cls: 'bg-red-100 text-red-700' },
-  PENDING_PAYMENT: { label: 'En attente', cls: 'bg-amber-100 text-amber-800' },
 }
 </script>
 
@@ -101,14 +91,11 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
       <button class="btn-ghost !py-2 text-sm" @click="resetFilters">Réinitialiser</button>
     </div>
 
-    <p v-if="errorMsg" class="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
-
     <!-- Compteur -->
     <p v-if="data" class="mt-4 text-sm text-slate-500">
       {{ data.total }} réservation{{ data.total > 1 ? 's' : '' }}
     </p>
 
-    <!-- Liste -->
     <p v-if="pending" class="mt-4 text-sm text-slate-400">Chargement…</p>
 
     <div v-if="data && !data.bookings.length && !pending" class="mt-6 text-sm text-slate-500">
@@ -119,19 +106,14 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
       <div
         v-for="b in data?.bookings"
         :key="b.id"
-        class="card cursor-pointer hover:border-brand-200 transition-colors"
+        class="card cursor-pointer transition-colors hover:border-brand-200"
         @click="openDetail(b.id)"
       >
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
               <p class="font-semibold text-slate-900">{{ b.customer.name }}</p>
-              <span
-                class="rounded-full px-2 py-0.5 text-xs font-medium"
-                :class="STATUS_LABELS[b.status]?.cls ?? 'bg-slate-100 text-slate-600'"
-              >
-                {{ STATUS_LABELS[b.status]?.label ?? b.status }}
-              </span>
+              <StatusBadge :status="b.status" />
             </div>
             <p class="mt-1 text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
             <p class="mt-0.5 truncate text-xs text-slate-500">
@@ -145,7 +127,6 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
           <p class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</p>
         </div>
 
-        <!-- Action "Terminer" inline pour les courses confirmées passées -->
         <div
           v-if="b.status === 'CONFIRMED' && new Date(b.scheduledAt) <= new Date()"
           class="mt-3 border-t border-slate-100 pt-3"
@@ -162,42 +143,28 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
       </div>
     </div>
 
-    <!-- Pagination -->
-    <div v-if="data && data.pages > 1" class="mt-6 flex items-center justify-center gap-3">
-      <button class="btn-ghost !py-2 text-sm" :disabled="page === 1" @click="() => { page--; refresh() }">
-        ← Précédent
-      </button>
-      <span class="text-sm text-slate-500">{{ page }} / {{ data.pages }}</span>
-      <button class="btn-ghost !py-2 text-sm" :disabled="page === data.pages" @click="() => { page++; refresh() }">
-        Suivant →
-      </button>
+    <div class="mt-6">
+      <AppPagination v-if="data" :page="page" :pages="data.pages" @change="(p) => { page = p; refresh() }" />
     </div>
   </div>
 
-  <!-- Panneau de détail (slide-over simplifié) -->
+  <!-- Panneau de détail -->
   <Teleport to="body">
     <div v-if="selected" class="fixed inset-0 z-40 flex justify-end" @click.self="closeDetail">
       <div class="relative w-full max-w-md overflow-y-auto bg-white shadow-2xl">
         <div class="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
           <h2 class="font-semibold text-slate-900">Détail de la réservation</h2>
-          <button class="text-slate-400 hover:text-slate-700 text-xl leading-none" @click="closeDetail">✕</button>
+          <button class="text-xl leading-none text-slate-400 hover:text-slate-700" @click="closeDetail">✕</button>
         </div>
 
         <div v-if="loadingDetail" class="p-5 text-sm text-slate-400">Chargement…</div>
 
         <div v-else-if="detail" class="space-y-5 p-5">
-          <!-- Statut -->
           <div class="flex items-center gap-2">
-            <span
-              class="rounded-full px-3 py-1 text-sm font-medium"
-              :class="STATUS_LABELS[(detail.status as string)]?.cls"
-            >
-              {{ STATUS_LABELS[(detail.status as string)]?.label }}
-            </span>
+            <StatusBadge :status="(detail.status as string)" />
             <span class="text-sm text-slate-500">{{ formatDateTime(detail.scheduledAt as string) }}</span>
           </div>
 
-          <!-- Client -->
           <div class="card !p-4">
             <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Client</p>
             <p class="mt-2 font-semibold text-slate-900">{{ (detail.customer as Record<string, string>).name }}</p>
@@ -205,7 +172,6 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
             <p class="text-sm text-slate-600">{{ (detail.customer as Record<string, string>).email }}</p>
           </div>
 
-          <!-- Trajet -->
           <div class="card !p-4">
             <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Trajet</p>
             <template v-if="(detail.ride as Record<string, unknown>).type === 'TRANSFER'">
@@ -228,7 +194,6 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
             </p>
           </div>
 
-          <!-- Paiement -->
           <div class="card !p-4">
             <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Paiement</p>
             <p class="mt-2 text-2xl font-bold text-slate-900">
@@ -245,12 +210,10 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
             </template>
           </div>
 
-          <!-- Annulation info -->
           <div v-if="detail.status === 'CONFIRMED'" class="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
             <p>Remboursement possible si annulé maintenant : <strong>{{ formatMoney((detail.cancellation as Record<string, number>).currentRefundCents, detail.currency as string) }}</strong></p>
           </div>
 
-          <!-- Action Terminer -->
           <div v-if="detail.status === 'CONFIRMED' && new Date(detail.scheduledAt as string) <= new Date()">
             <button
               class="btn-primary w-full"

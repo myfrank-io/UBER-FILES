@@ -46,6 +46,8 @@ async function logout() {
       <slot />
     </main>
 
+    <AppToast />
+
     <!-- Barre de navigation mobile -->
     <nav class="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white sm:hidden">
       <NuxtLink

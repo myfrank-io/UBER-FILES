@@ -113,22 +113,10 @@ const statusColors: Record<string, string> = {
 
       <!-- Stats -->
       <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div class="card !p-4">
-          <p class="text-xs text-slate-500">Courses</p>
-          <p class="mt-1 text-xl font-bold">{{ data.stats.bookings }}</p>
-        </div>
-        <div class="card !p-4">
-          <p class="text-xs text-slate-500">À venir</p>
-          <p class="mt-1 text-xl font-bold">{{ data.stats.upcomingBookings }}</p>
-        </div>
-        <div class="card !p-4">
-          <p class="text-xs text-slate-500">GMV total</p>
-          <p class="mt-1 text-xl font-bold">{{ formatMoney(data.stats.revenueCents) }}</p>
-        </div>
-        <div class="card !p-4">
-          <p class="text-xs text-slate-500">Commission</p>
-          <p class="mt-1 text-xl font-bold">{{ formatMoney(data.stats.commissionCents) }}</p>
-        </div>
+        <StatCard title="Courses" :value="data.stats.bookings" />
+        <StatCard title="À venir" :value="data.stats.upcomingBookings" />
+        <StatCard title="GMV total" :value="formatMoney(data.stats.revenueCents)" />
+        <StatCard title="Commission" :value="formatMoney(data.stats.commissionCents)" />
       </div>
 
       <!-- Details grid -->
@@ -221,43 +209,39 @@ const statusColors: Record<string, string> = {
     </div>
 
     <!-- Edit modal -->
-    <Teleport to="body">
-      <div v-if="editing" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div class="card w-full max-w-lg">
-          <h2 class="mb-4 text-lg font-semibold text-slate-900">Modifier le chauffeur</h2>
-          <div class="grid gap-3">
-            <div>
-              <label class="label">Nom affiché</label>
-              <input v-model="form.displayName" class="field" />
-            </div>
-            <div>
-              <label class="label">Slug URL</label>
-              <input v-model="form.slug" class="field" />
-            </div>
-            <div>
-              <label class="label">Téléphone</label>
-              <input v-model="form.phone" class="field" />
-            </div>
-            <div>
-              <label class="label">Email contact</label>
-              <input v-model="form.contactEmail" class="field" type="email" />
-            </div>
-            <div>
-              <label class="label">Commission (bp ex: 1500 = 15%)</label>
-              <input v-model.number="form.commissionBps" class="field" type="number" min="0" max="5000" />
-            </div>
-            <div>
-              <label class="label">Forfait mensuel (centimes)</label>
-              <input v-model.number="form.monthlyFeeCents" class="field" type="number" min="0" />
-            </div>
-          </div>
-          <p v-if="saveError" class="mt-3 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{{ saveError }}</p>
-          <div class="mt-5 flex justify-end gap-3">
-            <button class="rounded-lg border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50" @click="editing = false">Annuler</button>
-            <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? '…' : 'Enregistrer' }}</button>
-          </div>
+    <AppModal v-if="editing" @close="editing = false">
+      <h2 class="mb-4 text-lg font-semibold text-slate-900">Modifier le chauffeur</h2>
+      <div class="grid gap-3">
+        <div>
+          <label class="label">Nom affiché</label>
+          <input v-model="form.displayName" class="field" />
+        </div>
+        <div>
+          <label class="label">Slug URL</label>
+          <input v-model="form.slug" class="field" />
+        </div>
+        <div>
+          <label class="label">Téléphone</label>
+          <input v-model="form.phone" class="field" />
+        </div>
+        <div>
+          <label class="label">Email contact</label>
+          <input v-model="form.contactEmail" class="field" type="email" />
+        </div>
+        <div>
+          <label class="label">Commission (bp ex: 1500 = 15%)</label>
+          <input v-model.number="form.commissionBps" class="field" type="number" min="0" max="5000" />
+        </div>
+        <div>
+          <label class="label">Forfait mensuel (centimes)</label>
+          <input v-model.number="form.monthlyFeeCents" class="field" type="number" min="0" />
         </div>
       </div>
-    </Teleport>
+      <p v-if="saveError" class="mt-3 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{{ saveError }}</p>
+      <div class="mt-5 flex justify-end gap-3">
+        <button class="rounded-lg border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50" @click="editing = false">Annuler</button>
+        <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? '…' : 'Enregistrer' }}</button>
+      </div>
+    </AppModal>
   </div>
 </template>

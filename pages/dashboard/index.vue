@@ -5,10 +5,10 @@ useHead({ title: 'Tableau de bord' })
 const { formatMoney, formatDateTime } = useFormat()
 
 const { data, refresh, pending } = await useFetch('/api/dashboard/overview')
+const { error: toastError } = useToast()
 
 const busyId = ref<string | null>(null)
 const adjustValue = reactive<Record<string, number>>({})
-const errorMsg = ref('')
 
 async function validate(quoteId: string, custom = false) {
   busyId.value = quoteId
@@ -18,7 +18,7 @@ async function validate(quoteId: string, custom = false) {
     await $fetch(`/api/dashboard/quotes/${quoteId}/validate`, { method: 'POST', body })
     await refresh()
   } catch (e) {
-    errorMsg.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.'
+    toastError((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.')
   } finally {
     busyId.value = null
   }
@@ -42,7 +42,7 @@ async function resend(quoteId: string) {
     await $fetch(`/api/dashboard/quotes/${quoteId}/resend`, { method: 'POST' })
     await refresh()
   } catch (e) {
-    errorMsg.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.'
+    toastError((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.')
   } finally {
     busyId.value = null
   }
@@ -70,8 +70,6 @@ async function resend(quoteId: string) {
         </p>
       </div>
     </div>
-
-    <p v-if="errorMsg" class="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
 
     <!-- Devis en attente -->
     <section class="mt-8">
