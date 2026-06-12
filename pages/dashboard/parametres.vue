@@ -243,6 +243,73 @@ async function call(key: string, fn: () => Promise<unknown>) {
 const transferBands = computed(() => (me.value as Record<string, unknown>)?.transferBands as Record<string, unknown>[] ?? [])
 const hourlyTiers = computed(() => (me.value as Record<string, unknown>)?.hourlyTiers as Record<string, unknown>[] ?? [])
 const currency = computed(() => ((me.value as Record<string, unknown>)?.currency as string) ?? 'eur')
+const surcharges = computed(() => (me.value as Record<string, unknown>)?.surcharges as Record<string, unknown>[] ?? [])
+
+// ─── Suppléments ──────────────────────────────────────────────────────────
+
+const newSurcharge = reactive({ name: '', kind: 'FIXED' as 'FIXED' | 'PERCENT', amountDisplay: '', autoApply: false })
+const editingSurcharge = ref<string | null>(null)
+const editSurchargeForm = reactive({ name: '', kind: 'FIXED' as 'FIXED' | 'PERCENT', amountDisplay: '', autoApply: false })
+
+function surchargeAmount(s: Record<string, unknown>): string {
+  if (s.kind === 'PERCENT') return `${((s.amount as number) / 100).toFixed(1)} %`
+  return `+ ${formatMoney(s.amount as number, currency.value)}`
+}
+
+function startEditSurcharge(s: Record<string, unknown>) {
+  editingSurcharge.value = s.id as string
+  editSurchargeForm.name = s.name as string
+  editSurchargeForm.kind = s.kind as 'FIXED' | 'PERCENT'
+  editSurchargeForm.amountDisplay = s.kind === 'PERCENT'
+    ? ((s.amount as number) / 100).toFixed(1)
+    : ((s.amount as number) / 100).toFixed(2)
+  editSurchargeForm.autoApply = s.autoApply as boolean
+}
+
+function parseSurchargeAmount(kind: 'FIXED' | 'PERCENT', display: string): number {
+  return kind === 'PERCENT'
+    ? Math.round(parseFloat(display) * 100)
+    : Math.round(parseFloat(display) * 100)
+}
+
+async function addSurcharge() {
+  await call('surcharge-add', async () => {
+    await $fetch('/api/dashboard/surcharges', {
+      method: 'POST',
+      body: {
+        name: newSurcharge.name,
+        kind: newSurcharge.kind,
+        amount: parseSurchargeAmount(newSurcharge.kind, newSurcharge.amountDisplay),
+        autoApply: newSurcharge.autoApply,
+      },
+    })
+    newSurcharge.name = ''
+    newSurcharge.amountDisplay = ''
+    newSurcharge.autoApply = false
+  })
+}
+
+async function updateSurcharge(id: string) {
+  await call(`surcharge-edit-${id}`, async () => {
+    await $fetch(`/api/dashboard/surcharges/${id}`, {
+      method: 'PATCH',
+      body: {
+        name: editSurchargeForm.name,
+        kind: editSurchargeForm.kind,
+        amount: parseSurchargeAmount(editSurchargeForm.kind, editSurchargeForm.amountDisplay),
+        autoApply: editSurchargeForm.autoApply,
+      },
+    })
+    editingSurcharge.value = null
+  })
+}
+
+async function deleteSurcharge(id: string) {
+  if (!confirm('Supprimer ce supplément ?')) return
+  await call(`surcharge-del-${id}`, () =>
+    $fetch(`/api/dashboard/surcharges/${id}`, { method: 'DELETE' }),
+  )
+}
 </script>
 
 <template>
@@ -507,6 +574,89 @@ const currency = computed(() => ((me.value as Record<string, unknown>)?.currency
               {{ saving === 'tier-add' ? '…' : 'Ajouter' }}
             </button>
           </div>
+        </div>
+      </details>
+    </div>
+    <!-- Suppléments -->
+    <div class="card space-y-4">
+      <h2 class="font-semibold text-slate-900">Suppléments</h2>
+      <p class="text-xs text-slate-500">Frais additionnels applicables à une course (ex. bagage, animal, nuit…). Les suppléments "auto" sont inclus dans tous les devis.</p>
+
+      <div v-for="s in surcharges" :key="(s as Record<string, unknown>).id as string" class="rounded-lg border border-slate-200 p-3">
+        <div v-if="editingSurcharge === (s.id as string)" class="space-y-3">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="label">Nom</label>
+              <input v-model="editSurchargeForm.name" type="text" class="field" />
+            </div>
+            <div>
+              <label class="label">Type</label>
+              <select v-model="editSurchargeForm.kind" class="field">
+                <option value="FIXED">Fixe (€)</option>
+                <option value="PERCENT">Pourcentage (%)</option>
+              </select>
+            </div>
+            <div>
+              <label class="label">{{ editSurchargeForm.kind === 'PERCENT' ? 'Pourcentage (%)' : 'Montant (€)' }}</label>
+              <input v-model="editSurchargeForm.amountDisplay" type="number" step="0.01" min="0.01" class="field" />
+            </div>
+            <div class="flex items-end pb-1">
+              <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                <input v-model="editSurchargeForm.autoApply" type="checkbox" />
+                Appliquer automatiquement
+              </label>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" class="btn-primary" :disabled="saving === `surcharge-edit-${s.id}`" @click="updateSurcharge(s.id as string)">
+              {{ saving === `surcharge-edit-${s.id}` ? '…' : 'Enregistrer' }}
+            </button>
+            <button type="button" class="btn-ghost" @click="editingSurcharge = null">Annuler</button>
+          </div>
+        </div>
+
+        <div v-else class="flex items-center justify-between">
+          <div>
+            <p class="font-medium text-slate-800">{{ s.name }}</p>
+            <p class="text-xs text-slate-500">{{ (s.autoApply as boolean) ? 'Auto' : 'Manuel' }}</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="font-semibold text-slate-900">{{ surchargeAmount(s) }}</span>
+            <button type="button" class="text-xs text-brand-700 hover:underline" @click="startEditSurcharge(s)">Modifier</button>
+            <button type="button" class="text-xs text-red-600 hover:underline" @click="deleteSurcharge(s.id as string)">Supprimer</button>
+          </div>
+        </div>
+      </div>
+
+      <details class="rounded-lg border border-dashed border-slate-300">
+        <summary class="cursor-pointer px-3 py-2 text-sm text-slate-600 hover:text-slate-900">+ Ajouter un supplément</summary>
+        <div class="space-y-3 p-3">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="label">Nom</label>
+              <input v-model="newSurcharge.name" type="text" class="field" placeholder="Bagage supplémentaire" />
+            </div>
+            <div>
+              <label class="label">Type</label>
+              <select v-model="newSurcharge.kind" class="field">
+                <option value="FIXED">Fixe (€)</option>
+                <option value="PERCENT">Pourcentage (%)</option>
+              </select>
+            </div>
+            <div>
+              <label class="label">{{ newSurcharge.kind === 'PERCENT' ? 'Pourcentage (%)' : 'Montant (€)' }}</label>
+              <input v-model="newSurcharge.amountDisplay" type="number" step="0.01" min="0.01" class="field" placeholder="10.00" />
+            </div>
+            <div class="flex items-end pb-1">
+              <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                <input v-model="newSurcharge.autoApply" type="checkbox" />
+                Appliquer automatiquement
+              </label>
+            </div>
+          </div>
+          <button type="button" class="btn-primary" :disabled="saving === 'surcharge-add' || !newSurcharge.name || !newSurcharge.amountDisplay" @click="addSurcharge">
+            {{ saving === 'surcharge-add' ? '…' : 'Ajouter' }}
+          </button>
         </div>
       </details>
     </div>

@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   const driverId = await requireDriverId(event)
   const driver = await prisma.driver.findUniqueOrThrow({
     where: { id: driverId },
-    include: { transferBands: true, hourlyTiers: true, cancellationPolicy: true },
+    include: { transferBands: true, hourlyTiers: true, cancellationPolicy: true, surcharges: true },
   })
   return {
     id: driver.id,
@@ -38,5 +38,6 @@ export default defineEventHandler(async (event) => {
     transferBands: driver.transferBands,
     hourlyTiers: driver.hourlyTiers,
     cancellationPolicy: driver.cancellationPolicy,
+    surcharges: driver.surcharges,
   }
 })

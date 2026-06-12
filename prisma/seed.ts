@@ -51,6 +51,12 @@ async function main() {
       commissionBps: 0,
       timezone: 'Europe/Paris',
       locale: 'fr',
+      // Stripe simulé pour les tests — permet d'afficher le formulaire et d'utiliser
+      // le bouton "Payer (test)" via /api/dev/confirm-booking sans vrai compte Stripe.
+      stripeAccountId: 'acct_test_karim_demo',
+      stripeChargesEnabled: true,
+      stripePayoutsEnabled: true,
+      stripeOnboarded: true,
     },
   })
 
