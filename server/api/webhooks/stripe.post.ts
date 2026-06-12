@@ -122,6 +122,10 @@ async function confirmBookingFromSession(
     manageUrl: `${appBaseUrl}/reservation/${manageToken}`,
     driverPhone: quote.driver.phone,
     driverEmail: quote.driver.contactEmail,
+    siren: quote.driver.siren,
+    companyName: quote.driver.companyName,
+    vehicleMake: quote.driver.vehicleMake,
+    vehicleModel: quote.driver.vehicleModel,
   })
   await sendEmail({ to: req.customerEmail, ...tpl })
 }

@@ -3,6 +3,8 @@ import { prisma } from '~/server/utils/prisma'
 import { computeRefund } from '~/lib/cancellation'
 import { createRefund } from '~/server/utils/stripe'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
+import { sendTelegramMessage } from '~/server/utils/telegram'
+import { formatMoney } from '~/lib/money'
 
 // Annulation d'une réservation par le client. Calcule le remboursement selon la
 // politique, déclenche le remboursement Stripe, libère le créneau calendrier.
@@ -66,6 +68,33 @@ export default defineEventHandler(async (event) => {
       currency: booking.quote.currency,
     }),
   })
+
+  // Notification au chauffeur (Telegram + email)
+  const req = booking.quote.rideRequest
+  const scheduledStr = booking.scheduledAt.toLocaleString('fr-FR')
+  const refundStr = refund.refundCents > 0
+    ? `Remboursement : ${formatMoney(refund.refundCents, booking.quote.currency)}`
+    : 'Aucun remboursement (annulation hors délai).'
+
+  if (booking.driver.telegramChatId) {
+    await sendTelegramMessage(
+      booking.driver.telegramChatId,
+      `❌ <b>Annulation client</b>\n` +
+      `Client : ${req.customerName}\n` +
+      `Course prévue le ${scheduledStr}\n` +
+      `${refundStr}`,
+    )
+  }
+
+  if (booking.driver.contactEmail) {
+    await sendEmail({
+      to: booking.driver.contactEmail,
+      subject: `Course annulée — ${req.customerName} (${scheduledStr})`,
+      html: `<p><strong>${req.customerName}</strong> a annulé sa réservation prévue le <strong>${scheduledStr}</strong>.</p>
+             <p>${refundStr}</p>
+             <p>Le créneau est libéré dans votre calendrier.</p>`,
+    })
+  }
 
   return { ok: true, refundCents: refund.refundCents, retainedCents: refund.retainedCents }
 })
