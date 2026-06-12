@@ -58,20 +58,41 @@ export const emailTemplates = {
       ),
     }
   },
-  paymentConfirmed(opts: { driverName: string; amountCents: number; currency: string; scheduledAt: Date; manageUrl: string; driverPhone?: string | null; driverEmail?: string | null }) {
+  paymentConfirmed(opts: {
+    driverName: string
+    amountCents: number
+    currency: string
+    scheduledAt: Date
+    manageUrl: string
+    driverPhone?: string | null
+    driverEmail?: string | null
+    siren?: string | null
+    companyName?: string | null
+    vehicleMake?: string | null
+    vehicleModel?: string | null
+  }) {
     const contact = [
       opts.driverPhone ? `📞 ${opts.driverPhone}` : '',
       opts.driverEmail ? `✉️ ${opts.driverEmail}` : '',
     ].filter(Boolean).join('&nbsp;&nbsp;|&nbsp;&nbsp;')
 
+    const legalLines = [
+      opts.companyName ? `Prestataire : ${opts.companyName}` : `Prestataire : ${opts.driverName}`,
+      opts.siren ? `SIREN : ${opts.siren}` : '',
+      opts.vehicleMake && opts.vehicleModel ? `Véhicule : ${opts.vehicleMake} ${opts.vehicleModel}` : '',
+    ].filter(Boolean).join(' &nbsp;·&nbsp; ')
+
     return {
-      subject: `Course confirmée — ${opts.driverName}`,
+      subject: `Confirmation de réservation — ${opts.driverName}`,
       html: wrap(
-        'Votre course est confirmée ✅',
+        'Votre réservation est confirmée ✅',
         `<p>Le paiement de <strong>${formatMoney(opts.amountCents, opts.currency)}</strong> a bien été reçu.</p>
          <p>Prise en charge le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
-         ${contact ? `<p style="font-size:13px;color:#374151">Contact : ${contact}</p>` : ''}
-         ${button(opts.manageUrl, 'Gérer ma réservation')}`,
+         ${contact ? `<p style="font-size:13px;color:#374151">Contact chauffeur : ${contact}</p>` : ''}
+         ${button(opts.manageUrl, 'Gérer ma réservation')}
+         <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
+         <p style="font-size:11px;color:#9ca3af">${legalLines}</p>
+         <p style="font-size:11px;color:#9ca3af">Conformément à l'art. L221-28 du Code de la consommation, le droit de rétractation de 14 jours ne s'applique pas à ce service de transport daté.</p>`,
       ),
     }
   },

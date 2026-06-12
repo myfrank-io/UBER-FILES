@@ -33,5 +33,6 @@ export default defineEventHandler(async (event) => {
     hasHourly: driver.hourlyTiers.length > 0,
     fromKmCents: cheapestKm,
     fromHourCents: cheapestHour,
+    bookingEnabled: driver.stripeChargesEnabled,
   }
 })
