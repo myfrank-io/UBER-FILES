@@ -11,7 +11,7 @@ créneau est **bloqué dans le calendrier** du chauffeur.
 - **PostgreSQL** + **Prisma** (multi-tenant row-level par `driverId`)
 - **Tailwind CSS** + **@nuxtjs/i18n** (FR / EN, mobile-first)
 - **Stripe** Connect Express + destination charges (encaissement centralisé, reversement chauffeur)
-- **Google Maps Platform** (Places + Routes) — proxifié côté serveur, repli haversine/Nominatim sans clé
+- **Google Maps Platform** (Places + Routes) — proxifié côté serveur, repli haversine + Base Adresse Nationale (data.gouv.fr) sans clé
 - **Resend** (emails transactionnels) · **Telegram Bot** (notifs + validation devis) · **API Sirene INSEE**
 - Tests : **Vitest** (logique métier) + **Playwright** (E2E)
 
@@ -126,7 +126,7 @@ curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://votre-domaine/api/c
 | Intégration | Variable(s) | Notes |
 |---|---|---|
 | Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET` | Webhooks : `/api/webhooks/stripe` (checkout) et `/api/webhooks/stripe-connect` (account.updated) |
-| Google Maps | `GOOGLE_MAPS_API_KEY` | Restreindre la clé (Places + Routes). Sans clé : repli haversine/Nominatim |
+| Google Maps | `GOOGLE_MAPS_API_KEY` | Restreindre la clé (Places + Routes). Sans clé : repli haversine + Base Adresse Nationale (data.gouv.fr) |
 | Resend | `RESEND_API_KEY`, `EMAIL_FROM` | Vérifier SPF/DKIM du domaine |
 | Telegram | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` | Webhook : `/api/webhooks/telegram` |
 | INSEE | `INSEE_API_KEY` | Vérification SIREN à l'onboarding |
