@@ -14,6 +14,7 @@ const errorMsg = ref('')
 const photoInput = ref<HTMLInputElement | null>(null)
 const photoLoading = ref(false)
 const photoError = ref('')
+const photoSuccess = ref('')
 
 const MAX_PHOTO_SOURCE_BYTES = 15 * 1024 * 1024 // 15 Mo en entrée (photos de smartphone)
 const MAX_PHOTO_DIMENSION = 512 // px, côté le plus long après redimensionnement
@@ -43,11 +44,33 @@ function resizeImage(file: File): Promise<string> {
   })
 }
 
+// Enregistre immédiatement la photo en base (sans attendre le bouton « Enregistrer »
+// en bas de page) : plus simple et plus fiable côté mobile. On envoie uniquement le
+// champ photoUrl — l'endpoint accepte les mises à jour partielles.
+async function persistPhoto(value: string | null) {
+  photoError.value = ''
+  photoSuccess.value = ''
+  photoLoading.value = true
+  try {
+    await $fetch('/api/dashboard/profile', { method: 'PATCH', body: { photoUrl: value } })
+    form.photoUrl = value ?? ''
+    await refresh()
+    photoSuccess.value = value ? 'Photo enregistrée.' : 'Photo supprimée.'
+  } catch (e) {
+    photoError.value =
+      (e as { data?: { statusMessage?: string } })?.data?.statusMessage ||
+      "Enregistrement de la photo impossible. Vérifiez votre connexion et réessayez."
+  } finally {
+    photoLoading.value = false
+  }
+}
+
 async function onPhotoSelected(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
   photoError.value = ''
+  photoSuccess.value = ''
 
   if (!file.type.startsWith('image/')) {
     photoError.value = 'Veuillez choisir une image (JPG, PNG, WEBP…).'
@@ -62,18 +85,18 @@ async function onPhotoSelected(e: Event) {
 
   photoLoading.value = true
   try {
-    form.photoUrl = await resizeImage(file)
+    const dataUrl = await resizeImage(file)
+    await persistPhoto(dataUrl)
   } catch (err) {
     photoError.value = (err as Error).message || 'Import de la photo impossible.'
-  } finally {
     photoLoading.value = false
+  } finally {
     input.value = '' // permet de re-sélectionner le même fichier
   }
 }
 
 function removePhoto() {
-  form.photoUrl = ''
-  photoError.value = ''
+  void persistPhoto(null)
 }
 
 const form = reactive({
@@ -206,10 +229,13 @@ async function save() {
               >
                 Supprimer
               </button>
-              <p class="text-xs text-slate-400">JPG, PNG ou WEBP — depuis votre téléphone ou ordinateur.</p>
+              <p class="text-xs text-slate-400">
+                JPG, PNG ou WEBP — depuis votre téléphone ou ordinateur. Enregistrement automatique.
+              </p>
             </div>
           </div>
           <p v-if="photoError" class="mt-2 text-sm text-red-600">{{ photoError }}</p>
+          <p v-else-if="photoSuccess" class="mt-2 text-sm text-green-600">{{ photoSuccess }}</p>
         </div>
       </div>
 
