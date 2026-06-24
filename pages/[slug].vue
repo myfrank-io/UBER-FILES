@@ -1,5 +1,7 @@
 <script setup lang="ts">
 // Page publique de réservation d'un chauffeur (marque blanche, mobile-first).
+import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '~/lib/payment-methods'
+
 const route = useRoute()
 const slug = route.params.slug as string
 const { formatMoney, formatDateTime } = useFormat()
@@ -10,6 +12,8 @@ interface DriverPublic {
   tagline: string | null
   bio: string | null
   photoUrl: string | null
+  phone: string | null
+  contactEmail: string | null
   vehicle: { make: string | null; model: string | null; class: string | null; seats: number | null }
   services: string | null
   serviceArea: string | null
@@ -21,6 +25,7 @@ interface DriverPublic {
   hasHourly: boolean
   fromKmCents: number | null
   fromHourCents: number | null
+  acceptedPaymentMethods: PaymentMethod[]
 }
 
 const { data: driver, error } = await useFetch<DriverPublic>(`/api/public/${slug}`)
@@ -193,12 +198,12 @@ const canSubmit = computed(
       </p>
     </div>
 
-    <!-- Réservations désactivées (Stripe pas encore actif) -->
+    <!-- Réservations désactivées (aucun moyen de paiement configuré) -->
     <div v-else-if="!driver.bookingEnabled" class="card mt-5 rounded-2xl border-amber-200 bg-amber-50 p-6 text-center">
       <p class="text-2xl">⏳</p>
       <p class="mt-2 font-semibold text-amber-900">Réservations bientôt disponibles</p>
       <p class="mt-1 text-sm text-amber-800">
-        Le paiement en ligne n'est pas encore activé. Contactez
+        Aucun moyen de paiement n'est encore configuré. Contactez
         <template v-if="driver.phone">
           <a :href="`tel:${driver.phone}`" class="underline">{{ driver.phone }}</a>
         </template>
@@ -213,6 +218,20 @@ const canSubmit = computed(
     <!-- Formulaire -->
     <form v-else class="card mt-5 space-y-5" @submit.prevent="submit">
       <h2 class="text-lg font-bold text-slate-900">Réservez votre course</h2>
+
+      <!-- Moyens de paiement acceptés -->
+      <div v-if="driver.acceptedPaymentMethods.length" class="rounded-xl bg-slate-50 p-3">
+        <p class="text-xs font-medium text-slate-500">Moyens de paiement acceptés</p>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <span
+            v-for="m in driver.acceptedPaymentMethods"
+            :key="m"
+            class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+          >
+            {{ PAYMENT_METHOD_LABELS[m] }}
+          </span>
+        </div>
+      </div>
 
       <!-- Type de prestation -->
       <div class="grid grid-cols-2 gap-2">
