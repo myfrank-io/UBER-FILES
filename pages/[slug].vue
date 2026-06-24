@@ -34,7 +34,9 @@ useHead(() => {
   if (!d) return { title: 'Réservation VTC' }
   const description = d.tagline ?? `Réservez votre course avec ${d.displayName}. Devis instantané, paiement sécurisé.`
   const url = `${appBase}/${d.slug}`
-  const image = d.photoUrl ?? `${appBase}/og-default.jpg`
+  // Les crawlers (réseaux sociaux) ne peuvent pas récupérer une data URL : on ne
+  // l'utilise comme image de partage que si c'est une URL http(s) accessible.
+  const image = d.photoUrl?.startsWith('http') ? d.photoUrl : `${appBase}/og-default.jpg`
   return {
     title: `${d.displayName} — Réservation VTC`,
     meta: [
