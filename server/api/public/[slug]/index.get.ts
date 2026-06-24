@@ -4,6 +4,7 @@ import { loadActiveDriverBySlug } from '~/server/utils/driver'
 export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, 'slug')!
   const driver = await loadActiveDriverBySlug(slug)
+  const config = useRuntimeConfig()
 
   const cheapestKm = driver.transferBands.length
     ? Math.min(...driver.transferBands.map((b) => b.pricePerKmCents))
@@ -33,6 +34,6 @@ export default defineEventHandler(async (event) => {
     hasHourly: driver.hourlyTiers.length > 0,
     fromKmCents: cheapestKm,
     fromHourCents: cheapestHour,
-    bookingEnabled: driver.stripeChargesEnabled,
+    bookingEnabled: driver.stripeChargesEnabled || config.allowBookingWithoutStripe,
   }
 })

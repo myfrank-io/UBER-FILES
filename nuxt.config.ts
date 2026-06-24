@@ -60,6 +60,10 @@ export default defineNuxtConfig({
     inseeApiKey: process.env.INSEE_API_KEY || '',
     // Secret du déclencheur de tâches planifiées (rappels J-1)
     cronSecret: process.env.CRON_SECRET || '',
+    // Autorise les réservations en ligne même si Stripe n'est pas encore activé
+    // (utile pour tester le tunnel de réservation avant l'onboarding Stripe).
+    // Le paiement reste géré plus tard, à la validation du devis par le chauffeur.
+    allowBookingWithoutStripe: process.env.ALLOW_BOOKING_WITHOUT_STRIPE === '1',
     public: {
       appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:3000',
       // Outils de développement (commutateur admin/chauffeur/public).

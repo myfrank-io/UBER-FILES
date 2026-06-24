@@ -14,8 +14,9 @@ export default defineEventHandler(async (event) => {
   const driver = await loadActiveDriverBySlug(slug)
   const config = useRuntimeConfig()
 
-  // Bloquer la demande si le paiement Stripe n'est pas encore activé sur ce compte.
-  if (!driver.stripeChargesEnabled) {
+  // Bloquer la demande si le paiement Stripe n'est pas encore activé sur ce compte,
+  // sauf si l'on autorise explicitement les réservations sans Stripe (mode test).
+  if (!driver.stripeChargesEnabled && !config.allowBookingWithoutStripe) {
     throw createError({
       statusCode: 503,
       statusMessage: 'Les réservations en ligne ne sont pas encore disponibles pour ce chauffeur. Contactez-le directement.',
