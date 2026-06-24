@@ -7,6 +7,17 @@ const slug = route.params.slug as string
 const { formatMoney, formatDateTime } = useFormat()
 const { t } = useI18n()
 
+interface PublicVehicle {
+  id: string
+  make: string
+  modelFamily: string
+  modelLabel: string
+  vehicleClass: string | null
+  seats: number | null
+  color: string | null
+  isPrimary: boolean
+}
+
 interface DriverPublic {
   slug: string
   displayName: string
@@ -16,6 +27,7 @@ interface DriverPublic {
   phone: string | null
   contactEmail: string | null
   vehicle: { make: string | null; model: string | null; class: string | null; seats: number | null }
+  vehicles: PublicVehicle[]
   services: string | null
   serviceArea: string | null
   currency: string
@@ -34,6 +46,9 @@ if (error.value) {
   throw createError({ statusCode: 404, statusMessage: 'Chauffeur introuvable', fatal: true })
 }
 const appBase = useRuntimeConfig().public.appBaseUrl
+
+// Véhicule agrandi au clic (lightbox).
+const zoomedVehicle = ref<PublicVehicle | null>(null)
 
 useHead(() => {
   const d = driver.value
@@ -194,6 +209,62 @@ const canSubmit = computed(
         </span>
       </div>
     </div>
+
+    <!-- Véhicules -->
+    <div v-if="driver.vehicles && driver.vehicles.length" class="card mt-5">
+      <h2 class="text-lg font-bold text-slate-900">
+        {{ driver.vehicles.length > 1 ? 'Véhicules' : 'Véhicule' }}
+      </h2>
+      <div class="mt-4 grid gap-4" :class="driver.vehicles.length > 1 ? 'sm:grid-cols-2' : ''">
+        <button
+          v-for="v in driver.vehicles"
+          :key="v.id"
+          type="button"
+          class="group text-left"
+          @click="zoomedVehicle = v"
+        >
+          <div class="flex h-40 items-center justify-center overflow-hidden rounded-xl bg-slate-50 transition group-hover:bg-slate-100">
+            <VehicleImage
+              :make="v.make"
+              :model-family="v.modelFamily"
+              :vehicle-class="v.vehicleClass"
+              :color="v.color"
+              :alt="v.modelLabel"
+              class="h-full w-full p-2 transition group-hover:scale-105"
+            />
+          </div>
+          <p class="mt-2 font-semibold text-slate-900">{{ v.modelLabel }}</p>
+          <p class="text-xs text-slate-500">
+            <span v-if="v.vehicleClass">{{ v.vehicleClass }}</span>
+            <span v-if="v.seats"> · {{ v.seats }} places</span>
+            <span v-if="v.color"> · {{ v.color }}</span>
+          </p>
+        </button>
+      </div>
+    </div>
+
+    <!-- Lightbox véhicule -->
+    <AppModal v-if="zoomedVehicle" @close="zoomedVehicle = null">
+      <div class="flex h-64 items-center justify-center rounded-xl bg-slate-50">
+        <VehicleImage
+          :make="zoomedVehicle.make"
+          :model-family="zoomedVehicle.modelFamily"
+          :vehicle-class="zoomedVehicle.vehicleClass"
+          :color="zoomedVehicle.color"
+          :alt="zoomedVehicle.modelLabel"
+          class="h-full w-full p-2"
+        />
+      </div>
+      <p class="mt-4 text-center text-lg font-bold text-slate-900">{{ zoomedVehicle.modelLabel }}</p>
+      <p class="text-center text-sm text-slate-500">
+        <span v-if="zoomedVehicle.vehicleClass">{{ zoomedVehicle.vehicleClass }}</span>
+        <span v-if="zoomedVehicle.seats"> · {{ zoomedVehicle.seats }} places</span>
+        <span v-if="zoomedVehicle.color"> · {{ zoomedVehicle.color }}</span>
+      </p>
+      <div class="mt-5 flex justify-end">
+        <button class="btn-ghost" @click="zoomedVehicle = null">Fermer</button>
+      </div>
+    </AppModal>
 
     <!-- Confirmation -->
     <div v-if="submitted" class="card mt-5 border-green-200 bg-green-50 text-center">

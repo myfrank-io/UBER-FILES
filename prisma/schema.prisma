@@ -135,6 +135,7 @@ model Driver {
   transferBands    TransferRateBand[]
   hourlyTiers      HourlyRateTier[]
   surcharges       Surcharge[]
+  vehicles         Vehicle[]
   cancellationPolicy CancellationPolicy?
   customers        Customer[]
   rideRequests     RideRequest[]
@@ -148,6 +149,31 @@ model Driver {
   updatedAt DateTime @updatedAt
 
   @@index([status])
+}
+
+/// Un véhicule de la flotte d'un chauffeur. Un chauffeur peut en déclarer plusieurs.
+/// `make`/`modelFamily` correspondent aux paramètres du catalogue/CDN d'images
+/// (imagin.studio) afin d'afficher une photo cohérente du modèle. `modelLabel` est
+/// le libellé lisible (ex: "Mercedes Classe V"). Les photos partagent le même angle
+/// et le même fond pour garantir la cohérence visuelle de la page publique.
+model Vehicle {
+  id       String @id @default(cuid())
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String
+
+  make        String  // marque normalisée pour le CDN (ex: "mercedes")
+  modelFamily String  // famille de modèle pour le CDN (ex: "v-class")
+  modelLabel  String  // libellé affiché (ex: "Mercedes Classe V")
+  vehicleClass String? // Berline, Van, SUV, Premium…
+  seats       Int?
+  color       String? // couleur libre (ex: "Noir")
+  isPrimary   Boolean @default(false) // véhicule mis en avant
+  position    Int     @default(0)     // ordre d'affichage
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([driverId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

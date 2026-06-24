@@ -1,0 +1,18 @@
+<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Van">
+  <g fill="#cbd5e1">
+    <path d="M44 198 L44 132 C44 108 60 98 86 96 L150 92 C166 80 196 78 240 78 L520 78 C552 80 566 92 566 124 L566 214 C566 226 554 232 540 232 L62 232 C48 232 44 224 44 214 Z"/>
+  </g>
+  <g fill="#f1f5f9">
+    <path d="M150 120 C160 100 188 94 224 94 L260 94 L260 132 L150 132 Z"/>
+    <rect x="280" y="94" width="90" height="38" rx="4"/>
+    <rect x="390" y="94" width="120" height="38" rx="4"/>
+  </g>
+  <g fill="#475569">
+    <circle cx="166" cy="232" r="44"/>
+    <circle cx="458" cy="232" r="44"/>
+  </g>
+  <g fill="#e2e8f0">
+    <circle cx="166" cy="232" r="20"/>
+    <circle cx="458" cy="232" r="20"/>
+  </g>
+</svg>

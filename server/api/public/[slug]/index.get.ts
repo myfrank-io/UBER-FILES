@@ -1,5 +1,6 @@
 import { loadActiveDriverBySlug, canAcceptBookings, publicPhotoUrl } from '~/server/utils/driver'
 import { ONSITE_METHODS, type PaymentMethod } from '~/lib/payment-methods'
+import { prisma } from '~/server/utils/prisma'
 
 // Profil public d'un chauffeur + résumé tarifaire (pour la page de réservation).
 export default defineEventHandler(async (event) => {
@@ -9,6 +10,21 @@ export default defineEventHandler(async (event) => {
   // Données publiques : cache CDN court + revalidation en arrière-plan, pour que
   // les visites suivantes ne repaient ni le démarrage serverless ni la requête SQL.
   setResponseHeader(event, 'Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
+
+  const vehicleRows = await prisma.vehicle.findMany({
+    where: { driverId: driver.id },
+    orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }, { createdAt: 'asc' }],
+  })
+  const vehicles = vehicleRows.map((v) => ({
+    id: v.id,
+    make: v.make,
+    modelFamily: v.modelFamily,
+    modelLabel: v.modelLabel,
+    vehicleClass: v.vehicleClass,
+    seats: v.seats,
+    color: v.color,
+    isPrimary: v.isPrimary,
+  }))
 
   const cheapestKm = driver.transferBands.length
     ? Math.min(...driver.transferBands.map((b) => b.pricePerKmCents))
@@ -42,6 +58,7 @@ export default defineEventHandler(async (event) => {
       class: driver.vehicleClass,
       seats: driver.vehicleSeats,
     },
+    vehicles,
     services: driver.services,
     serviceArea: driver.serviceArea,
     currency: driver.currency,

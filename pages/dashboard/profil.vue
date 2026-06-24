@@ -242,29 +242,15 @@ async function save() {
         </div>
       </div>
 
-      <!-- Véhicule -->
-      <div class="card space-y-4">
-        <h2 class="font-semibold text-slate-900">Véhicule</h2>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="label" for="vehicleMake">Marque</label>
-            <input id="vehicleMake" v-model="form.vehicleMake" type="text" class="field" maxlength="60" placeholder="Mercedes" />
-          </div>
-          <div>
-            <label class="label" for="vehicleModel">Modèle</label>
-            <input id="vehicleModel" v-model="form.vehicleModel" type="text" class="field" maxlength="60" placeholder="Classe E" />
-          </div>
+      <!-- Véhicules -->
+      <div class="card flex items-center justify-between gap-4">
+        <div>
+          <h2 class="font-semibold text-slate-900">Véhicules</h2>
+          <p class="mt-1 text-sm text-slate-500">
+            Gérez votre flotte (un ou plusieurs véhicules) avec photo du modèle.
+          </p>
         </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="label" for="vehicleClass">Catégorie</label>
-            <input id="vehicleClass" v-model="form.vehicleClass" type="text" class="field" maxlength="60" placeholder="Berline, Van, Premium…" />
-          </div>
-          <div>
-            <label class="label" for="vehicleSeats">Nombre de places</label>
-            <input id="vehicleSeats" v-model.number="form.vehicleSeats" type="number" class="field" min="1" max="20" />
-          </div>
-        </div>
+        <NuxtLink to="/dashboard/vehicules" class="btn-ghost shrink-0">Gérer</NuxtLink>
       </div>
 
       <!-- Zone & prestations -->
