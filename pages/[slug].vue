@@ -195,24 +195,7 @@ const canSubmit = computed(
       </p>
     </div>
 
-    <!-- Réservations désactivées (Stripe pas encore actif) -->
-    <div v-else-if="!driver.bookingEnabled" class="card mt-5 rounded-2xl border-amber-200 bg-amber-50 p-6 text-center">
-      <p class="text-2xl">⏳</p>
-      <p class="mt-2 font-semibold text-amber-900">Réservations bientôt disponibles</p>
-      <p class="mt-1 text-sm text-amber-800">
-        Le paiement en ligne n'est pas encore activé. Contactez
-        <template v-if="driver.phone">
-          <a :href="`tel:${driver.phone}`" class="underline">{{ driver.phone }}</a>
-        </template>
-        <template v-else-if="driver.contactEmail">
-          <a :href="`mailto:${driver.contactEmail}`" class="underline">{{ driver.contactEmail }}</a>
-        </template>
-        <template v-else>le chauffeur directement</template>
-        pour réserver.
-      </p>
-    </div>
-
-    <!-- Formulaire -->
+    <!-- Formulaire (toujours disponible, même si le paiement en ligne n'est pas activé) -->
     <form v-else class="card mt-5 space-y-5" @submit.prevent="submit">
       <h2 class="text-lg font-bold text-slate-900">Réservez votre course</h2>
 
