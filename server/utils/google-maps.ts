@@ -76,12 +76,18 @@ export async function computeRoute(
   return { distanceMeters: route.distanceMeters, durationSeconds, estimated: false }
 }
 
-/** Autocomplétion d'adresse via Places (nouvelle API). Renvoie [] sans clé. */
+/**
+ * Autocomplétion d'adresse. Utilise Google Places si une clé est configurée,
+ * sinon se rabat sur la Base Adresse Nationale (api-adresse.data.gouv.fr) —
+ * gratuite et sans clé — pour fournir des suggestions dynamiques en dev/démo
+ * comme en production tant que Google n'est pas branché.
+ */
 export async function autocompletePlaces(
   input: string,
   apiKey: string | undefined,
 ): Promise<PlacePrediction[]> {
-  if (!apiKey || input.trim().length < 3) return []
+  if (input.trim().length < 3) return []
+  if (!apiKey) return autocompleteBan(input)
 
   const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
     method: 'POST',
@@ -107,6 +113,28 @@ export async function autocompletePlaces(
 }
 
 /**
+ * Repli d'autocomplétion sans clé via la Base Adresse Nationale (data.gouv.fr).
+ * Gratuit, sans authentification, optimisé pour les adresses françaises.
+ */
+async function autocompleteBan(input: string): Promise<PlacePrediction[]> {
+  const url = `https://api-adresse.data.gouv.fr/search/?limit=5&q=${encodeURIComponent(input)}`
+  let res: Response
+  try {
+    res = await fetch(url, { headers: { 'User-Agent': 'vtc-booking/1.0' } })
+  } catch {
+    return []
+  }
+  if (!res.ok) return []
+  const data = (await res.json()) as {
+    features?: { properties?: { label?: string; id?: string } }[]
+  }
+  return (data.features ?? [])
+    .map((f) => f.properties)
+    .filter((p): p is NonNullable<typeof p> => Boolean(p?.label && p?.id))
+    .map((p) => ({ description: p.label!, placeId: p.id! }))
+}
+
+/**
  * Géocode une adresse libre en coordonnées. Utilise Google Geocoding si une clé est
  * configurée, sinon se rabat sur OpenStreetMap Nominatim (sans clé) — ce qui permet
  * de faire fonctionner tout le flux en dev/démo sans Google.
@@ -129,16 +157,18 @@ export async function geocodeAddress(
     }
     return null
   }
-  // Repli Nominatim (politique d'usage : User-Agent requis, 1 req/s).
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=fr&q=${encodeURIComponent(
-    address,
-  )}`
-  const res = await fetch(url, { headers: { 'User-Agent': 'vtc-booking/1.0 (dev)' } })
+  // Repli sans clé via la Base Adresse Nationale (même source que l'autocomplétion).
+  const url = `https://api-adresse.data.gouv.fr/search/?limit=1&q=${encodeURIComponent(address)}`
+  const res = await fetch(url, { headers: { 'User-Agent': 'vtc-booking/1.0' } })
   if (!res.ok) return null
-  const data = (await res.json()) as { lat: string; lon: string; display_name: string }[]
-  const r = data[0]
-  if (!r) return null
-  return { lat: parseFloat(r.lat), lng: parseFloat(r.lon), formatted: r.display_name }
+  const data = (await res.json()) as {
+    features?: { geometry?: { coordinates?: [number, number] }; properties?: { label?: string } }[]
+  }
+  const r = data.features?.[0]
+  const coords = r?.geometry?.coordinates
+  if (!r || !coords) return null
+  // BAN renvoie [longitude, latitude].
+  return { lat: coords[1], lng: coords[0], formatted: r.properties?.label ?? address }
 }
 
 /** Récupère les coordonnées d'un placeId via Place Details. */
