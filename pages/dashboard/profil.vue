@@ -242,16 +242,8 @@ async function save() {
         </div>
       </div>
 
-      <!-- Véhicules -->
-      <div class="card flex items-center justify-between gap-4">
-        <div>
-          <h2 class="font-semibold text-slate-900">Véhicules</h2>
-          <p class="mt-1 text-sm text-slate-500">
-            Gérez votre flotte (un ou plusieurs véhicules) avec photo du modèle.
-          </p>
-        </div>
-        <NuxtLink to="/dashboard/vehicules" class="btn-ghost shrink-0">Gérer</NuxtLink>
-      </div>
+      <!-- Véhicules (gestion intégrée) -->
+      <VehiclesManager />
 
       <!-- Zone & prestations -->
       <div class="card space-y-4">

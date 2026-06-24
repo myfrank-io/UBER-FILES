@@ -210,34 +210,33 @@ const canSubmit = computed(
       </div>
     </div>
 
-    <!-- Véhicules -->
-    <div v-if="driver.vehicles && driver.vehicles.length" class="card mt-5">
-      <h2 class="text-lg font-bold text-slate-900">
+    <!-- Véhicules (compact, intégré) -->
+    <div v-if="driver.vehicles && driver.vehicles.length" class="mt-3">
+      <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
         {{ driver.vehicles.length > 1 ? 'Véhicules' : 'Véhicule' }}
-      </h2>
-      <div class="mt-4 grid gap-4" :class="driver.vehicles.length > 1 ? 'sm:grid-cols-2' : ''">
+      </p>
+      <div class="flex gap-2.5 overflow-x-auto pb-1">
         <button
           v-for="v in driver.vehicles"
           :key="v.id"
           type="button"
-          class="group text-left"
+          class="group flex w-32 shrink-0 flex-col rounded-xl border border-slate-100 bg-white p-2 transition hover:border-slate-200 hover:shadow-sm"
           @click="zoomedVehicle = v"
         >
-          <div class="flex h-40 items-center justify-center overflow-hidden rounded-xl bg-slate-50 transition group-hover:bg-slate-100">
+          <div class="flex h-16 w-full items-center justify-center">
             <VehicleImage
               :make="v.make"
               :model-family="v.modelFamily"
               :vehicle-class="v.vehicleClass"
               :color="v.color"
               :alt="v.modelLabel"
-              class="h-full w-full p-2 transition group-hover:scale-105"
+              class="h-full w-full transition group-hover:scale-105"
             />
           </div>
-          <p class="mt-2 font-semibold text-slate-900">{{ v.modelLabel }}</p>
-          <p class="text-xs text-slate-500">
+          <p class="mt-1.5 w-full truncate text-xs font-medium text-slate-700">{{ v.modelLabel }}</p>
+          <p class="w-full truncate text-[11px] text-slate-400">
             <span v-if="v.vehicleClass">{{ v.vehicleClass }}</span>
-            <span v-if="v.seats"> · {{ v.seats }} places</span>
-            <span v-if="v.color"> · {{ v.color }}</span>
+            <span v-if="v.seats"> · {{ v.seats }} pl.</span>
           </p>
         </button>
       </div>
