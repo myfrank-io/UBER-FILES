@@ -1,10 +1,26 @@
 import { loadActiveDriverBySlug } from '~/server/utils/driver'
+import { prisma } from '~/server/utils/prisma'
 
 // Profil public d'un chauffeur + résumé tarifaire (pour la page de réservation).
 export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, 'slug')!
   const driver = await loadActiveDriverBySlug(slug)
   const config = useRuntimeConfig()
+
+  const vehicleRows = await prisma.vehicle.findMany({
+    where: { driverId: driver.id },
+    orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }, { createdAt: 'asc' }],
+  })
+  const vehicles = vehicleRows.map((v) => ({
+    id: v.id,
+    make: v.make,
+    modelFamily: v.modelFamily,
+    modelLabel: v.modelLabel,
+    vehicleClass: v.vehicleClass,
+    seats: v.seats,
+    color: v.color,
+    isPrimary: v.isPrimary,
+  }))
 
   const cheapestKm = driver.transferBands.length
     ? Math.min(...driver.transferBands.map((b) => b.pricePerKmCents))
@@ -25,6 +41,7 @@ export default defineEventHandler(async (event) => {
       class: driver.vehicleClass,
       seats: driver.vehicleSeats,
     },
+    vehicles,
     services: driver.services,
     serviceArea: driver.serviceArea,
     currency: driver.currency,

@@ -66,6 +66,9 @@ export default defineNuxtConfig({
     allowBookingWithoutStripe: process.env.ALLOW_BOOKING_WITHOUT_STRIPE === '1',
     public: {
       appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:3000',
+      // Clé client du CDN d'images de véhicules (imagin.studio). Par défaut : clé démo
+      // gratuite. Remplacer par votre propre clé pour la production (sans changer le code).
+      imaginCustomer: process.env.IMAGIN_CUSTOMER || 'hrjavascript-mastery',
       // Outils de développement (commutateur admin/chauffeur/public).
       // Actifs automatiquement en local ; en ligne uniquement si DEV_TOOLS=1.
       // À RETIRER avant la mise en production finale.
