@@ -9,7 +9,6 @@ const nav = [
   { to: '/dashboard/calendrier', label: 'Calendrier', icon: '📅' },
   { to: '/dashboard/clients', label: 'Clients', icon: '👥' },
   { to: '/dashboard/profil', label: 'Profil', icon: '👤' },
-  { to: '/dashboard/vehicules', label: 'Véhicules', icon: '🚗' },
   { to: '/dashboard/parametres', label: 'Réglages', icon: '⚙️' },
 ]
 
