@@ -25,6 +25,12 @@ export default defineEventHandler(async (event) => {
   if (quote.expiresAt.getTime() < Date.now()) {
     throw createError({ statusCode: 410, statusMessage: 'Ce devis a expiré.' })
   }
+  if (!quote.driver.paymentMethods.includes('STRIPE_PREPAYMENT')) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Le chauffeur ne propose pas le paiement en ligne pour cette course.',
+    })
+  }
   if (!quote.driver.stripeAccountId || !quote.driver.stripeChargesEnabled) {
     throw createError({
       statusCode: 503,

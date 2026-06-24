@@ -51,6 +51,8 @@ async function main() {
       commissionBps: 0,
       timezone: 'Europe/Paris',
       locale: 'fr',
+      // Démo : accepte le prépaiement en ligne ET l'encaissement sur place (carte/espèces).
+      paymentMethods: ['STRIPE_PREPAYMENT', 'ONSITE_CARD', 'ONSITE_CASH'],
       // Stripe simulé pour les tests — permet d'afficher le formulaire et d'utiliser
       // le bouton "Payer (test)" via /api/dev/confirm-booking sans vrai compte Stripe.
       stripeAccountId: 'acct_test_karim_demo',

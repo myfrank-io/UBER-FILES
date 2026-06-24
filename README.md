@@ -63,7 +63,11 @@ npm run dev                 # http://localhost:3000
 - **Deux prestations** : transfert A→B (€/km à taux variable jour/nuit/pointe, option A/R) et
   mise à disposition (tarif horaire dégressif).
 - **Devis validé par le chauffeur** (back-office ou Telegram) avant envoi du lien de paiement.
-- **Paiement Stripe** intégral en amont → confirmation → blocage du créneau (course + approche).
+- **Moyens de paiement paramétrables par le chauffeur** : prépaiement en ligne (Stripe) et/ou
+  encaissement sur place le jour de la course (carte, espèces, chèque). Le chauffeur choisit
+  librement ceux qu'il accepte dans ses réglages — il n'est pas obligé de passer par Stripe.
+- **Paiement** → confirmation → blocage du créneau (course + approche). En ligne : confirmé au
+  paiement Stripe ; sur place : confirmé à la réservation, encaissement marqué reçu par le chauffeur.
 - **Calendrier interne** + indisponibilités + détection de conflit avant validation.
 - **Modification / annulation** client (liens signés) + remboursement selon politique paramétrable.
 - **Notifications** : email client (devis, confirmation, rappel J-1, annulation) + Telegram chauffeur.

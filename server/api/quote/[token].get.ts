@@ -1,5 +1,6 @@
 import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
+import { ONSITE_METHODS, type PaymentMethod } from '~/lib/payment-methods'
 
 // Consultation d'un devis par le client via son jeton signé (sans compte).
 export default defineEventHandler(async (event) => {
@@ -12,11 +13,16 @@ export default defineEventHandler(async (event) => {
 
   const quote = await prisma.quote.findUnique({
     where: { id: payload.ref },
-    include: { driver: true, rideRequest: true, booking: true },
+    include: { driver: true, rideRequest: true, booking: { include: { payments: true } } },
   })
   if (!quote) throw createError({ statusCode: 404, statusMessage: 'Devis introuvable.' })
 
   const expired = quote.status === 'SENT' && quote.expiresAt.getTime() < Date.now()
+
+  // Options de paiement proposées au client selon le choix du chauffeur.
+  const methods = quote.driver.paymentMethods as PaymentMethod[]
+  const stripeReady = Boolean(quote.driver.stripeAccountId) && quote.driver.stripeChargesEnabled
+  const onSiteMethods = methods.filter((m) => ONSITE_METHODS.includes(m))
 
   return {
     id: quote.id,
@@ -25,7 +31,16 @@ export default defineEventHandler(async (event) => {
     currency: quote.currency,
     breakdown: quote.breakdown,
     expiresAt: quote.expiresAt,
-    alreadyPaid: quote.status === 'ACCEPTED' || Boolean(quote.booking),
+    confirmed: quote.status === 'ACCEPTED' || Boolean(quote.booking),
+    // True si la course est déjà confirmée ET réglée en ligne (sinon : règlement sur place).
+    alreadyPaid: Boolean(quote.booking?.payments.some((p) => p.status === 'PAID')),
+    payment: {
+      // Le prépaiement en ligne n'est proposé que si le chauffeur l'accepte ET que
+      // son compte Stripe est opérationnel.
+      prepaymentAvailable: methods.includes('STRIPE_PREPAYMENT') && stripeReady,
+      // Encaissement sur place : le client réserve et règle le jour de la course.
+      onSiteMethods,
+    },
     driver: { displayName: quote.driver.displayName, slug: quote.driver.slug },
     ride: {
       type: quote.rideRequest.type,
