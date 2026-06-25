@@ -116,6 +116,36 @@ export const emailTemplates = {
       ),
     }
   },
+  driverWelcomePending(opts: { displayName: string; dashboardUrl: string }) {
+    return {
+      subject: 'Bienvenue — votre profil chauffeur est en cours de validation',
+      html: wrap(
+        `Bienvenue ${opts.displayName} 👋`,
+        `<p>Merci pour votre inscription. Votre profil a bien été reçu et est
+          <strong>en cours de vérification</strong> par notre équipe.</p>
+         <p>En attendant la validation, vous pouvez dès maintenant accéder à votre espace
+          pour compléter et personnaliser votre profil (présentation, véhicule, tarifs, zone…).</p>
+         ${button(opts.dashboardUrl, 'Accéder à mon espace')}
+         <p style="font-size:13px;color:#6b7280">Dès que votre profil sera approuvé, votre page
+          publique de réservation sera mise en ligne et vous en serez informé par email.</p>`,
+      ),
+    }
+  },
+  driverApproved(opts: { displayName: string; publicUrl: string; dashboardUrl: string }) {
+    return {
+      subject: 'Votre profil chauffeur est validé ✅',
+      html: wrap(
+        'Votre profil est validé ✅',
+        `<p>Bonne nouvelle ${opts.displayName} ! Votre profil a été approuvé.</p>
+         <p>Votre page publique de réservation est désormais en ligne :</p>
+         <p><a href="${opts.publicUrl}" style="color:#4f46e5;font-weight:600">${opts.publicUrl}</a></p>
+         ${button(opts.publicUrl, 'Voir ma page publique')}
+         <p style="font-size:13px;color:#6b7280">Partagez ce lien avec vos clients pour
+          recevoir vos premières demandes de course. Gérez tout depuis
+          <a href="${opts.dashboardUrl}" style="color:#4f46e5">votre espace</a>.</p>`,
+      ),
+    }
+  },
   passwordReset(opts: { resetUrl: string }) {
     return {
       subject: 'Réinitialisation de votre mot de passe',

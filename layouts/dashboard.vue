@@ -2,6 +2,11 @@
 // Layout du back-office chauffeur : navigation latérale (desktop) / barre basse (mobile).
 const { user, clear } = useUserSession()
 
+// État de validation du profil (bannière d'attente / suspension).
+const { data: me } = await useFetch('/api/dashboard/me', { key: 'dashboard-status' })
+const status = computed(() => (me.value as { status?: string } | null)?.status ?? null)
+const publicSlug = computed(() => (me.value as { slug?: string } | null)?.slug ?? '')
+
 const nav = [
   { to: '/dashboard', label: 'Accueil', icon: '🏠' },
   { to: '/dashboard/reservations', label: 'Réservations', icon: '🗂️' },
@@ -43,6 +48,31 @@ async function logout() {
 
     <!-- Contenu -->
     <main class="flex-1 px-5 py-6 sm:px-8 sm:py-8">
+      <!-- Bannière de statut : profil en attente de validation ou suspendu -->
+      <div
+        v-if="status === 'PENDING'"
+        class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"
+      >
+        <p class="font-semibold">⏳ Profil en cours de validation</p>
+        <p class="mt-1 text-amber-800">
+          Votre profil a bien été reçu et est soumis à vérification par notre équipe.
+          Vous pouvez dès maintenant le compléter et le personnaliser. Dès qu’il sera
+          approuvé, votre page publique
+          <code v-if="publicSlug" class="rounded bg-white/70 px-1">/{{ publicSlug }}</code>
+          sera mise en ligne.
+        </p>
+      </div>
+      <div
+        v-else-if="status === 'SUSPENDED'"
+        class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800"
+      >
+        <p class="font-semibold">⛔ Profil suspendu</p>
+        <p class="mt-1">
+          Votre page publique n’est plus accessible. Contactez l’administration pour
+          réactiver votre compte.
+        </p>
+      </div>
+
       <slot />
     </main>
 
