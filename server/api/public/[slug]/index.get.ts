@@ -1,4 +1,4 @@
-import { loadActiveDriverBySlug } from '~/server/utils/driver'
+import { loadActiveDriverBySlug, canAcceptBookings } from '~/server/utils/driver'
 
 // Profil public d'un chauffeur + résumé tarifaire (pour la page de réservation).
 export default defineEventHandler(async (event) => {
@@ -33,6 +33,6 @@ export default defineEventHandler(async (event) => {
     hasHourly: driver.hourlyTiers.length > 0,
     fromKmCents: cheapestKm,
     fromHourCents: cheapestHour,
-    bookingEnabled: driver.stripeChargesEnabled,
+    bookingEnabled: canAcceptBookings(driver),
   }
 })

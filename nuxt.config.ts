@@ -48,6 +48,16 @@ export default defineNuxtConfig({
     stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
     stripeConnectWebhookSecret: process.env.STRIPE_CONNECT_WEBHOOK_SECRET || '',
+    // SumUp (OAuth + Hosted Checkout). redirectUri doit matcher exactement une
+    // « Authorized redirect URL » déclarée sur l'app OAuth SumUp.
+    sumupClientId: process.env.SUMUP_CLIENT_ID || '',
+    sumupClientSecret: process.env.SUMUP_CLIENT_SECRET || '',
+    sumupRedirectUri:
+      process.env.SUMUP_REDIRECT_URI ||
+      `${process.env.APP_BASE_URL || 'http://localhost:3000'}/api/payments/sumup/callback`,
+    sumupWebhookSecret: process.env.SUMUP_WEBHOOK_SECRET || '',
+    // Clé de chiffrement des jetons OAuth chauffeurs (AES-256-GCM).
+    sumupTokenEncryptionKey: process.env.SUMUP_TOKEN_ENCRYPTION_KEY || '',
     // Google Maps (serveur uniquement — proxifié)
     googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
     // Resend

@@ -1,4 +1,4 @@
-import { loadActiveDriverBySlug } from '~/server/utils/driver'
+import { loadActiveDriverBySlug, canAcceptBookings } from '~/server/utils/driver'
 import { rideRequestSchema } from '~/server/utils/validation'
 import { assertLeadTime, computeQuote } from '~/server/utils/quote-service'
 import { bookingSlot, findConflict } from '~/server/utils/calendar'
@@ -14,8 +14,8 @@ export default defineEventHandler(async (event) => {
   const driver = await loadActiveDriverBySlug(slug)
   const config = useRuntimeConfig()
 
-  // Bloquer la demande si le paiement Stripe n'est pas encore activé sur ce compte.
-  if (!driver.stripeChargesEnabled) {
+  // Bloquer la demande si le chauffeur ne peut pas encore encaisser (Stripe/SumUp).
+  if (!canAcceptBookings(driver)) {
     throw createError({
       statusCode: 503,
       statusMessage: 'Les réservations en ligne ne sont pas encore disponibles pour ce chauffeur. Contactez-le directement.',
