@@ -4,6 +4,7 @@
 
 <template>
   <div class="min-h-screen">
+    <LangSwitcher />
     <slot />
     <AppToast />
   </div>
