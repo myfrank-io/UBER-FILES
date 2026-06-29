@@ -3,6 +3,7 @@
 const route = useRoute()
 const slug = route.params.slug as string
 const { formatMoney, formatDateTime } = useFormat()
+const { t } = useI18n()
 
 interface DriverPublic {
   slug: string
@@ -31,12 +32,12 @@ const appBase = useRuntimeConfig().public.appBaseUrl
 
 useHead(() => {
   const d = driver.value
-  if (!d) return { title: 'Réservation VTC' }
-  const description = d.tagline ?? `Réservez votre course avec ${d.displayName}. Devis instantané, paiement sécurisé.`
+  if (!d) return { title: t('common.appName') }
+  const description = d.tagline ?? t('public.metaDescription', { name: d.displayName })
   const url = `${appBase}/${d.slug}`
   const image = d.photoUrl ?? `${appBase}/og-default.jpg`
   return {
-    title: `${d.displayName} — Réservation VTC`,
+    title: t('public.metaTitle', { name: d.displayName }),
     meta: [
       { name: 'description', content: description },
       // Open Graph
@@ -122,7 +123,7 @@ async function getEstimate() {
 async function submit() {
   errorMsg.value = ''
   if (!cgvAccepted.value) {
-    errorMsg.value = 'Veuillez accepter les conditions générales de vente.'
+    errorMsg.value = t('public.cgvError')
     return
   }
   submitting.value = true
@@ -142,7 +143,7 @@ async function submit() {
 
 function errMessage(e: unknown): string {
   const err = e as { statusMessage?: string; data?: { statusMessage?: string; message?: string } }
-  return err?.data?.statusMessage || err?.data?.message || err?.statusMessage || 'Une erreur est survenue.'
+  return err?.data?.statusMessage || err?.data?.message || err?.statusMessage || t('common.genericError')
 }
 
 const canEstimate = computed(() =>
@@ -175,7 +176,7 @@ const canSubmit = computed(
       <p v-if="driver.bio" class="mt-4 text-sm text-slate-600">{{ driver.bio }}</p>
       <div class="mt-4 flex flex-wrap gap-2 text-xs">
         <span v-if="driver.vehicle.class" class="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-          {{ driver.vehicle.class }}<template v-if="driver.vehicle.seats"> · {{ driver.vehicle.seats }} places</template>
+          {{ driver.vehicle.class }}<template v-if="driver.vehicle.seats"> · {{ $t('common.places', { count: driver.vehicle.seats }) }}</template>
         </span>
         <span v-if="driver.serviceArea" class="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
           {{ driver.serviceArea }}
@@ -186,33 +187,32 @@ const canSubmit = computed(
     <!-- Confirmation -->
     <div v-if="submitted" class="card mt-5 border-green-200 bg-green-50 text-center">
       <p class="text-3xl">✅</p>
-      <h2 class="mt-2 text-lg font-bold text-green-900">Demande envoyée !</h2>
+      <h2 class="mt-2 text-lg font-bold text-green-900">{{ $t('public.submittedTitle') }}</h2>
       <p class="mt-2 text-sm text-green-800">
-        {{ driver.displayName }} va valider votre devis. Vous recevrez un email à
-        <strong>{{ customer.email }}</strong> avec le lien de paiement.
+        {{ $t('public.submittedBody', { name: driver.displayName, email: customer.email }) }}
       </p>
     </div>
 
-    <!-- Réservations désactivées (Stripe pas encore actif) -->
+    <!-- Réservations désactivées (paiement pas encore actif) -->
     <div v-else-if="!driver.bookingEnabled" class="card mt-5 rounded-2xl border-amber-200 bg-amber-50 p-6 text-center">
       <p class="text-2xl">⏳</p>
-      <p class="mt-2 font-semibold text-amber-900">Réservations bientôt disponibles</p>
+      <p class="mt-2 font-semibold text-amber-900">{{ $t('public.disabledTitle') }}</p>
       <p class="mt-1 text-sm text-amber-800">
-        Le paiement en ligne n'est pas encore activé. Contactez
+        {{ $t('public.disabledBodyPrefix') }}
         <template v-if="driver.phone">
           <a :href="`tel:${driver.phone}`" class="underline">{{ driver.phone }}</a>
         </template>
         <template v-else-if="driver.contactEmail">
           <a :href="`mailto:${driver.contactEmail}`" class="underline">{{ driver.contactEmail }}</a>
         </template>
-        <template v-else>le chauffeur directement</template>
-        pour réserver.
+        <template v-else>{{ $t('public.disabledBodyFallback') }}</template>
+        {{ $t('public.disabledBodySuffix') }}
       </p>
     </div>
 
     <!-- Formulaire -->
     <form v-else class="card mt-5 space-y-5" @submit.prevent="submit">
-      <h2 class="text-lg font-bold text-slate-900">Réservez votre course</h2>
+      <h2 class="text-lg font-bold text-slate-900">{{ $t('public.formTitle') }}</h2>
 
       <!-- Type de prestation -->
       <div class="grid grid-cols-2 gap-2">
@@ -223,9 +223,9 @@ const canSubmit = computed(
           :class="type === 'TRANSFER' ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'"
           @click="type = 'TRANSFER'"
         >
-          Transfert (A → B)
+          {{ $t('public.typeTransfer') }}
           <span v-if="driver.fromKmCents" class="block text-xs font-normal text-slate-500">
-            dès {{ formatMoney(driver.fromKmCents, driver.currency) }}/km
+            {{ $t('public.fromPerKm', { price: formatMoney(driver.fromKmCents, driver.currency) }) }}
           </span>
         </button>
         <button
@@ -235,9 +235,9 @@ const canSubmit = computed(
           :class="type === 'HOURLY' ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'"
           @click="type = 'HOURLY'"
         >
-          Mise à disposition
+          {{ $t('public.typeHourly') }}
           <span v-if="driver.fromHourCents" class="block text-xs font-normal text-slate-500">
-            dès {{ formatMoney(driver.fromHourCents, driver.currency) }}/h
+            {{ $t('public.fromPerHour', { price: formatMoney(driver.fromHourCents, driver.currency) }) }}
           </span>
         </button>
       </div>
@@ -245,43 +245,43 @@ const canSubmit = computed(
       <!-- Transfert -->
       <template v-if="type === 'TRANSFER'">
         <div>
-          <label class="label" for="pickup">Adresse de départ</label>
-          <AddressField id="pickup" v-model="pickup" placeholder="Ex : Aéroport CDG, Terminal 2E" />
+          <label class="label" for="pickup">{{ $t('public.pickupLabel') }}</label>
+          <AddressField id="pickup" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" />
         </div>
         <div>
-          <label class="label" for="dropoff">Adresse d'arrivée</label>
-          <AddressField id="dropoff" v-model="dropoff" placeholder="Ex : 10 rue de Rivoli, Paris" />
+          <label class="label" for="dropoff">{{ $t('public.dropoffLabel') }}</label>
+          <AddressField id="dropoff" v-model="dropoff" :placeholder="$t('public.dropoffPlaceholder')" />
         </div>
         <label class="flex items-center gap-2 text-sm text-slate-700">
           <input v-model="roundTrip" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
-          Aller-retour
+          {{ $t('public.roundTrip') }}
         </label>
       </template>
 
       <!-- Mise à disposition -->
       <template v-else>
         <div>
-          <label class="label" for="duration">Durée souhaitée (heures)</label>
+          <label class="label" for="duration">{{ $t('public.durationLabel') }}</label>
           <input id="duration" v-model.number="durationHours" type="number" min="1" max="24" class="field" />
         </div>
       </template>
 
       <div>
-        <label class="label" for="datetime">Date et heure</label>
+        <label class="label" for="datetime">{{ $t('public.datetimeLabel') }}</label>
         <input id="datetime" v-model="scheduledAt" type="datetime-local" class="field" />
         <p class="mt-1 text-xs text-slate-500">
-          Réservation au plus tôt {{ Math.round(driver.minLeadTimeMinutes / 60) }}h à l'avance.
+          {{ $t('public.leadTime', { hours: Math.round(driver.minLeadTimeMinutes / 60) }) }}
         </p>
       </div>
 
       <!-- Estimation -->
       <button type="button" class="btn-ghost w-full" :disabled="!canEstimate || estimating" @click="getEstimate">
-        {{ estimating ? 'Calcul…' : 'Estimer le prix' }}
+        {{ estimating ? $t('public.estimating') : $t('public.estimateButton') }}
       </button>
 
       <div v-if="estimate" class="rounded-xl bg-slate-50 p-4">
         <div class="flex items-baseline justify-between">
-          <span class="text-sm text-slate-600">Estimation</span>
+          <span class="text-sm text-slate-600">{{ $t('public.estimateLabel') }}</span>
           <span class="text-2xl font-bold text-slate-900">
             {{ formatMoney(estimate.amountCents, estimate.currency) }}
           </span>
@@ -292,27 +292,27 @@ const canSubmit = computed(
             <span>{{ formatMoney(line.amountCents, estimate.currency) }}</span>
           </li>
         </ul>
-        <p class="mt-2 text-xs text-slate-400">Prix indicatif, soumis à validation du chauffeur.</p>
+        <p class="mt-2 text-xs text-slate-400">{{ $t('public.estimateIndicative') }}</p>
       </div>
 
       <!-- Coordonnées client -->
       <div class="space-y-3 border-t border-slate-100 pt-4">
         <div>
-          <label class="label" for="name">Votre nom</label>
+          <label class="label" for="name">{{ $t('public.nameLabel') }}</label>
           <input id="name" v-model="customer.name" type="text" class="field" required />
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="label" for="phone">Téléphone</label>
+            <label class="label" for="phone">{{ $t('public.phoneLabel') }}</label>
             <input id="phone" v-model="customer.phone" type="tel" class="field" required />
           </div>
           <div>
-            <label class="label" for="email">Email</label>
+            <label class="label" for="email">{{ $t('public.emailLabel') }}</label>
             <input id="email" v-model="customer.email" type="email" class="field" required />
           </div>
         </div>
         <div>
-          <label class="label" for="notes">Précisions (optionnel)</label>
+          <label class="label" for="notes">{{ $t('public.notesLabel') }}</label>
           <textarea id="notes" v-model="notes" rows="2" class="field" />
         </div>
       </div>
@@ -320,22 +320,18 @@ const canSubmit = computed(
       <!-- CGV -->
       <label class="flex items-start gap-2 text-xs text-slate-600">
         <input v-model="cgvAccepted" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" />
-        <span>
-          J'accepte les conditions générales de vente et reconnais que, s'agissant d'un service
-          daté, le droit de rétractation de 14 jours ne s'applique pas (art. L221-28 du Code de la
-          consommation).
-        </span>
+        <span>{{ $t('public.cgv') }}</span>
       </label>
 
       <p v-if="errorMsg" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
 
       <button type="submit" class="btn-primary w-full" :disabled="!canSubmit || submitting">
-        {{ submitting ? 'Envoi…' : 'Envoyer la demande' }}
+        {{ submitting ? $t('public.submitting') : $t('public.submitButton') }}
       </button>
     </form>
 
     <p class="mt-6 text-center text-xs text-slate-400">
-      Paiement sécurisé · Créneau garanti après paiement
+      {{ $t('common.securePayment') }}
     </p>
   </div>
 </template>
