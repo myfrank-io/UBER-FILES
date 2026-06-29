@@ -29,10 +29,15 @@ export default defineEventHandler(async (event) => {
     minLeadTimeMinutes: driver.minLeadTimeMinutes,
     quoteExpiryHours: driver.quoteExpiryHours,
     approachBufferMinutes: driver.approachBufferMinutes,
+    paymentProvider: driver.paymentProvider,
     stripe: {
       connected: Boolean(driver.stripeAccountId),
       chargesEnabled: driver.stripeChargesEnabled,
       payoutsEnabled: driver.stripePayoutsEnabled,
+    },
+    sumup: {
+      connected: driver.sumupConnected,
+      merchantCode: driver.sumupMerchantCode,
     },
     telegramLinked: Boolean(driver.telegramChatId),
     transferBands: driver.transferBands,
