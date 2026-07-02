@@ -9,7 +9,7 @@ definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Réglages' })
 const { formatMoney } = useFormat()
 
-const { data: me, refresh } = await useFetch('/api/dashboard/me')
+const { data: me, refresh } = await useFetch('/api/dashboard/me', { lazy: true })
 const connecting = ref(false)
 const saving = ref<string | null>(null)
 const errorMsg = ref('')
@@ -384,6 +384,7 @@ async function deleteSurcharge(id: string) {
 <template>
   <div class="max-w-2xl space-y-6">
     <h1 class="text-2xl font-bold text-slate-900">Réglages</h1>
+    <p v-if="!me" class="mt-4 text-sm text-slate-400">Chargement…</p>
 
     <!-- Notifications globales -->
     <p v-if="successMsg" class="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">{{ successMsg }}</p>

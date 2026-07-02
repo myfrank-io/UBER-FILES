@@ -4,7 +4,8 @@ definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Tableau de bord' })
 const { formatMoney, formatDateTime } = useFormat()
 
-const { data, refresh, pending } = await useFetch('/api/dashboard/overview')
+// lazy : la navigation s'affiche immédiatement, les données arrivent ensuite.
+const { data, refresh, pending } = await useFetch('/api/dashboard/overview', { lazy: true })
 const { error: toastError } = useToast()
 
 const busyId = ref<string | null>(null)
@@ -52,6 +53,7 @@ async function resend(quoteId: string) {
 <template>
   <div>
     <h1 class="text-2xl font-bold text-slate-900">Tableau de bord</h1>
+    <p v-if="pending && !data" class="mt-4 text-sm text-slate-400">Chargement…</p>
 
     <!-- Stats -->
     <div v-if="data" class="mt-5 grid grid-cols-3 gap-3">

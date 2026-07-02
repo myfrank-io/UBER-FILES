@@ -5,6 +5,7 @@ const { formatMoney } = useFormat()
 
 const period = ref<'week' | 'month' | 'year'>('month')
 const { data, refresh } = await useFetch('/api/dashboard/earnings', {
+  lazy: true,
   query: computed(() => ({ period: period.value })),
 })
 
@@ -45,6 +46,7 @@ function exportCsv() {
   <div class="max-w-2xl">
     <div class="flex items-center justify-between">
       <h1 class="text-2xl font-bold text-slate-900">Gains</h1>
+      <p v-if="!data" class="mt-1 text-sm text-slate-400">Chargement…</p>
       <button class="btn-ghost !py-2 text-sm" @click="exportCsv">Exporter CSV</button>
     </div>
 

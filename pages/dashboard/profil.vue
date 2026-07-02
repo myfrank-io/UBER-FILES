@@ -2,7 +2,7 @@
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Mon profil' })
 
-const { data: me, refresh } = await useFetch('/api/dashboard/me')
+const { data: me, refresh } = await useFetch('/api/dashboard/me', { lazy: true })
 
 const saving = ref(false)
 const successMsg = ref('')
@@ -168,6 +168,7 @@ async function save() {
 <template>
   <div class="max-w-2xl">
     <h1 class="text-2xl font-bold text-slate-900">Mon profil</h1>
+    <p v-if="!me" class="mt-1 text-sm text-slate-400">Chargement…</p>
     <p class="mt-1 text-sm text-slate-500">Ces informations apparaissent sur votre page publique.</p>
 
     <form class="mt-6 space-y-6" @submit.prevent="save">
