@@ -1,8 +1,14 @@
 <script setup lang="ts">
+import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '~/lib/payment-methods'
+
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Réservations' })
 const { formatMoney, formatDateTime } = useFormat()
-const { error: toastError } = useToast()
+const { error: toastError, success: toastSuccess } = useToast()
+
+function methodLabel(method: unknown): string {
+  return PAYMENT_METHOD_LABELS[method as PaymentMethod] ?? ''
+}
 
 // ─── Filtres ──────────────────────────────────────────────────────────────────
 
@@ -60,6 +66,23 @@ async function markComplete(id: string) {
     toastError((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.')
   } finally {
     completing.value = null
+  }
+}
+
+const markingPaid = ref<string | null>(null)
+
+async function markPaid(id: string) {
+  if (!confirm('Confirmer l’encaissement de cette course ?')) return
+  markingPaid.value = id
+  try {
+    await $fetch(`/api/dashboard/bookings/${id}/mark-paid`, { method: 'POST' })
+    toastSuccess('Encaissement enregistré.')
+    await refresh()
+    if (selected.value === id) await openDetail(id)
+  } catch (e) {
+    toastError((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.')
+  } finally {
+    markingPaid.value = null
   }
 }
 </script>
@@ -123,8 +146,27 @@ async function markComplete(id: string) {
               </template>
               <template v-else>Mise à disposition — {{ b.ride.durationHours }}h</template>
             </p>
+            <p v-if="b.payment" class="mt-1 text-xs">
+              <span v-if="b.payment.status === 'PAID'" class="text-green-700">● Réglé</span>
+              <span v-else-if="b.payment.status === 'PENDING'" class="text-amber-600">● À encaisser sur place — {{ methodLabel(b.payment.method) }}</span>
+            </p>
           </div>
           <p class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</p>
+        </div>
+
+        <!-- Encaissement sur place : action rapide -->
+        <div
+          v-if="b.payment && b.payment.status === 'PENDING'"
+          class="mt-3 border-t border-slate-100 pt-3"
+          @click.stop
+        >
+          <button
+            class="rounded-lg border border-green-600 bg-white px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-50 disabled:opacity-50"
+            :disabled="markingPaid === b.id"
+            @click="markPaid(b.id)"
+          >
+            {{ markingPaid === b.id ? '…' : 'Marquer comme encaissé' }}
+          </button>
         </div>
 
         <div
@@ -199,9 +241,24 @@ async function markComplete(id: string) {
             <p class="mt-2 text-2xl font-bold text-slate-900">
               {{ formatMoney(detail.amountCents as number, detail.currency as string) }}
             </p>
-            <p v-for="p in (detail.payments as Record<string, unknown>[])" :key="p.id as string" class="mt-1 text-xs text-slate-500">
-              Payé le {{ formatDateTime(p.createdAt as string) }}
+            <p v-for="p in (detail.payments as Record<string, unknown>[])" :key="p.id as string" class="mt-1 text-xs">
+              <template v-if="p.status === 'PAID'">
+                <span class="text-green-700">Réglé</span>
+                <span class="text-slate-500"> ({{ methodLabel(p.method) }}) — le {{ formatDateTime(p.createdAt as string) }}</span>
+              </template>
+              <span v-else-if="p.status === 'PENDING'" class="text-amber-600">À encaisser sur place — {{ methodLabel(p.method) }}</span>
+              <span v-else class="text-slate-500">{{ p.status }} — le {{ formatDateTime(p.createdAt as string) }}</span>
             </p>
+
+            <button
+              v-if="(detail.payments as Record<string, unknown>[]).some((p) => p.status === 'PENDING')"
+              class="mt-3 rounded-lg border border-green-600 bg-white px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-50 disabled:opacity-50"
+              :disabled="markingPaid === (detail.id as string)"
+              @click="markPaid(detail.id as string)"
+            >
+              {{ markingPaid === detail.id ? '…' : 'Marquer comme encaissé' }}
+            </button>
+
             <template v-if="(detail.refunds as Record<string, unknown>[]).length">
               <p class="mt-2 text-xs font-medium text-red-600">Remboursements</p>
               <p v-for="r in (detail.refunds as Record<string, unknown>[])" :key="r.id as string" class="text-xs text-red-500">

@@ -27,6 +27,14 @@ export default defineEventHandler(async (event) => {
   if (quote.expiresAt.getTime() < Date.now()) {
     throw createError({ statusCode: 410, statusMessage: 'Ce devis a expiré.' })
   }
+  // Le prépaiement en ligne doit faire partie des moyens acceptés par le chauffeur
+  // (la disponibilité du prestataire — Stripe ou SumUp — est vérifiée plus bas).
+  if (!quote.driver.paymentMethods.includes('STRIPE_PREPAYMENT')) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Le chauffeur ne propose pas le paiement en ligne pour cette course.',
+    })
+  }
 
   const description =
     quote.rideRequest.type === 'TRANSFER'

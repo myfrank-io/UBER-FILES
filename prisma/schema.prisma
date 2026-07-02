@@ -50,6 +50,16 @@ enum DriverStatus {
   SUSPENDED
 }
 
+/// Moyens de paiement qu'un chauffeur peut accepter. Il choisit librement
+/// lesquels activer dans ses réglages : prépaiement en ligne et/ou
+/// encaissement sur place le jour de la course (carte, espèces, chèque).
+enum PaymentMethod {
+  STRIPE_PREPAYMENT // paiement en avance par carte en ligne (Stripe ou SumUp selon le prestataire actif)
+  ONSITE_CARD       // carte bancaire sur place (terminal du chauffeur)
+  ONSITE_CASH       // espèces sur place
+  ONSITE_CHECK      // chèque sur place
+}
+
 enum PaymentProvider {
   STRIPE
   SUMUP
@@ -100,6 +110,11 @@ model Driver {
   // Notifications
   telegramChatId String?
   telegramLinkCode String? @unique // code d'appairage du bot
+
+  // Moyens de paiement acceptés (choisis par le chauffeur dans ses réglages).
+  // Par défaut : prépaiement Stripe. Le chauffeur peut tout encaisser sur place
+  // (carte / espèces / chèque) sans passer par le prépaiement s'il le souhaite.
+  paymentMethods PaymentMethod[] @default([STRIPE_PREPAYMENT])
 
   // Paramètres métier (centimes / minutes)
   currency             String @default("eur")
@@ -450,6 +465,9 @@ model Payment {
   applicationFeeCents Int @default(0)
   currency            String @default("eur")
   status              PaymentStatus @default(PENDING)
+  // Moyen par lequel ce paiement est (ou sera) encaissé. Pour un encaissement
+  // sur place, le paiement reste PENDING jusqu'à ce que le chauffeur le marque reçu.
+  method              PaymentMethod @default(STRIPE_PREPAYMENT)
 
   refunds Refund[]
 
