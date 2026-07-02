@@ -1,5 +1,6 @@
 import { requireDriverId } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
+import { publicPhotoUrl } from '~/server/utils/driver'
 
 // Profil + état de configuration du chauffeur connecté.
 export default defineEventHandler(async (event) => {
@@ -14,7 +15,7 @@ export default defineEventHandler(async (event) => {
     displayName: driver.displayName,
     tagline: driver.tagline,
     bio: driver.bio,
-    photoUrl: driver.photoUrl,
+    photoUrl: publicPhotoUrl(driver),
     vehicleMake: driver.vehicleMake,
     vehicleModel: driver.vehicleModel,
     vehicleClass: driver.vehicleClass,

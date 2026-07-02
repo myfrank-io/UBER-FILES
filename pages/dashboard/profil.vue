@@ -136,13 +136,15 @@ async function save() {
   successMsg.value = ''
   errorMsg.value = ''
   try {
+    // La photo est enregistrée à part (dès l'import, via persistPhoto) : on ne
+    // renvoie jamais form.photoUrl ici — c'est l'URL de l'endpoint image, pas
+    // une valeur à stocker.
     await $fetch('/api/dashboard/profile', {
       method: 'PATCH',
       body: {
-        ...form,
+        displayName: form.displayName,
         tagline: form.tagline || null,
         bio: form.bio || null,
-        photoUrl: form.photoUrl || null,
         vehicleMake: form.vehicleMake || null,
         vehicleModel: form.vehicleModel || null,
         vehicleClass: form.vehicleClass || null,

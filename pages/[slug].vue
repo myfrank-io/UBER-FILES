@@ -40,9 +40,13 @@ useHead(() => {
   if (!d) return { title: t('common.appName') }
   const description = d.tagline ?? t('public.metaDescription', { name: d.displayName })
   const url = `${appBase}/${d.slug}`
-  // Les crawlers (réseaux sociaux) ne peuvent pas récupérer une data URL : on ne
-  // l'utilise comme image de partage que si c'est une URL http(s) accessible.
-  const image = d.photoUrl?.startsWith('http') ? d.photoUrl : `${appBase}/og-default.jpg`
+  // La photo est servie en URL http (absolue ou chemin /api/public/…/photo) :
+  // on la rend absolue pour les crawlers des réseaux sociaux.
+  const image = d.photoUrl
+    ? d.photoUrl.startsWith('http')
+      ? d.photoUrl
+      : `${appBase}${d.photoUrl}`
+    : `${appBase}/og-default.jpg`
   return {
     title: t('public.metaTitle', { name: d.displayName }),
     meta: [
