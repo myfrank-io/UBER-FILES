@@ -3,6 +3,7 @@ import { verifyClientToken, signClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
 import { bookingSlot, findConflict } from '~/server/utils/calendar'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
+import { notifyDriver } from '~/server/utils/notify-driver'
 import { ONSITE_METHODS, isOnSiteMethod, type PaymentMethod } from '~/lib/payment-methods'
 
 // Confirme une course SANS prépaiement en ligne : le client réserve et règle sur
@@ -132,6 +133,21 @@ export default defineEventHandler(async (event) => {
     vehicleModel: quote.driver.vehicleModel,
   })
   await sendEmail({ to: req.customerEmail, ...tpl })
+
+  // Le chauffeur est prévenu par email : course confirmée, encaissement sur place.
+  await notifyDriver(quote.driver, {
+    email: emailTemplates.bookingConfirmedDriver({
+      customerName: req.customerName,
+      customerPhone: req.customerPhone,
+      customerEmail: req.customerEmail,
+      scheduledAt: req.scheduledAt,
+      amountCents: quote.amountCents,
+      currency: quote.currency,
+      paidOnline: false,
+      method,
+      dashboardUrl: `${config.public.appBaseUrl}/dashboard/reservations`,
+    }),
+  })
 
   return { ok: true, method }
 })

@@ -12,7 +12,8 @@ créneau est **bloqué dans le calendrier** du chauffeur.
 - **Tailwind CSS** + **@nuxtjs/i18n** (FR / EN, mobile-first)
 - **Stripe** Connect Express + destination charges (encaissement centralisé, reversement chauffeur)
 - **Google Maps Platform** (Places + Routes) — proxifié côté serveur, repli haversine/Nominatim sans clé
-- **Resend** (emails transactionnels) · **Telegram Bot** (notifs + validation devis) · **API Sirene INSEE**
+- **Resend** (emails transactionnels — canal de notification principal) · **Telegram Bot**
+  (optionnel, coupé par défaut) · **API Sirene INSEE**
 - Tests : **Vitest** (logique métier) + **Playwright** (E2E)
 
 ## Démarrage rapide
@@ -70,7 +71,9 @@ npm run dev                 # http://localhost:3000
   paiement Stripe ; sur place : confirmé à la réservation, encaissement marqué reçu par le chauffeur.
 - **Calendrier interne** + indisponibilités + détection de conflit avant validation.
 - **Modification / annulation** client (liens signés) + remboursement selon politique paramétrable.
-- **Notifications** : email client (devis, confirmation, rappel J-1, annulation) + Telegram chauffeur.
+- **Notifications** : tout passe par email — client (devis, confirmation, rappel J-1, annulation)
+  et chauffeur (nouvelle demande, course confirmée, annulation). Les notifications Telegram sont
+  coupées par défaut (réactivables via `TELEGRAM_NOTIFICATIONS_ENABLED=1`).
 - **Back-office chauffeur** : grilles, demandes, courses, calendrier, base clients (export CSV).
 - **Back-office admin** : onboarding/suspension chauffeurs, dashboard, facturation des forfaits.
 
@@ -132,7 +135,7 @@ curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://votre-domaine/api/c
 | Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET` | Webhooks : `/api/webhooks/stripe` (checkout) et `/api/webhooks/stripe-connect` (account.updated) |
 | Google Maps | `GOOGLE_MAPS_API_KEY` | Restreindre la clé (Places + Routes). Sans clé : repli haversine/Nominatim |
 | Resend | `RESEND_API_KEY`, `EMAIL_FROM` | Vérifier SPF/DKIM du domaine |
-| Telegram | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` | Webhook : `/api/webhooks/telegram` |
+| Telegram | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_NOTIFICATIONS_ENABLED` | Webhook : `/api/webhooks/telegram`. Notifications coupées par défaut (mettre `1` pour réactiver) |
 | INSEE | `INSEE_API_KEY` | Vérification SIREN à l'onboarding |
 
 > Sans clés, l'application fonctionne en mode dégradé (emails/Telegram journalisés, itinéraires

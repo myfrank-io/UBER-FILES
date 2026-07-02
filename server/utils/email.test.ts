@@ -1,0 +1,85 @@
+import { describe, expect, it } from 'vitest'
+import { emailTemplates } from './email'
+
+const base = {
+  customerName: 'Ali & Fils <script>alert(1)</script>',
+  scheduledAt: new Date('2026-08-15T14:30:00Z'),
+}
+
+describe('emailTemplates chauffeur', () => {
+  it('newRequestDriver : rend les détails et échappe les saisies client', () => {
+    const tpl = emailTemplates.newRequestDriver({
+      ...base,
+      customerPhone: '+33612345678',
+      type: 'TRANSFER',
+      pickupAddress: 'Gare de Lyon <b>Paris</b>',
+      dropoffAddress: 'Orly',
+      roundTrip: true,
+      amountCents: 12550,
+      currency: 'EUR',
+      hasConflict: true,
+      notes: 'Bagages <volumineux>',
+      dashboardUrl: 'https://app.test/dashboard',
+    })
+    expect(tpl.subject).toContain('Nouvelle demande')
+    expect(tpl.html).not.toContain('<script>')
+    expect(tpl.html).toContain('&lt;script&gt;')
+    expect(tpl.html).toContain('Gare de Lyon &lt;b&gt;Paris&lt;/b&gt; → Orly (aller-retour)')
+    expect(tpl.html).toContain('125,50')
+    expect(tpl.html).toContain('Conflit calendrier')
+    expect(tpl.html).toContain('Bagages &lt;volumineux&gt;')
+    expect(tpl.html).toContain('https://app.test/dashboard')
+  })
+
+  it('newRequestDriver : mise à disposition sans conflit', () => {
+    const tpl = emailTemplates.newRequestDriver({
+      ...base,
+      type: 'HOURLY',
+      durationHours: 3,
+      amountCents: 30000,
+      currency: 'EUR',
+      hasConflict: false,
+      dashboardUrl: 'https://app.test/dashboard',
+    })
+    expect(tpl.html).toContain('Mise à disposition 3 h')
+    expect(tpl.html).not.toContain('Conflit calendrier')
+  })
+
+  it('bookingConfirmedDriver : paiement en ligne vs sur place', () => {
+    const common = {
+      ...base,
+      customerPhone: '+33612345678',
+      customerEmail: 'client@test.fr',
+      amountCents: 8000,
+      currency: 'EUR',
+      dashboardUrl: 'https://app.test/dashboard/reservations',
+    }
+    const online = emailTemplates.bookingConfirmedDriver({ ...common, paidOnline: true })
+    expect(online.html).toContain('payés en ligne')
+
+    const onsite = emailTemplates.bookingConfirmedDriver({
+      ...common,
+      paidOnline: false,
+      method: 'CASH',
+    })
+    expect(onsite.html).toContain('à encaisser sur place')
+    expect(onsite.html).toContain('client@test.fr')
+  })
+
+  it('bookingCancelledDriver : avec et sans remboursement', () => {
+    const withRefund = emailTemplates.bookingCancelledDriver({
+      ...base,
+      refundCents: 4000,
+      currency: 'EUR',
+    })
+    expect(withRefund.subject).toContain('Course annulée')
+    expect(withRefund.html).toContain('40,00')
+
+    const noRefund = emailTemplates.bookingCancelledDriver({
+      ...base,
+      refundCents: 0,
+      currency: 'EUR',
+    })
+    expect(noRefund.html).toContain('Aucun remboursement')
+  })
+})
