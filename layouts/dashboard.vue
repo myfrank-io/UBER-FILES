@@ -3,7 +3,9 @@
 const { user, clear } = useUserSession()
 
 // État de validation du profil (bannière d'attente / suspension).
-const { data: me } = await useFetch('/api/dashboard/me', { key: 'dashboard-status' })
+// Pas de `key` explicite : les pages qui appellent aussi /api/dashboard/me
+// partagent alors la même clé auto-générée → une seule requête au lieu de deux.
+const { data: me } = await useFetch('/api/dashboard/me')
 const status = computed(() => (me.value as { status?: string } | null)?.status ?? null)
 const publicSlug = computed(() => (me.value as { slug?: string } | null)?.slug ?? '')
 

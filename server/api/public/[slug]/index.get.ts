@@ -1,10 +1,14 @@
-import { loadActiveDriverBySlug, canAcceptBookings } from '~/server/utils/driver'
+import { loadActiveDriverBySlug, canAcceptBookings, publicPhotoUrl } from '~/server/utils/driver'
 import { ONSITE_METHODS, type PaymentMethod } from '~/lib/payment-methods'
 
 // Profil public d'un chauffeur + résumé tarifaire (pour la page de réservation).
 export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, 'slug')!
   const driver = await loadActiveDriverBySlug(slug)
+
+  // Données publiques : cache CDN court + revalidation en arrière-plan, pour que
+  // les visites suivantes ne repaient ni le démarrage serverless ni la requête SQL.
+  setResponseHeader(event, 'Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
 
   const cheapestKm = driver.transferBands.length
     ? Math.min(...driver.transferBands.map((b) => b.pricePerKmCents))
@@ -31,7 +35,7 @@ export default defineEventHandler(async (event) => {
     displayName: driver.displayName,
     tagline: driver.tagline,
     bio: driver.bio,
-    photoUrl: driver.photoUrl,
+    photoUrl: publicPhotoUrl(driver),
     vehicle: {
       make: driver.vehicleMake,
       model: driver.vehicleModel,
