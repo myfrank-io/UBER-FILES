@@ -35,7 +35,9 @@ useHead(() => {
   if (!d) return { title: t('common.appName') }
   const description = d.tagline ?? t('public.metaDescription', { name: d.displayName })
   const url = `${appBase}/${d.slug}`
-  const image = d.photoUrl ?? `${appBase}/og-default.jpg`
+  // Les crawlers (réseaux sociaux) ne peuvent pas récupérer une data URL : on ne
+  // l'utilise comme image de partage que si c'est une URL http(s) accessible.
+  const image = d.photoUrl?.startsWith('http') ? d.photoUrl : `${appBase}/og-default.jpg`
   return {
     title: t('public.metaTitle', { name: d.displayName }),
     meta: [
@@ -193,24 +195,7 @@ const canSubmit = computed(
       </p>
     </div>
 
-    <!-- Réservations désactivées (paiement pas encore actif) -->
-    <div v-else-if="!driver.bookingEnabled" class="card mt-5 rounded-2xl border-amber-200 bg-amber-50 p-6 text-center">
-      <p class="text-2xl">⏳</p>
-      <p class="mt-2 font-semibold text-amber-900">{{ $t('public.disabledTitle') }}</p>
-      <p class="mt-1 text-sm text-amber-800">
-        {{ $t('public.disabledBodyPrefix') }}
-        <template v-if="driver.phone">
-          <a :href="`tel:${driver.phone}`" class="underline">{{ driver.phone }}</a>
-        </template>
-        <template v-else-if="driver.contactEmail">
-          <a :href="`mailto:${driver.contactEmail}`" class="underline">{{ driver.contactEmail }}</a>
-        </template>
-        <template v-else>{{ $t('public.disabledBodyFallback') }}</template>
-        {{ $t('public.disabledBodySuffix') }}
-      </p>
-    </div>
-
-    <!-- Formulaire -->
+    <!-- Formulaire (toujours disponible, même si le paiement en ligne n'est pas activé) -->
     <form v-else class="card mt-5 space-y-5" @submit.prevent="submit">
       <h2 class="text-lg font-bold text-slate-900">{{ $t('public.formTitle') }}</h2>
 
