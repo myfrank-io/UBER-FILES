@@ -5,7 +5,6 @@ import { bookingSlot, findConflict } from '~/server/utils/calendar'
 import { computeApplicationFee } from '~/lib/pricing'
 import { prisma } from '~/server/utils/prisma'
 import { newRequestMessage, sendTelegramMessage } from '~/server/utils/telegram'
-import { ONSITE_METHODS, type PaymentMethod } from '~/lib/payment-methods'
 
 // Soumission d'une demande de course par le client (sans compte).
 // Crée/retrouve le client, enregistre la demande + un devis BROUILLON, détecte un
@@ -15,19 +14,9 @@ export default defineEventHandler(async (event) => {
   const driver = await loadActiveDriverBySlug(slug)
   const config = useRuntimeConfig()
 
-  // Bloquer la demande seulement si AUCUN moyen de paiement n'est utilisable :
-  // ni prépaiement en ligne (Stripe opérationnel) ni encaissement sur place.
-  const methods = driver.paymentMethods as PaymentMethod[]
-  const stripeReady = Boolean(driver.stripeAccountId) && driver.stripeChargesEnabled
-  const hasUsableMethod = methods.some((m) =>
-    m === 'STRIPE_PREPAYMENT' ? stripeReady : ONSITE_METHODS.includes(m),
-  )
-  if (!hasUsableMethod) {
-    throw createError({
-      statusCode: 503,
-      statusMessage: 'Les réservations ne sont pas encore disponibles pour ce chauffeur. Contactez-le directement.',
-    })
-  }
+  // La demande est acceptée même si aucun moyen de paiement n'est encore configuré :
+  // elle est transmise au chauffeur, qui valide le devis et règle le paiement
+  // directement avec le client (le paiement en ligne reste optionnel, en aval).
 
   const body = await readValidatedBody(event, (b) => rideRequestSchema.safeParse(b))
   if (!body.success) {

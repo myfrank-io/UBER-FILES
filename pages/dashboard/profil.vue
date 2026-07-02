@@ -8,6 +8,97 @@ const saving = ref(false)
 const successMsg = ref('')
 const errorMsg = ref('')
 
+// Import de la photo de profil depuis un fichier (galerie / pellicule du téléphone
+// sur mobile, ou disque sur ordinateur). On redimensionne l'image côté client pour
+// rester léger, puis on la stocke en data URL dans `form.photoUrl`.
+const photoInput = ref<HTMLInputElement | null>(null)
+const photoLoading = ref(false)
+const photoError = ref('')
+const photoSuccess = ref('')
+
+const MAX_PHOTO_SOURCE_BYTES = 15 * 1024 * 1024 // 15 Mo en entrée (photos de smartphone)
+const MAX_PHOTO_DIMENSION = 512 // px, côté le plus long après redimensionnement
+
+function resizeImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Lecture du fichier impossible.'))
+    reader.onload = () => {
+      const img = new Image()
+      img.onerror = () => reject(new Error("Ce fichier n'est pas une image valide."))
+      img.onload = () => {
+        const scale = Math.min(1, MAX_PHOTO_DIMENSION / Math.max(img.width, img.height))
+        const width = Math.round(img.width * scale)
+        const height = Math.round(img.height * scale)
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return reject(new Error('Traitement de l’image impossible.'))
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', 0.85))
+      }
+      img.src = reader.result as string
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+// Enregistre immédiatement la photo en base (sans attendre le bouton « Enregistrer »
+// en bas de page) : plus simple et plus fiable côté mobile. On envoie uniquement le
+// champ photoUrl — l'endpoint accepte les mises à jour partielles.
+async function persistPhoto(value: string | null) {
+  photoError.value = ''
+  photoSuccess.value = ''
+  photoLoading.value = true
+  try {
+    await $fetch('/api/dashboard/profile', { method: 'PATCH', body: { photoUrl: value } })
+    form.photoUrl = value ?? ''
+    await refresh()
+    photoSuccess.value = value ? 'Photo enregistrée.' : 'Photo supprimée.'
+  } catch (e) {
+    photoError.value =
+      (e as { data?: { statusMessage?: string } })?.data?.statusMessage ||
+      "Enregistrement de la photo impossible. Vérifiez votre connexion et réessayez."
+  } finally {
+    photoLoading.value = false
+  }
+}
+
+async function onPhotoSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  photoError.value = ''
+  photoSuccess.value = ''
+
+  if (!file.type.startsWith('image/')) {
+    photoError.value = 'Veuillez choisir une image (JPG, PNG, WEBP…).'
+    input.value = ''
+    return
+  }
+  if (file.size > MAX_PHOTO_SOURCE_BYTES) {
+    photoError.value = 'Image trop volumineuse (15 Mo maximum).'
+    input.value = ''
+    return
+  }
+
+  photoLoading.value = true
+  try {
+    const dataUrl = await resizeImage(file)
+    await persistPhoto(dataUrl)
+  } catch (err) {
+    photoError.value = (err as Error).message || 'Import de la photo impossible.'
+    photoLoading.value = false
+  } finally {
+    input.value = '' // permet de re-sélectionner le même fichier
+  }
+}
+
+function removePhoto() {
+  void persistPhoto(null)
+}
+
 const form = reactive({
   displayName: '',
   tagline: '',
@@ -95,9 +186,56 @@ async function save() {
           <textarea id="bio" v-model="form.bio" class="field min-h-[100px]" maxlength="2000" placeholder="Décrivez votre expérience, vos valeurs…" />
         </div>
         <div>
-          <label class="label" for="photoUrl">URL de votre photo</label>
-          <input id="photoUrl" v-model="form.photoUrl" type="url" class="field" placeholder="https://…" />
-          <img v-if="form.photoUrl" :src="form.photoUrl" alt="Aperçu" class="mt-2 h-20 w-20 rounded-full object-cover" />
+          <label class="label">Photo de profil</label>
+          <div class="mt-1 flex items-center gap-4">
+            <img
+              v-if="form.photoUrl"
+              :src="form.photoUrl"
+              alt="Aperçu de votre photo"
+              class="h-20 w-20 shrink-0 rounded-full object-cover ring-1 ring-slate-200"
+            />
+            <div
+              v-else
+              class="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400"
+              aria-hidden="true"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-8 w-8">
+                <path fill-rule="evenodd" d="M18.685 19.097A9.723 9.723 0 0 0 21.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 0 0 3.065 7.097A9.716 9.716 0 0 0 12 21.75a9.716 9.716 0 0 0 6.685-2.653Zm-12.54-1.285A7.486 7.486 0 0 1 12 15a7.486 7.486 0 0 1 5.855 2.812A8.224 8.224 0 0 1 12 20.25a8.224 8.224 0 0 1-5.855-2.438ZM15.75 9a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" clip-rule="evenodd" />
+              </svg>
+            </div>
+
+            <!-- `accept="image/*"` ouvre directement l'appareil photo / la pellicule sur mobile -->
+            <input
+              ref="photoInput"
+              type="file"
+              accept="image/*"
+              class="sr-only"
+              @change="onPhotoSelected"
+            />
+            <div class="space-y-1.5">
+              <button
+                type="button"
+                class="btn-ghost px-4 py-2 text-sm"
+                :disabled="photoLoading"
+                @click="photoInput?.click()"
+              >
+                {{ photoLoading ? 'Chargement…' : form.photoUrl ? 'Changer la photo' : 'Importer une photo' }}
+              </button>
+              <button
+                v-if="form.photoUrl && !photoLoading"
+                type="button"
+                class="block text-sm font-medium text-red-600 hover:underline"
+                @click="removePhoto"
+              >
+                Supprimer
+              </button>
+              <p class="text-xs text-slate-400">
+                JPG, PNG ou WEBP — depuis votre téléphone ou ordinateur. Enregistrement automatique.
+              </p>
+            </div>
+          </div>
+          <p v-if="photoError" class="mt-2 text-sm text-red-600">{{ photoError }}</p>
+          <p v-else-if="photoSuccess" class="mt-2 text-sm text-green-600">{{ photoSuccess }}</p>
         </div>
       </div>
 

@@ -1,8 +1,10 @@
 import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
 import { createCheckoutSession } from '~/server/utils/stripe'
+import { getValidAccessToken, createHostedCheckout } from '~/server/utils/sumup'
 
-// Crée la session de paiement Stripe pour un devis validé. Le client est redirigé vers Checkout.
+// Crée la session de paiement pour un devis validé et renvoie l'URL hébergée.
+// Bascule entre Stripe et SumUp selon le prestataire configuré par le chauffeur.
 export default defineEventHandler(async (event) => {
   const token = getRouterParam(event, 'token')!
   const config = useRuntimeConfig()
@@ -25,16 +27,12 @@ export default defineEventHandler(async (event) => {
   if (quote.expiresAt.getTime() < Date.now()) {
     throw createError({ statusCode: 410, statusMessage: 'Ce devis a expiré.' })
   }
+  // Le prépaiement en ligne doit faire partie des moyens acceptés par le chauffeur
+  // (la disponibilité du prestataire — Stripe ou SumUp — est vérifiée plus bas).
   if (!quote.driver.paymentMethods.includes('STRIPE_PREPAYMENT')) {
     throw createError({
       statusCode: 409,
       statusMessage: 'Le chauffeur ne propose pas le paiement en ligne pour cette course.',
-    })
-  }
-  if (!quote.driver.stripeAccountId || !quote.driver.stripeChargesEnabled) {
-    throw createError({
-      statusCode: 503,
-      statusMessage: 'Le chauffeur n’a pas finalisé sa configuration de paiement.',
     })
   }
 
@@ -43,6 +41,40 @@ export default defineEventHandler(async (event) => {
       ? `Transfert — ${quote.driver.displayName}`
       : `Mise à disposition — ${quote.driver.displayName}`
 
+  const successUrl = `${config.public.appBaseUrl}/devis/${token}?paid=1`
+  const cancelUrl = `${config.public.appBaseUrl}/devis/${token}`
+
+  // ─── SumUp (chauffeur merchant of record) ───────────────────────────────
+  if (quote.driver.paymentProvider === 'SUMUP') {
+    if (!quote.driver.sumupConnected || !quote.driver.sumupMerchantCode) {
+      throw createError({ statusCode: 503, statusMessage: 'Le chauffeur n’a pas connecté son compte SumUp.' })
+    }
+    const accessToken = await getValidAccessToken(quote.driver)
+    const checkout = await createHostedCheckout({
+      accessToken,
+      merchantCode: quote.driver.sumupMerchantCode,
+      checkoutReference: quote.id,
+      amount: quote.amountCents / 100, // SumUp attend des unités majeures (euros)
+      currency: quote.currency,
+      description,
+      returnUrl: `${config.public.appBaseUrl}/api/webhooks/sumup`,
+      redirectUrl: successUrl,
+    })
+    // Mémorise l'id du checkout pour que le webhook retrouve ce devis.
+    await prisma.quote.update({ where: { id: quote.id }, data: { sumupCheckoutId: checkout.id } })
+    if (!checkout.hosted_checkout_url) {
+      throw createError({ statusCode: 502, statusMessage: 'SumUp n’a pas renvoyé d’URL de paiement.' })
+    }
+    return { url: checkout.hosted_checkout_url }
+  }
+
+  // ─── Stripe (destination charge) ────────────────────────────────────────
+  if (!quote.driver.stripeAccountId || !quote.driver.stripeChargesEnabled) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Le chauffeur n’a pas finalisé sa configuration de paiement.',
+    })
+  }
   const session = await createCheckoutSession({
     quoteId: quote.id,
     amountCents: quote.amountCents,
@@ -51,11 +83,8 @@ export default defineEventHandler(async (event) => {
     connectedAccountId: quote.driver.stripeAccountId,
     customerEmail: quote.rideRequest.customerEmail,
     description,
-    successUrl: `${config.public.appBaseUrl}/devis/${token}?paid=1`,
-    cancelUrl: `${config.public.appBaseUrl}/devis/${token}`,
+    successUrl,
+    cancelUrl,
   })
-
-  // Le Payment et le Booking sont créés à la confirmation (webhook), une fois le
-  // paiement effectivement abouti — c'est la règle produit : pas de blocage avant paiement.
   return { url: session.url }
 })

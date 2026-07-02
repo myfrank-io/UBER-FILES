@@ -53,8 +53,10 @@ async function main() {
       locale: 'fr',
       // Démo : accepte le prépaiement en ligne ET l'encaissement sur place (carte/espèces).
       paymentMethods: ['STRIPE_PREPAYMENT', 'ONSITE_CARD', 'ONSITE_CASH'],
-      // Stripe simulé pour les tests — permet d'afficher le formulaire et d'utiliser
-      // le bouton "Payer (test)" via /api/dev/confirm-booking sans vrai compte Stripe.
+      // Démo : on garde le chauffeur sur Stripe simulé pour que `canAcceptBookings`
+      // soit vrai sans vrai compte de paiement, et que le bouton "Confirmer sans payer"
+      // (/api/dev/confirm-booking) reste utilisable. En prod, le défaut est SumUp.
+      paymentProvider: 'STRIPE',
       stripeAccountId: 'acct_test_karim_demo',
       stripeChargesEnabled: true,
       stripePayoutsEnabled: true,

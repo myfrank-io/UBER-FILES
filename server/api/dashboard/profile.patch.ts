@@ -6,7 +6,17 @@ const schema = z.object({
   displayName: z.string().min(2).max(120).optional(),
   tagline: z.string().max(200).optional().nullable(),
   bio: z.string().max(2000).optional().nullable(),
-  photoUrl: z.string().url().optional().nullable(),
+  // Accepte une URL http(s) classique OU une image importée depuis l'appareil,
+  // encodée en data URL (data:image/...;base64,…). ~8 Mo de marge en base64.
+  photoUrl: z
+    .string()
+    .max(8_000_000)
+    .refine(
+      (v) => /^https?:\/\//i.test(v) || /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(v),
+      'Photo invalide.',
+    )
+    .optional()
+    .nullable(),
   vehicleMake: z.string().max(60).optional().nullable(),
   vehicleModel: z.string().max(60).optional().nullable(),
   vehicleClass: z.string().max(60).optional().nullable(),

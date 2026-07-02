@@ -1,5 +1,6 @@
 import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
+import { canAcceptBookings } from '~/server/utils/driver'
 import { ONSITE_METHODS, type PaymentMethod } from '~/lib/payment-methods'
 
 // Consultation d'un devis par le client via son jeton signé (sans compte).
@@ -21,7 +22,7 @@ export default defineEventHandler(async (event) => {
 
   // Options de paiement proposées au client selon le choix du chauffeur.
   const methods = quote.driver.paymentMethods as PaymentMethod[]
-  const stripeReady = Boolean(quote.driver.stripeAccountId) && quote.driver.stripeChargesEnabled
+  const onlineReady = canAcceptBookings(quote.driver)
   const onSiteMethods = methods.filter((m) => ONSITE_METHODS.includes(m))
 
   return {
@@ -36,8 +37,8 @@ export default defineEventHandler(async (event) => {
     alreadyPaid: Boolean(quote.booking?.payments.some((p) => p.status === 'PAID')),
     payment: {
       // Le prépaiement en ligne n'est proposé que si le chauffeur l'accepte ET que
-      // son compte Stripe est opérationnel.
-      prepaymentAvailable: methods.includes('STRIPE_PREPAYMENT') && stripeReady,
+      // son prestataire de paiement (Stripe ou SumUp) est opérationnel.
+      prepaymentAvailable: methods.includes('STRIPE_PREPAYMENT') && onlineReady,
       // Encaissement sur place : le client réserve et règle le jour de la course.
       onSiteMethods,
     },

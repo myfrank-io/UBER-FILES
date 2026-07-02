@@ -1,4 +1,5 @@
 import { createError } from 'h3'
+import type { Driver } from '@prisma/client'
 import { prisma } from './prisma'
 import type { DriverWithPricing } from './quote-service'
 
@@ -12,4 +13,13 @@ export async function loadActiveDriverBySlug(slug: string): Promise<DriverWithPr
     throw createError({ statusCode: 404, statusMessage: 'Chauffeur introuvable.' })
   }
   return driver
+}
+
+/**
+ * Le chauffeur peut-il encaisser en ligne ? Dépend du prestataire actif :
+ *  - SUMUP  : compte OAuth connecté
+ *  - STRIPE : onboarding terminé (charges activées)
+ */
+export function canAcceptBookings(driver: Pick<Driver, 'paymentProvider' | 'sumupConnected' | 'stripeChargesEnabled'>): boolean {
+  return driver.paymentProvider === 'SUMUP' ? driver.sumupConnected : driver.stripeChargesEnabled
 }

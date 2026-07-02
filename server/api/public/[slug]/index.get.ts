@@ -1,4 +1,4 @@
-import { loadActiveDriverBySlug } from '~/server/utils/driver'
+import { loadActiveDriverBySlug, canAcceptBookings } from '~/server/utils/driver'
 import { ONSITE_METHODS, type PaymentMethod } from '~/lib/payment-methods'
 
 // Profil public d'un chauffeur + résumé tarifaire (pour la page de réservation).
@@ -14,13 +14,13 @@ export default defineEventHandler(async (event) => {
     : null
 
   // Moyens de paiement effectivement proposables au client : le prépaiement en
-  // ligne n'est retenu que si le compte Stripe est opérationnel ; les encaissements
-  // sur place sont toujours utilisables. La réservation est ouverte dès qu'au
-  // moins un moyen est disponible (le chauffeur n'est plus obligé d'activer Stripe).
+  // ligne n'est retenu que si le prestataire actif (Stripe ou SumUp) est opérationnel ;
+  // les encaissements sur place sont toujours utilisables. Le formulaire de réservation
+  // reste affiché dans tous les cas (le paiement se règle en aval avec le chauffeur).
   const methods = driver.paymentMethods as PaymentMethod[]
-  const stripeReady = Boolean(driver.stripeAccountId) && driver.stripeChargesEnabled
+  const onlineReady = canAcceptBookings(driver)
   const acceptedPaymentMethods = methods.filter(
-    (m) => (m === 'STRIPE_PREPAYMENT' ? stripeReady : ONSITE_METHODS.includes(m)),
+    (m) => (m === 'STRIPE_PREPAYMENT' ? onlineReady : ONSITE_METHODS.includes(m)),
   )
 
   return {
