@@ -50,6 +50,21 @@ enum DriverStatus {
   SUSPENDED
 }
 
+/// Moyens de paiement qu'un chauffeur peut accepter. Il choisit librement
+/// lesquels activer dans ses réglages : prépaiement en ligne et/ou
+/// encaissement sur place le jour de la course (carte, espèces, chèque).
+enum PaymentMethod {
+  STRIPE_PREPAYMENT // paiement en avance par carte en ligne (Stripe ou SumUp selon le prestataire actif)
+  ONSITE_CARD       // carte bancaire sur place (terminal du chauffeur)
+  ONSITE_CASH       // espèces sur place
+  ONSITE_CHECK      // chèque sur place
+}
+
+enum PaymentProvider {
+  STRIPE
+  SUMUP
+}
+
 /// Un chauffeur = un tenant. Sa page publique est servie sur /{slug}.
 model Driver {
   id     String       @id @default(cuid())
@@ -75,15 +90,31 @@ model Driver {
   sirenVerified Boolean @default(false)
   companyName   String?
 
+  // Prestataire de paiement actif pour ce chauffeur.
+  paymentProvider PaymentProvider @default(SUMUP)
+
   // Paiement (Stripe Connect Express)
   stripeAccountId       String? @unique
   stripeOnboarded       Boolean @default(false)
   stripePayoutsEnabled  Boolean @default(false)
   stripeChargesEnabled  Boolean @default(false)
 
+  // Paiement (SumUp OAuth — le chauffeur est merchant of record, encaisse en direct).
+  // Les jetons OAuth sont stockés CHIFFRÉS (AES-256-GCM via SUMUP_TOKEN_ENCRYPTION_KEY).
+  sumupMerchantCode    String?   @unique
+  sumupAccessToken     String?   @db.Text // chiffré
+  sumupRefreshToken    String?   @db.Text // chiffré
+  sumupTokenExpiresAt  DateTime?
+  sumupConnected       Boolean   @default(false)
+
   // Notifications
   telegramChatId String?
   telegramLinkCode String? @unique // code d'appairage du bot
+
+  // Moyens de paiement acceptés (choisis par le chauffeur dans ses réglages).
+  // Par défaut : prépaiement Stripe. Le chauffeur peut tout encaisser sur place
+  // (carte / espèces / chèque) sans passer par le prépaiement s'il le souhaite.
+  paymentMethods PaymentMethod[] @default([STRIPE_PREPAYMENT])
 
   // Paramètres métier (centimes / minutes)
   currency             String @default("eur")
@@ -303,6 +334,9 @@ model Quote {
   // Part chauffeur / commission plateforme (destination charges)
   applicationFeeCents Int @default(0)
 
+  // Id du Hosted Checkout SumUp en cours (permet au webhook de retrouver le devis).
+  sumupCheckoutId String? @unique
+
   expiresAt   DateTime
   sentAt      DateTime?
   acceptedAt  DateTime?
@@ -417,14 +451,23 @@ model Payment {
   booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   bookingId String
 
+  provider PaymentProvider @default(SUMUP)
+
   stripeCheckoutSessionId String? @unique
   stripePaymentIntentId   String? @unique
   stripeChargeId          String?
+
+  // SumUp : id du checkout hébergé + code de la transaction aboutie.
+  sumupCheckoutId       String? @unique
+  sumupTransactionCode  String?
 
   amountCents         Int
   applicationFeeCents Int @default(0)
   currency            String @default("eur")
   status              PaymentStatus @default(PENDING)
+  // Moyen par lequel ce paiement est (ou sera) encaissé. Pour un encaissement
+  // sur place, le paiement reste PENDING jusqu'à ce que le chauffeur le marque reçu.
+  method              PaymentMethod @default(STRIPE_PREPAYMENT)
 
   refunds Refund[]
 
@@ -449,6 +492,7 @@ model Refund {
   bookingId String
 
   stripeRefundId String? @unique
+  sumupRefundTxId String? @unique
   amountCents    Int
   reason         String?
   status         RefundStatus @default(PENDING)

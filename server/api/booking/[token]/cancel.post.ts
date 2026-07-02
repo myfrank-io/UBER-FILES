@@ -2,6 +2,7 @@ import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
 import { computeRefund } from '~/lib/cancellation'
 import { createRefund } from '~/server/utils/stripe'
+import { getValidAccessToken, refundTransaction } from '~/server/utils/sumup'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { sendTelegramMessage } from '~/server/utils/telegram'
 import { formatMoney } from '~/lib/money'
@@ -33,23 +34,39 @@ export default defineEventHandler(async (event) => {
   const refund = computeRefund(booking.amountCents, booking.scheduledAt, policy)
   const payment = booking.payments[0]
 
-  // Remboursement Stripe (si paiement présent et montant > 0).
-  if (payment?.stripePaymentIntentId && refund.refundCents > 0 && config.stripeSecretKey) {
-    const stripeRefund = await createRefund(payment.stripePaymentIntentId, refund.refundCents)
-    await prisma.refund.create({
-      data: {
-        paymentId: payment.id,
-        bookingId: booking.id,
-        stripeRefundId: stripeRefund.id,
-        amountCents: refund.refundCents,
-        reason: 'Annulation client',
-        status: 'SUCCEEDED',
-      },
-    })
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: { status: refund.refundCents === booking.amountCents ? 'REFUNDED' : 'PARTIALLY_REFUNDED' },
-    })
+  // Remboursement (si paiement présent et montant > 0), selon le prestataire.
+  if (payment && refund.refundCents > 0) {
+    let refunded = false
+    let refundRef: { stripeRefundId?: string; sumupRefundTxId?: string } = {}
+
+    if (payment.provider === 'SUMUP' && payment.sumupTransactionCode) {
+      // SumUp rembourse en unités majeures (euros) sur la transaction d'origine.
+      const accessToken = await getValidAccessToken(booking.driver)
+      await refundTransaction(accessToken, payment.sumupTransactionCode, refund.refundCents / 100)
+      refundRef = { sumupRefundTxId: payment.sumupTransactionCode }
+      refunded = true
+    } else if (payment.stripePaymentIntentId && config.stripeSecretKey) {
+      const stripeRefund = await createRefund(payment.stripePaymentIntentId, refund.refundCents)
+      refundRef = { stripeRefundId: stripeRefund.id }
+      refunded = true
+    }
+
+    if (refunded) {
+      await prisma.refund.create({
+        data: {
+          paymentId: payment.id,
+          bookingId: booking.id,
+          ...refundRef,
+          amountCents: refund.refundCents,
+          reason: 'Annulation client',
+          status: 'SUCCEEDED',
+        },
+      })
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: refund.refundCents === booking.amountCents ? 'REFUNDED' : 'PARTIALLY_REFUNDED' },
+      })
+    }
   }
 
   // Annulation + libération du créneau (transaction).

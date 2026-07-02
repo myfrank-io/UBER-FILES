@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
       include: {
         customer: true,
         quote: { include: { rideRequest: true } },
-        payments: { where: { status: 'PAID' }, take: 1 },
+        payments: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
       orderBy: { scheduledAt: 'desc' },
       skip: (page - 1) * perPage,
@@ -56,7 +56,10 @@ export default defineEventHandler(async (event) => {
         distanceMeters: b.quote.rideRequest.distanceMeters,
         notes: b.quote.rideRequest.notes,
       },
-      paidAt: b.payments[0]?.createdAt ?? null,
+      payment: b.payments[0]
+        ? { method: b.payments[0].method, status: b.payments[0].status }
+        : null,
+      paidAt: b.payments[0]?.status === 'PAID' ? b.payments[0].createdAt : null,
     })),
     total,
     page,

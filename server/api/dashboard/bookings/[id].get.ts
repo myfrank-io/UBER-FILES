@@ -50,6 +50,7 @@ export default defineEventHandler(async (event) => {
     payments: booking.payments.map((p) => ({
       id: p.id,
       status: p.status,
+      method: p.method,
       amountCents: p.amountCents,
       createdAt: p.createdAt,
     })),

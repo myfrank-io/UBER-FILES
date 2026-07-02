@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import {
+  PAYMENT_METHODS,
+  PAYMENT_METHOD_LABELS,
+  type PaymentMethod,
+} from '~/lib/payment-methods'
+
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Réglages' })
 const { formatMoney } = useFormat()
@@ -21,8 +27,71 @@ async function connectStripe() {
   }
 }
 
+// ─── SumUp ─────────────────────────────────────────────────────────────────
+
+const SUMUP_MESSAGES: Record<string, { type: 'success' | 'error'; text: string }> = {
+  connected: { type: 'success', text: 'Compte SumUp connecté. Vous pouvez encaisser vos courses.' },
+  denied: { type: 'error', text: 'Connexion SumUp refusée.' },
+  invalid_state: { type: 'error', text: 'Session de connexion expirée, réessayez.' },
+  error: { type: 'error', text: 'Échec de la connexion SumUp. Réessayez.' },
+}
+
+async function connectSumup() {
+  connecting.value = true
+  try {
+    const res = await $fetch<{ url: string }>('/api/payments/sumup/connect', { method: 'POST' })
+    if (res.url) window.location.href = res.url
+  } catch {
+    connecting.value = false
+  }
+}
+
+async function disconnectSumup() {
+  if (!confirm('Déconnecter votre compte SumUp ? Vous ne pourrez plus encaisser tant qu’un compte n’est pas reconnecté.')) return
+  await call('sumup-disconnect', () => $fetch('/api/payments/sumup/disconnect', { method: 'POST' }))
+}
+
 const route = useRoute()
-onMounted(() => { if (route.query.stripe) refresh() })
+onMounted(() => {
+  if (route.query.stripe) refresh()
+  const code = route.query.sumup as string | undefined
+  if (code) {
+    refresh()
+    const msg = SUMUP_MESSAGES[code]
+    if (msg?.type === 'success') successMsg.value = msg.text
+    else if (msg) errorMsg.value = msg.text
+  }
+})
+
+// ─── Moyens de paiement acceptés ───────────────────────────────────────────
+
+const paymentMethods = ref<PaymentMethod[]>([])
+
+watchEffect(() => {
+  const m = (me.value as Record<string, unknown>)?.paymentMethods as PaymentMethod[] | undefined
+  if (m) paymentMethods.value = [...m]
+})
+
+// Stripe doit être opérationnel pour proposer effectivement le prépaiement en ligne.
+const stripeReady = computed(() => {
+  const s = (me.value as Record<string, unknown>)?.stripe as Record<string, unknown> | undefined
+  return Boolean(s?.connected && s?.chargesEnabled)
+})
+
+function toggleMethod(method: PaymentMethod) {
+  const i = paymentMethods.value.indexOf(method)
+  if (i === -1) paymentMethods.value.push(method)
+  else paymentMethods.value.splice(i, 1)
+}
+
+async function savePaymentMethods() {
+  await call('payment-methods', () =>
+    $fetch('/api/dashboard/settings', {
+      method: 'PATCH',
+      body: { paymentMethods: paymentMethods.value },
+    }),
+  )
+}
 
 // ─── Paramètres métier ─────────────────────────────────────────────────────
 
@@ -329,22 +398,98 @@ async function deleteSurcharge(id: string) {
       </p>
     </div>
 
-    <!-- Stripe -->
+    <!-- SumUp (prestataire de paiement principal) -->
     <div v-if="me" class="card">
+      <h2 class="font-semibold text-slate-900">Paiement (SumUp)</h2>
+      <p class="mt-1 text-sm text-slate-600">
+        Connectez votre compte SumUp : les paiements de vos courses arrivent directement chez vous.
+      </p>
+      <div class="mt-3">
+        <p v-if="((me as Record<string, unknown>).sumup as Record<string, unknown>)?.connected" class="inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm text-green-800">
+          ✅ Compte SumUp connecté — encaissement actif
+        </p>
+        <p v-else class="text-sm text-slate-500">Aucun compte SumUp connecté.</p>
+      </div>
+      <div class="mt-4 flex gap-2">
+        <button class="btn-primary" :disabled="connecting" @click="connectSumup">
+          {{ connecting ? '…' : ((me as Record<string, unknown>).sumup as Record<string, unknown>)?.connected ? 'Reconnecter SumUp' : 'Connecter SumUp' }}
+        </button>
+        <button
+          v-if="((me as Record<string, unknown>).sumup as Record<string, unknown>)?.connected"
+          class="btn-ghost"
+          :disabled="saving === 'sumup-disconnect'"
+          @click="disconnectSumup"
+        >
+          Déconnecter
+        </button>
+      </div>
+    </div>
+
+    <!-- Stripe (alternative — affiché si déjà utilisé) -->
+    <div v-if="me && ((me as Record<string, unknown>).stripe as Record<string, unknown>)?.connected" class="card">
       <h2 class="font-semibold text-slate-900">Paiement (Stripe)</h2>
       <div class="mt-3">
-        <p v-if="(me as Record<string, unknown>).stripe && ((me as Record<string, unknown>).stripe as Record<string, unknown>).chargesEnabled" class="inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm text-green-800">
+        <p v-if="((me as Record<string, unknown>).stripe as Record<string, unknown>).chargesEnabled" class="inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm text-green-800">
           ✅ Compte actif — paiements et reversements activés
         </p>
-        <p v-else-if="(me as Record<string, unknown>).stripe && ((me as Record<string, unknown>).stripe as Record<string, unknown>).connected" class="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-sm text-amber-800">
+        <p v-else class="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-sm text-amber-800">
           ⏳ Onboarding à finaliser
         </p>
-        <p v-else class="text-sm text-slate-500">Aucun compte de paiement configuré.</p>
       </div>
       <button class="btn-primary mt-4" :disabled="connecting" @click="connectStripe">
-        {{ connecting ? '…' : ((me as Record<string, unknown>).stripe as Record<string, unknown>)?.connected ? 'Reprendre l\'onboarding' : 'Configurer les paiements' }}
+        {{ connecting ? '…' : 'Reprendre l\'onboarding' }}
       </button>
     </div>
+
+    <!-- Moyens de paiement acceptés -->
+    <form v-if="me" class="card space-y-4" @submit.prevent="savePaymentMethods">
+      <div>
+        <h2 class="font-semibold text-slate-900">Moyens de paiement acceptés</h2>
+        <p class="mt-1 text-sm text-slate-600">
+          Choisissez comment vos clients règlent leurs courses. Vous pouvez exiger un
+          paiement en ligne à l'avance, ou tout encaisser sur place le jour de la course
+          (carte, espèces, chèque) — c'est vous qui décidez.
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        <label
+          v-for="method in PAYMENT_METHODS"
+          :key="method"
+          class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200"
+        >
+          <input
+            type="checkbox"
+            class="mt-0.5 rounded"
+            :checked="paymentMethods.includes(method)"
+            @change="toggleMethod(method)"
+          />
+          <span class="flex-1">
+            <span class="text-sm font-medium text-slate-800">{{ PAYMENT_METHOD_LABELS[method] }}</span>
+            <span
+              v-if="method === 'STRIPE_PREPAYMENT' && paymentMethods.includes(method) && !stripeReady"
+              class="mt-1 block text-xs text-amber-600"
+            >
+              ⚠️ Configurez d'abord votre compte Stripe ci-dessus pour activer le paiement en ligne.
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <p v-if="!paymentMethods.length" class="text-xs text-red-600">
+        Sélectionnez au moins un moyen de paiement.
+      </p>
+
+      <div class="flex justify-end">
+        <button
+          type="submit"
+          class="btn-primary"
+          :disabled="saving === 'payment-methods' || !paymentMethods.length"
+        >
+          {{ saving === 'payment-methods' ? 'Enregistrement…' : 'Enregistrer' }}
+        </button>
+      </div>
+    </form>
 
     <!-- Paramètres métier -->
     <form class="card space-y-4" @submit.prevent="saveSettings">

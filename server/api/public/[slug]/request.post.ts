@@ -14,13 +14,9 @@ export default defineEventHandler(async (event) => {
   const driver = await loadActiveDriverBySlug(slug)
   const config = useRuntimeConfig()
 
-  // Bloquer la demande si le paiement Stripe n'est pas encore activé sur ce compte.
-  if (!driver.stripeChargesEnabled) {
-    throw createError({
-      statusCode: 503,
-      statusMessage: 'Les réservations en ligne ne sont pas encore disponibles pour ce chauffeur. Contactez-le directement.',
-    })
-  }
+  // La demande est acceptée même si aucun moyen de paiement n'est encore configuré :
+  // elle est transmise au chauffeur, qui valide le devis et règle le paiement
+  // directement avec le client (le paiement en ligne reste optionnel, en aval).
 
   const body = await readValidatedBody(event, (b) => rideRequestSchema.safeParse(b))
   if (!body.success) {

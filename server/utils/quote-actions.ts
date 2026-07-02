@@ -61,12 +61,18 @@ export async function sendQuoteToClient(
   )
   const payUrl = `${config.public.appBaseUrl}/devis/${token}`
 
+  // Le chauffeur propose-t-il le prépaiement en ligne ? (adapte le libellé du bouton)
+  const prepayment =
+    quote.driver.paymentMethods.includes('STRIPE_PREPAYMENT') &&
+    Boolean(quote.driver.stripeAccountId) &&
+    quote.driver.stripeChargesEnabled
   const tpl = emailTemplates.quoteSent({
     driverName: quote.driver.displayName,
     amountCents,
     currency: quote.currency,
     payUrl,
     expiresAt,
+    prepayment,
   })
   await sendEmail({ to: quote.rideRequest.customerEmail, ...tpl })
 

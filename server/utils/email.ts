@@ -1,6 +1,7 @@
 // Envoi d'emails transactionnels via Resend. Sans clé API, on journalise et on
 // renvoie un succès simulé (dev/test). Tous les emails client passent par ici.
 import { formatMoney } from '~/lib/money'
+import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '~/lib/payment-methods'
 
 interface SendArgs {
   to: string
@@ -46,14 +47,24 @@ const button = (url: string, label: string) =>
   `<p style="margin:24px 0"><a href="${url}" style="background:#4f46e5;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">${label}</a></p>`
 
 export const emailTemplates = {
-  quoteSent(opts: { driverName: string; amountCents: number; currency: string; payUrl: string; expiresAt: Date }) {
+  quoteSent(opts: {
+    driverName: string
+    amountCents: number
+    currency: string
+    payUrl: string
+    expiresAt: Date
+    // True si le chauffeur propose le prépaiement en ligne ; sinon le client
+    // réserve et règle sur place (le libellé du bouton s'adapte).
+    prepayment?: boolean
+  }) {
+    const label = opts.prepayment === false ? 'Voir mon devis et réserver' : 'Payer et confirmer la course'
     return {
       subject: `Votre devis — ${opts.driverName}`,
       html: wrap(
         'Votre devis est prêt',
         `<p>${opts.driverName} a validé votre devis :</p>
          <p style="font-size:28px;font-weight:700">${formatMoney(opts.amountCents, opts.currency)}</p>
-         ${button(opts.payUrl, 'Payer et confirmer la course')}
+         ${button(opts.payUrl, label)}
          <p style="font-size:13px;color:#6b7280">Devis valable jusqu'au ${opts.expiresAt.toLocaleString('fr-FR')}.</p>`,
       ),
     }
@@ -87,6 +98,46 @@ export const emailTemplates = {
       html: wrap(
         'Votre réservation est confirmée ✅',
         `<p>Le paiement de <strong>${formatMoney(opts.amountCents, opts.currency)}</strong> a bien été reçu.</p>
+         <p>Prise en charge le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
+         ${contact ? `<p style="font-size:13px;color:#374151">Contact chauffeur : ${contact}</p>` : ''}
+         ${button(opts.manageUrl, 'Gérer ma réservation')}
+         <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
+         <p style="font-size:11px;color:#9ca3af">${legalLines}</p>
+         <p style="font-size:11px;color:#9ca3af">Conformément à l'art. L221-28 du Code de la consommation, le droit de rétractation de 14 jours ne s'applique pas à ce service de transport daté.</p>`,
+      ),
+    }
+  },
+  bookingConfirmedOnSite(opts: {
+    driverName: string
+    amountCents: number
+    currency: string
+    scheduledAt: Date
+    method: PaymentMethod
+    manageUrl: string
+    driverPhone?: string | null
+    driverEmail?: string | null
+    siren?: string | null
+    companyName?: string | null
+    vehicleMake?: string | null
+    vehicleModel?: string | null
+  }) {
+    const contact = [
+      opts.driverPhone ? `📞 ${opts.driverPhone}` : '',
+      opts.driverEmail ? `✉️ ${opts.driverEmail}` : '',
+    ].filter(Boolean).join('&nbsp;&nbsp;|&nbsp;&nbsp;')
+
+    const legalLines = [
+      opts.companyName ? `Prestataire : ${opts.companyName}` : `Prestataire : ${opts.driverName}`,
+      opts.siren ? `SIREN : ${opts.siren}` : '',
+      opts.vehicleMake && opts.vehicleModel ? `Véhicule : ${opts.vehicleMake} ${opts.vehicleModel}` : '',
+    ].filter(Boolean).join(' &nbsp;·&nbsp; ')
+
+    return {
+      subject: `Confirmation de réservation — ${opts.driverName}`,
+      html: wrap(
+        'Votre réservation est confirmée ✅',
+        `<p>Votre course est réservée. Le règlement de <strong>${formatMoney(opts.amountCents, opts.currency)}</strong> se fera <strong>sur place</strong>, le jour de la course.</p>
+         <p style="font-size:13px;color:#374151">Moyen de paiement prévu : <strong>${PAYMENT_METHOD_LABELS[opts.method]}</strong>.</p>
          <p>Prise en charge le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
          ${contact ? `<p style="font-size:13px;color:#374151">Contact chauffeur : ${contact}</p>` : ''}
          ${button(opts.manageUrl, 'Gérer ma réservation')}
