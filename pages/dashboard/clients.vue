@@ -4,7 +4,7 @@ definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Clients' })
 const { formatMoney, formatDateTime } = useFormat()
 
-const { data: customers } = await useFetch('/api/dashboard/customers')
+const { data: customers } = await useFetch('/api/dashboard/customers', { lazy: true })
 
 function exportCsv() {
   if (!customers.value) return
@@ -34,6 +34,7 @@ function exportCsv() {
   <div>
     <div class="flex items-center justify-between">
       <h1 class="text-2xl font-bold text-slate-900">Clients</h1>
+      <p v-if="!customers" class="mt-1 text-sm text-slate-400">Chargement…</p>
       <button v-if="customers?.length" class="btn-ghost !py-2 text-sm" @click="exportCsv">
         Exporter CSV
       </button>

@@ -101,6 +101,7 @@ const range = computed(() => ({
 }))
 
 const { data: events, refresh, pending } = await useFetch<CalEvent[]>('/api/dashboard/calendar', {
+  lazy: true,
   query: range,
   watch: [range],
   default: () => [],

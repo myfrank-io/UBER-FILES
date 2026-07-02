@@ -24,7 +24,7 @@ const query = computed(() => ({
   page: page.value,
 }))
 
-const { data, refresh, pending } = await useFetch('/api/dashboard/bookings', { query })
+const { data, refresh, pending } = await useFetch('/api/dashboard/bookings', { query, lazy: true })
 
 function applyFilters() { page.value = 1; refresh() }
 function resetFilters() {
