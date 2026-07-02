@@ -14,9 +14,9 @@ export default defineEventHandler(async (event) => {
   const driver = await loadActiveDriverBySlug(slug)
   const config = useRuntimeConfig()
 
-  // La demande est acceptée même si le paiement en ligne (Stripe) n'est pas activé :
-  // elle est transmise au chauffeur, qui valide le devis et règle le paiement
-  // directement avec le client (le paiement en ligne reste optionnel, en aval).
+  // La demande est acceptée même si le paiement en ligne (Stripe/SumUp) n'est pas
+  // activé : elle est transmise au chauffeur, qui valide le devis et règle le
+  // paiement directement avec le client (le paiement en ligne reste optionnel, en aval).
 
   const body = await readValidatedBody(event, (b) => rideRequestSchema.safeParse(b))
   if (!body.success) {
