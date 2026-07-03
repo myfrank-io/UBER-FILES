@@ -39,6 +39,7 @@ interface DriverPublic {
   fromKmCents: number | null
   fromHourCents: number | null
   acceptedPaymentMethods: PaymentMethod[]
+  instantPayment: boolean
 }
 
 const { data: driver, error } = await useFetch<DriverPublic>(`/api/public/${slug}`)
@@ -105,6 +106,17 @@ const estimating = ref(false)
 const submitting = ref(false)
 const errorMsg = ref('')
 const submitted = ref(false)
+
+// Flux en deux étapes : 1) course + estimation, 2) coordonnées du client.
+// Les coordonnées ne sont demandées qu'après avoir estimé et cliqué sur « Réserver ».
+const step = ref<'details' | 'contact'>('details')
+
+// Toute modification de la course invalide l'estimation (et ramène à l'étape 1) :
+// on ne peut pas réserver sur un prix périmé.
+watch([type, pickup, dropoff, roundTrip, durationHours, scheduledAt], () => {
+  estimate.value = null
+  step.value = 'details'
+})
 
 async function geocode(address: string) {
   return $fetch<{ lat: number; lng: number; formatted: string }>('/api/public/geocode', {
@@ -188,8 +200,21 @@ const canEstimate = computed(() =>
     : pickup.value.length > 3 && durationHours.value >= 1,
 )
 const canSubmit = computed(
-  () => canEstimate.value && customer.name.length >= 2 && customer.phone.length >= 6 && customer.email.includes('@'),
+  () => Boolean(estimate.value) && customer.name.length >= 2 && customer.phone.length >= 6 && customer.email.includes('@'),
 )
+
+// Libellé du bouton de réservation : « Réserver et payer » si le chauffeur impose
+// le paiement en ligne, sinon « Réserver » (le paiement se règle ensuite).
+const reserveLabel = computed(() =>
+  driver.value?.instantPayment ? t('public.reserveAndPay') : t('public.reserve'),
+)
+
+// Passage à l'étape « coordonnées » une fois le prix estimé.
+function goToContact() {
+  if (!estimate.value) return
+  errorMsg.value = ''
+  step.value = 'contact'
+}
 </script>
 
 <template>
@@ -304,124 +329,156 @@ const canSubmit = computed(
         </div>
       </div>
 
-      <!-- Type de prestation -->
-      <div class="grid grid-cols-2 gap-2">
-        <button
-          v-if="driver.hasTransfer"
-          type="button"
-          class="rounded-xl border-2 px-3 py-3 text-sm font-semibold transition"
-          :class="type === 'TRANSFER' ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'"
-          @click="type = 'TRANSFER'"
-        >
-          {{ $t('public.typeTransfer') }}
-          <span v-if="driver.fromKmCents" class="block text-xs font-normal text-slate-500">
-            {{ $t('public.fromPerKm', { price: formatMoney(driver.fromKmCents, driver.currency) }) }}
-          </span>
-        </button>
-        <button
-          v-if="driver.hasHourly"
-          type="button"
-          class="rounded-xl border-2 px-3 py-3 text-sm font-semibold transition"
-          :class="type === 'HOURLY' ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'"
-          @click="type = 'HOURLY'"
-        >
-          {{ $t('public.typeHourly') }}
-          <span v-if="driver.fromHourCents" class="block text-xs font-normal text-slate-500">
-            {{ $t('public.fromPerHour', { price: formatMoney(driver.fromHourCents, driver.currency) }) }}
-          </span>
-        </button>
-      </div>
+      <!-- Étape 1 : course + estimation (les coordonnées ne sont pas encore demandées) -->
+      <template v-if="step === 'details'">
+        <!-- Type de prestation -->
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            v-if="driver.hasTransfer"
+            type="button"
+            class="rounded-xl border-2 px-3 py-3 text-sm font-semibold transition"
+            :class="type === 'TRANSFER' ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'"
+            @click="type = 'TRANSFER'"
+          >
+            {{ $t('public.typeTransfer') }}
+            <span v-if="driver.fromKmCents" class="block text-xs font-normal text-slate-500">
+              {{ $t('public.fromPerKm', { price: formatMoney(driver.fromKmCents, driver.currency) }) }}
+            </span>
+          </button>
+          <button
+            v-if="driver.hasHourly"
+            type="button"
+            class="rounded-xl border-2 px-3 py-3 text-sm font-semibold transition"
+            :class="type === 'HOURLY' ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'"
+            @click="type = 'HOURLY'"
+          >
+            {{ $t('public.typeHourly') }}
+            <span v-if="driver.fromHourCents" class="block text-xs font-normal text-slate-500">
+              {{ $t('public.fromPerHour', { price: formatMoney(driver.fromHourCents, driver.currency) }) }}
+            </span>
+          </button>
+        </div>
 
-      <!-- Transfert -->
-      <template v-if="type === 'TRANSFER'">
+        <!-- Transfert -->
+        <template v-if="type === 'TRANSFER'">
+          <div>
+            <label class="label" for="pickup">{{ $t('public.pickupLabel') }}</label>
+            <AddressField id="pickup" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" />
+          </div>
+          <div>
+            <label class="label" for="dropoff">{{ $t('public.dropoffLabel') }}</label>
+            <AddressField id="dropoff" v-model="dropoff" :placeholder="$t('public.dropoffPlaceholder')" />
+          </div>
+          <label class="flex items-center gap-2 text-sm text-slate-700">
+            <input v-model="roundTrip" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+            {{ $t('public.roundTrip') }}
+          </label>
+        </template>
+
+        <!-- Mise à disposition -->
+        <template v-else>
+          <div>
+            <label class="label" for="pickup-hourly">{{ $t('public.pickupLabel') }}</label>
+            <AddressField id="pickup-hourly" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" />
+          </div>
+          <div>
+            <label class="label" for="duration">{{ $t('public.durationLabel') }}</label>
+            <input id="duration" v-model.number="durationHours" type="number" min="1" max="24" class="field" />
+          </div>
+        </template>
+
         <div>
-          <label class="label" for="pickup">{{ $t('public.pickupLabel') }}</label>
-          <AddressField id="pickup" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" />
+          <label class="label" for="datetime">{{ $t('public.datetimeLabel') }}</label>
+          <input id="datetime" v-model="scheduledAt" type="datetime-local" class="field" />
+          <p class="mt-1 text-xs text-slate-500">
+            {{ $t('public.leadTime', { hours: Math.round(driver.minLeadTimeMinutes / 60) }) }}
+          </p>
         </div>
-        <div>
-          <label class="label" for="dropoff">{{ $t('public.dropoffLabel') }}</label>
-          <AddressField id="dropoff" v-model="dropoff" :placeholder="$t('public.dropoffPlaceholder')" />
-        </div>
-        <label class="flex items-center gap-2 text-sm text-slate-700">
-          <input v-model="roundTrip" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
-          {{ $t('public.roundTrip') }}
-        </label>
+
+        <!-- Estimation -->
+        <button type="button" class="btn-ghost w-full" :disabled="!canEstimate || estimating" @click="getEstimate">
+          {{ estimating ? $t('public.estimating') : $t('public.estimateButton') }}
+        </button>
+
+        <p v-if="errorMsg" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
+
+        <template v-if="estimate">
+          <div class="rounded-xl bg-slate-50 p-4">
+            <div class="flex items-baseline justify-between">
+              <span class="text-sm text-slate-600">{{ $t('public.estimateLabel') }}</span>
+              <span class="text-2xl font-bold text-slate-900">
+                {{ formatMoney(estimate.amountCents, estimate.currency) }}
+              </span>
+            </div>
+            <ul class="mt-2 space-y-1 text-xs text-slate-500">
+              <li v-for="(line, i) in estimate.breakdown" :key="i" class="flex justify-between">
+                <span>{{ line.label }}<span v-if="line.detail"> — {{ line.detail }}</span></span>
+                <span>{{ formatMoney(line.amountCents, estimate.currency) }}</span>
+              </li>
+            </ul>
+            <p class="mt-2 text-xs text-slate-400">{{ $t('public.estimateIndicative') }}</p>
+          </div>
+
+          <!-- Réserver → passe à la saisie des coordonnées -->
+          <button type="button" class="btn-primary w-full" @click="goToContact">
+            {{ reserveLabel }}
+          </button>
+        </template>
       </template>
 
-      <!-- Mise à disposition -->
+      <!-- Étape 2 : coordonnées du client -->
       <template v-else>
-        <div>
-          <label class="label" for="pickup-hourly">{{ $t('public.pickupLabel') }}</label>
-          <AddressField id="pickup-hourly" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" />
+        <!-- Rappel de la course estimée -->
+        <div v-if="estimate" class="rounded-xl bg-slate-50 p-4">
+          <div class="flex items-baseline justify-between">
+            <span class="text-sm text-slate-600">{{ $t('public.estimateLabel') }}</span>
+            <span class="text-2xl font-bold text-slate-900">
+              {{ formatMoney(estimate.amountCents, estimate.currency) }}
+            </span>
+          </div>
+          <button
+            type="button"
+            class="mt-2 text-xs font-medium text-brand-700 hover:underline"
+            @click="step = 'details'"
+          >
+            ← {{ $t('public.modifyTrip') }}
+          </button>
         </div>
-        <div>
-          <label class="label" for="duration">{{ $t('public.durationLabel') }}</label>
-          <input id="duration" v-model.number="durationHours" type="number" min="1" max="24" class="field" />
+
+        <!-- Coordonnées client -->
+        <div class="space-y-3">
+          <div>
+            <label class="label" for="name">{{ $t('public.nameLabel') }}</label>
+            <input id="name" v-model="customer.name" type="text" class="field" required />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="label" for="phone">{{ $t('public.phoneLabel') }}</label>
+              <input id="phone" v-model="customer.phone" type="tel" class="field" required />
+            </div>
+            <div>
+              <label class="label" for="email">{{ $t('public.emailLabel') }}</label>
+              <input id="email" v-model="customer.email" type="email" class="field" required />
+            </div>
+          </div>
+          <div>
+            <label class="label" for="notes">{{ $t('public.notesLabel') }}</label>
+            <textarea id="notes" v-model="notes" rows="2" class="field" />
+          </div>
         </div>
+
+        <!-- CGV -->
+        <label class="flex items-start gap-2 text-xs text-slate-600">
+          <input v-model="cgvAccepted" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" />
+          <span>{{ $t('public.cgv') }}</span>
+        </label>
+
+        <p v-if="errorMsg" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
+
+        <button type="submit" class="btn-primary w-full" :disabled="!canSubmit || submitting">
+          {{ submitting ? $t('public.submitting') : reserveLabel }}
+        </button>
       </template>
-
-      <div>
-        <label class="label" for="datetime">{{ $t('public.datetimeLabel') }}</label>
-        <input id="datetime" v-model="scheduledAt" type="datetime-local" class="field" />
-        <p class="mt-1 text-xs text-slate-500">
-          {{ $t('public.leadTime', { hours: Math.round(driver.minLeadTimeMinutes / 60) }) }}
-        </p>
-      </div>
-
-      <!-- Estimation -->
-      <button type="button" class="btn-ghost w-full" :disabled="!canEstimate || estimating" @click="getEstimate">
-        {{ estimating ? $t('public.estimating') : $t('public.estimateButton') }}
-      </button>
-
-      <div v-if="estimate" class="rounded-xl bg-slate-50 p-4">
-        <div class="flex items-baseline justify-between">
-          <span class="text-sm text-slate-600">{{ $t('public.estimateLabel') }}</span>
-          <span class="text-2xl font-bold text-slate-900">
-            {{ formatMoney(estimate.amountCents, estimate.currency) }}
-          </span>
-        </div>
-        <ul class="mt-2 space-y-1 text-xs text-slate-500">
-          <li v-for="(line, i) in estimate.breakdown" :key="i" class="flex justify-between">
-            <span>{{ line.label }}<span v-if="line.detail"> — {{ line.detail }}</span></span>
-            <span>{{ formatMoney(line.amountCents, estimate.currency) }}</span>
-          </li>
-        </ul>
-        <p class="mt-2 text-xs text-slate-400">{{ $t('public.estimateIndicative') }}</p>
-      </div>
-
-      <!-- Coordonnées client -->
-      <div class="space-y-3 border-t border-slate-100 pt-4">
-        <div>
-          <label class="label" for="name">{{ $t('public.nameLabel') }}</label>
-          <input id="name" v-model="customer.name" type="text" class="field" required />
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="label" for="phone">{{ $t('public.phoneLabel') }}</label>
-            <input id="phone" v-model="customer.phone" type="tel" class="field" required />
-          </div>
-          <div>
-            <label class="label" for="email">{{ $t('public.emailLabel') }}</label>
-            <input id="email" v-model="customer.email" type="email" class="field" required />
-          </div>
-        </div>
-        <div>
-          <label class="label" for="notes">{{ $t('public.notesLabel') }}</label>
-          <textarea id="notes" v-model="notes" rows="2" class="field" />
-        </div>
-      </div>
-
-      <!-- CGV -->
-      <label class="flex items-start gap-2 text-xs text-slate-600">
-        <input v-model="cgvAccepted" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" />
-        <span>{{ $t('public.cgv') }}</span>
-      </label>
-
-      <p v-if="errorMsg" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
-
-      <button type="submit" class="btn-primary w-full" :disabled="!canSubmit || submitting">
-        {{ submitting ? $t('public.submitting') : $t('public.submitButton') }}
-      </button>
     </form>
 
     <p class="mt-6 text-center text-xs text-slate-400">
