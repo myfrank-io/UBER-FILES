@@ -56,11 +56,15 @@ async function save() {
 
 // Accès à l'espace du chauffeur : l'admin ouvre une session « en tant que » lui
 // pour visiter et modifier son back-office, puis pourra revenir à l'admin.
+const { fetch: refreshSession } = useUserSession()
 const impersonating = ref(false)
 async function enterSpace() {
   impersonating.value = true
   try {
     await $fetch(`/api/admin/drivers/${id}/impersonate`, { method: 'POST' })
+    // Recharger l'état de session client (désormais DRIVER) AVANT de naviguer,
+    // sinon le middleware `dashboard` lit l'ancien rôle ADMIN et renvoie au login.
+    await refreshSession()
     await navigateTo('/dashboard')
   } catch (e) {
     saveError.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.'
