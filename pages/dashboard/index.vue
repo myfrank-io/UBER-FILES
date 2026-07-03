@@ -326,9 +326,7 @@ async function resend(quoteId: string) {
         </div>
         <div class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
           <span class="font-bold text-slate-900">{{ formatMoney(q.amountCents, q.currency) }}</span>
-          <button class="btn-primary text-sm" :disabled="busyId === q.id" @click="resend(q.id)">
-            {{ busyId === q.id ? '…' : '↩ Renvoyer le lien' }}
-          </button>
+          <span class="text-xs text-slate-400">Expirée — le client peut refaire une demande</span>
         </div>
       </div>
       </div>
