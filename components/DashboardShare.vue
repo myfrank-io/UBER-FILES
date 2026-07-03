@@ -188,6 +188,9 @@ async function submit() {
             placeholder="client@email.com"
             :required="needsEmail"
           />
+          <p v-if="needsEmail && !form.email.trim()" class="mt-1 text-xs text-amber-600">
+            L’email est obligatoire pour l’envoi par email.
+          </p>
         </div>
 
         <p v-if="errorMsg" class="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{{ errorMsg }}</p>
