@@ -82,6 +82,9 @@ export default defineNuxtConfig({
       // Laisser désactivé tant que SumUp n'a pas accordé le scope restreint
       // `payments` à l'app — les chauffeurs se connectent alors par clé API.
       sumupOauthEnabled: process.env.SUMUP_OAUTH_ENABLED === '1',
+      // Clé client du CDN d'images de véhicules (imagin.studio). Par défaut : clé démo
+      // gratuite. Remplacer par votre propre clé pour la production (sans changer le code).
+      imaginCustomer: process.env.IMAGIN_CUSTOMER || 'hrjavascript-mastery',
       // Outils de développement (commutateur admin/chauffeur/public).
       // Actifs automatiquement en local ; en ligne uniquement si DEV_TOOLS=1.
       // À RETIRER avant la mise en production finale.
