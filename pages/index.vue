@@ -165,15 +165,15 @@ const faq = [
             </NuxtLink>
           </div>
 
-          <div class="mt-10 flex flex-wrap gap-x-8 gap-y-3 border-t border-[#E0B579]/20 pt-6 text-sm text-[#C9D2DC]">
+          <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-[#E0B579]/20 pt-5 text-[13px] text-[#C9D2DC] sm:mt-10 sm:gap-x-8 sm:gap-y-3 sm:pt-6 sm:text-sm">
             <span class="flex items-center gap-2">
-              <span class="rw-serif text-lg text-[#E0B579]">0 %</span> de commission
+              <span class="rw-serif text-base text-[#E0B579] sm:text-lg">0 %</span> de commission
             </span>
             <span class="flex items-center gap-2">
-              <span class="rw-serif text-lg text-[#E0B579]">100 %</span> vos clients, votre marque
+              <span class="rw-serif text-base text-[#E0B579] sm:text-lg">100 %</span> vos clients
             </span>
             <span class="flex items-center gap-2">
-              <span class="rw-serif text-lg text-[#E0B579]">5 min</span> pour créer votre page
+              <span class="rw-serif text-base text-[#E0B579] sm:text-lg">5 min</span> pour créer votre page
             </span>
           </div>
         </div>
@@ -220,8 +220,8 @@ const faq = [
       </div>
     </section>
 
-    <!-- ═══════════ Bande de réassurance ═══════════ -->
-    <section class="border-b border-[#EFE7D8] bg-[#F6F1E9]">
+    <!-- ═══════════ Bande de réassurance (desktop — redondante avec le hero sur mobile) ═══════════ -->
+    <section class="hidden border-b border-[#EFE7D8] bg-[#F6F1E9] md:block">
       <div class="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-5 py-8 text-center sm:px-8 md:grid-cols-4">
         <div><div class="rw-serif text-lg text-[#0E1B2C]">Votre marque</div><div class="mt-1 text-[13px] text-[#6C7889]">Votre nom, votre photo, votre page</div></div>
         <div><div class="rw-serif text-lg text-[#0E1B2C]">Vos prix</div><div class="mt-1 text-[13px] text-[#6C7889]">Grilles km &amp; heure, tarifs de nuit</div></div>
@@ -231,48 +231,52 @@ const faq = [
     </section>
 
     <!-- ═══════════ Fonctionnement ═══════════ -->
-    <section id="fonctionnement" class="mx-auto max-w-6xl scroll-mt-20 px-5 py-16 sm:px-8 sm:py-24">
-      <div class="mb-12 flex items-baseline gap-4">
+    <section id="fonctionnement" class="mx-auto max-w-6xl scroll-mt-20 px-5 py-12 sm:px-8 sm:py-24">
+      <div class="mb-8 flex items-baseline gap-4 sm:mb-12">
         <span class="rw-serif text-xl text-[#B5793F]">01</span>
         <h2 class="rw-label !text-[13px] text-[#16283D]">Comment ça marche</h2>
         <span class="h-px flex-1 bg-[#E4DCCC]" />
       </div>
 
-      <div class="mb-10 max-w-2xl">
-        <p class="rw-serif text-3xl leading-tight text-[#0E1B2C] sm:text-4xl">
+      <div class="mb-8 max-w-2xl sm:mb-10">
+        <p class="rw-serif text-2xl leading-tight text-[#0E1B2C] sm:text-4xl">
           De l’inscription à la course encaissée, <em class="text-[#B5793F]">en quatre temps</em>.
         </p>
       </div>
 
-      <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <!-- Mobile : lignes compactes · desktop : cartes détaillées -->
+      <div class="grid gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
         <div
           v-for="(s, i) in steps"
           :key="s.title"
-          class="rounded-[20px] border border-[#EFE7D8] bg-white p-6"
+          class="flex items-center gap-4 rounded-2xl border border-[#EFE7D8] bg-white p-4 sm:block sm:rounded-[20px] sm:p-6"
         >
-          <div class="rw-serif mb-4 text-3xl text-[#E0B579]">{{ String(i + 1).padStart(2, '0') }}</div>
-          <h3 class="text-[17px] font-bold text-[#16283D]">{{ s.title }}</h3>
-          <p class="mt-2 text-sm leading-relaxed text-[#6C7889]">{{ s.text }}</p>
+          <div class="rw-serif shrink-0 text-2xl text-[#E0B579] sm:mb-4 sm:text-3xl">{{ String(i + 1).padStart(2, '0') }}</div>
+          <div>
+            <h3 class="text-[15px] font-bold text-[#16283D] sm:text-[17px]">{{ s.title }}</h3>
+            <p class="mt-2 hidden text-sm leading-relaxed text-[#6C7889] sm:block">{{ s.text }}</p>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- ═══════════ Avantages ═══════════ -->
     <section id="avantages" class="scroll-mt-20 bg-white">
-      <div class="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-24">
-        <div class="mb-12 flex items-baseline gap-4">
+      <div class="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-24">
+        <div class="mb-8 flex items-baseline gap-4 sm:mb-12">
           <span class="rw-serif text-xl text-[#B5793F]">02</span>
           <h2 class="rw-label !text-[13px] text-[#16283D]">Pensé pour les chauffeurs</h2>
           <span class="h-px flex-1 bg-[#E4DCCC]" />
         </div>
 
-        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <!-- Mobile : lignes icône + texte · desktop : cartes -->
+        <div class="grid gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
           <div
             v-for="f in features"
             :key="f.title"
-            class="rounded-[20px] border border-[#EFE7D8] bg-[#FBF7F0] p-6"
+            class="flex items-start gap-4 rounded-2xl border border-[#EFE7D8] bg-[#FBF7F0] p-4 sm:block sm:rounded-[20px] sm:p-6"
           >
-            <span class="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#B5793F] ring-1 ring-[#EFE7D8]">
+            <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#B5793F] ring-1 ring-[#EFE7D8] sm:mb-4 sm:h-11 sm:w-11">
               <!-- Icônes charte : trait 1.6, extrémités arrondies -->
               <svg v-if="f.icon === 'route'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2" /><circle cx="18" cy="6" r="2" /><path d="M8 18h5a3 3 0 0 0 0-6h-2a3 3 0 0 1 0-6h5" /></svg>
               <svg v-else-if="f.icon === 'card'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.5" /><path d="M3 10h18" /><path d="M16 15h2" /></svg>
@@ -281,35 +285,37 @@ const faq = [
               <svg v-else-if="f.icon === 'bell'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11a7 7 0 0 1 14 0v4.5l1.5 2.5H3.5L5 15.5z" /><path d="M9.5 18a2.5 2.5 0 0 0 5 0" /></svg>
               <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8l7-4 9 4-7 4z" /><path d="M4 8v8l7 4M20 8v8l-9 4" /></svg>
             </span>
-            <h3 class="text-[16px] font-bold text-[#16283D]">{{ f.title }}</h3>
-            <p class="mt-2 text-sm leading-relaxed text-[#6C7889]">{{ f.text }}</p>
+            <div>
+              <h3 class="text-[15px] font-bold text-[#16283D] sm:text-[16px]">{{ f.title }}</h3>
+              <p class="mt-1 text-[13px] leading-snug text-[#6C7889] sm:mt-2 sm:text-sm sm:leading-relaxed">{{ f.text }}</p>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
     <!-- ═══════════ Tarif ═══════════ -->
-    <section id="tarif" class="mx-auto max-w-6xl scroll-mt-20 px-5 py-16 sm:px-8 sm:py-24">
-      <div class="mb-12 flex items-baseline gap-4">
+    <section id="tarif" class="mx-auto max-w-6xl scroll-mt-20 px-5 py-12 sm:px-8 sm:py-24">
+      <div class="mb-8 flex items-baseline gap-4 sm:mb-12">
         <span class="rw-serif text-xl text-[#B5793F]">03</span>
         <h2 class="rw-label !text-[13px] text-[#16283D]">Le tarif</h2>
         <span class="h-px flex-1 bg-[#E4DCCC]" />
       </div>
 
       <div class="overflow-hidden rounded-[24px] bg-[#0E1B2C] text-[#F6F1E9]">
-        <div class="relative grid gap-10 p-8 sm:p-12 lg:grid-cols-[1.2fr,1fr] lg:items-center">
+        <div class="relative grid gap-7 p-6 sm:gap-10 sm:p-12 lg:grid-cols-[1.2fr,1fr] lg:items-center">
           <div class="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full border border-[#E0B579]/20" />
           <div>
-            <p class="rw-serif text-3xl leading-tight sm:text-4xl">
+            <p class="rw-serif text-2xl leading-tight sm:text-4xl">
               Un forfait simple.<br />
               <span class="text-[#E0B579]">Zéro commission sur vos courses.</span>
             </p>
-            <p class="mt-5 max-w-lg text-[15px] leading-relaxed text-[#C9D2DC]">
+            <p class="mt-4 max-w-lg text-sm leading-relaxed text-[#C9D2DC] sm:mt-5 sm:text-[15px]">
               Pas de pourcentage prélevé, pas de surprise en fin de mois : le prix payé par
               votre client est le montant que vous encaissez. Ridewiz se rémunère par un
               forfait mensuel unique, sans engagement.
             </p>
-            <ul class="mt-7 space-y-3 text-[15px] text-[#C9D2DC]">
+            <ul class="mt-7 hidden space-y-3 text-[15px] text-[#C9D2DC] sm:block">
               <li class="flex items-center gap-3">
                 <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#2E7D5B] text-[11px] font-bold text-white">✓</span>
                 Page de réservation à votre nom, devis automatiques
@@ -324,11 +330,11 @@ const faq = [
               </li>
             </ul>
           </div>
-          <div class="rounded-[20px] border border-[#E0B579]/25 bg-white/[.03] p-8 text-center">
+          <div class="rounded-[20px] border border-[#E0B579]/25 bg-white/[.03] p-6 text-center sm:p-8">
             <p class="rw-label text-[#E0B579]">Vous gardez</p>
-            <p class="rw-serif mt-3 text-6xl text-[#F6F1E9]">100 %</p>
+            <p class="rw-serif mt-2 text-5xl text-[#F6F1E9] sm:mt-3 sm:text-6xl">100 %</p>
             <p class="mt-2 text-sm text-[#C9D2DC]">du montant de vos courses</p>
-            <NuxtLink to="/inscription" class="rw-btn mt-7 w-full !py-4">Commencer maintenant</NuxtLink>
+            <NuxtLink to="/inscription" class="rw-btn mt-5 w-full !py-4 sm:mt-7">Commencer maintenant</NuxtLink>
             <p class="mt-3 text-xs text-[#96A6B8]">Sans engagement · Profil vérifié sous 48 h</p>
           </div>
         </div>
@@ -337,8 +343,8 @@ const faq = [
 
     <!-- ═══════════ FAQ ═══════════ -->
     <section id="faq" class="bg-white">
-      <div class="mx-auto max-w-3xl scroll-mt-20 px-5 py-16 sm:px-8 sm:py-24">
-        <div class="mb-12 flex items-baseline gap-4">
+      <div class="mx-auto max-w-3xl scroll-mt-20 px-5 py-12 sm:px-8 sm:py-24">
+        <div class="mb-8 flex items-baseline gap-4 sm:mb-12">
           <span class="rw-serif text-xl text-[#B5793F]">04</span>
           <h2 class="rw-label !text-[13px] text-[#16283D]">Questions fréquentes</h2>
           <span class="h-px flex-1 bg-[#E4DCCC]" />
@@ -364,8 +370,8 @@ const faq = [
     <section class="relative overflow-hidden bg-[#0E1B2C] text-center text-[#F6F1E9]">
       <div class="pointer-events-none absolute -left-24 -top-24 h-80 w-80 rounded-full border border-[#E0B579]/15" />
       <div class="pointer-events-none absolute -bottom-32 -right-20 h-96 w-96 rounded-full border border-[#E0B579]/15" />
-      <div class="relative mx-auto max-w-3xl px-5 py-20 sm:py-28">
-        <p class="rw-serif text-3xl italic leading-snug text-[#E0B579] sm:text-4xl">
+      <div class="relative mx-auto max-w-3xl px-5 py-14 sm:py-28">
+        <p class="rw-serif text-2xl italic leading-snug text-[#E0B579] sm:text-4xl">
           « Votre chauffeur, votre signature. »
         </p>
         <p class="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-[#C9D2DC]">
