@@ -559,6 +559,23 @@ export const emailTemplates = {
       ),
     }
   },
+  // Invitation d'un chauffeur créée par l'admin : il clique pour définir son mot
+  // de passe et activer son compte, puis complète son profil dans son espace.
+  driverInvitation(opts: { firstName: string; inviteUrl: string }) {
+    return {
+      subject: 'Vous êtes invité à rejoindre Ridewiz 🚗',
+      html: wrap(
+        `Bienvenue ${esc(opts.firstName)} 👋`,
+        `<p>Vous avez été invité à créer votre espace chauffeur sur <strong>Ridewiz</strong>.</p>
+         <p>Cliquez ci-dessous pour <strong>définir votre mot de passe</strong> et activer votre
+            compte. Vous pourrez ensuite compléter votre profil (véhicule, tarifs, zone…)
+            directement depuis votre espace.</p>
+         ${button(opts.inviteUrl, 'Créer mon compte')}
+         <p style="font-size:13px;color:#6C7889">Ce lien est valable 14 jours. Si vous n'êtes pas
+            concerné par cette invitation, ignorez simplement cet email.</p>`,
+      ),
+    }
+  },
   passwordReset(opts: { resetUrl: string }) {
     return {
       subject: 'Réinitialisation de votre mot de passe',
