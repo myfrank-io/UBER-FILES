@@ -54,10 +54,10 @@ async function cancel() {
       </div>
 
       <div class="mt-4 space-y-1 text-sm text-slate-600">
-        <p v-if="booking.ride.type === 'TRANSFER'">
-          <strong>{{ $t('reservation.transfer') }}</strong>{{ booking.ride.roundTrip ? $t('common.roundTripSuffix') : '' }}<br />
-          {{ booking.ride.pickupAddress }} → {{ booking.ride.dropoffAddress }}
-        </p>
+        <div v-if="booking.ride.type === 'TRANSFER'">
+          <p><strong>{{ $t('reservation.transfer') }}</strong>{{ booking.ride.roundTrip ? $t('common.roundTripSuffix') : '' }}</p>
+          <RideRoute wrap class="mt-1" :pickup="booking.ride.pickupAddress" :dropoff="booking.ride.dropoffAddress" />
+        </div>
         <p v-else><strong>{{ $t('reservation.hourly') }}</strong> — {{ $t('reservation.hourlyDuration', { hours: booking.ride.durationHours }) }}</p>
         <p>{{ $t('reservation.on', { date: formatDateTime(booking.scheduledAt) }) }}</p>
         <p class="font-semibold text-slate-900">{{ formatMoney(booking.amountCents, booking.currency) }}</p>

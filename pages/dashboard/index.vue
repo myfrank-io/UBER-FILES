@@ -168,10 +168,10 @@ async function resend(quoteId: string) {
 
         <div class="mt-3 space-y-1 text-sm text-slate-600">
           <p>📅 {{ formatDateTime(q.ride.scheduledAt) }}</p>
-          <p v-if="q.ride.type === 'TRANSFER'">
-            📍 <NavAddress :address="q.ride.pickupAddress ?? ''" /> → <NavAddress :address="q.ride.dropoffAddress ?? ''" />
-            <span v-if="q.ride.roundTrip" class="text-xs text-slate-400">(A/R)</span>
-          </p>
+          <div v-if="q.ride.type === 'TRANSFER'">
+            <RideRoute nav wrap :pickup="q.ride.pickupAddress" :dropoff="q.ride.dropoffAddress" />
+            <span v-if="q.ride.roundTrip" class="mt-0.5 inline-block text-xs text-slate-400">Aller-retour</span>
+          </div>
           <p v-else>⏱️ {{ q.ride.durationHours }} h</p>
           <p v-if="q.ride.notes" class="italic text-slate-400">« {{ q.ride.notes }} »</p>
         </div>
@@ -241,10 +241,10 @@ async function resend(quoteId: string) {
         </div>
         <div class="mt-2 space-y-1 text-sm text-slate-600">
           <p>📅 {{ formatDateTime(q.ride.scheduledAt) }}</p>
-          <p v-if="q.ride.type === 'TRANSFER'">
-            📍 <NavAddress :address="q.ride.pickupAddress ?? ''" /> → <NavAddress :address="q.ride.dropoffAddress ?? ''" />
-            <span v-if="q.ride.roundTrip" class="text-xs text-slate-400">(A/R)</span>
-          </p>
+          <div v-if="q.ride.type === 'TRANSFER'">
+            <RideRoute nav wrap :pickup="q.ride.pickupAddress" :dropoff="q.ride.dropoffAddress" />
+            <span v-if="q.ride.roundTrip" class="mt-0.5 inline-block text-xs text-slate-400">Aller-retour</span>
+          </div>
           <p v-else>⏱️ {{ q.ride.durationHours }} h</p>
         </div>
         <div class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
@@ -270,9 +270,15 @@ async function resend(quoteId: string) {
         <div class="min-w-0">
           <p class="font-semibold text-slate-900">{{ b.customerName }}</p>
           <p class="text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
-          <p class="text-xs text-slate-500">
-            <template v-if="b.type === 'TRANSFER'"><NavAddress :address="b.pickupAddress ?? ''" /> → <NavAddress :address="b.dropoffAddress ?? ''" /></template>
-            <template v-else>Mise à disposition — {{ b.durationHours }} h<template v-if="b.pickupAddress"> · <NavAddress :address="b.pickupAddress" /></template></template>
+          <RideRoute
+            v-if="b.type === 'TRANSFER'"
+            nav
+            class="text-xs text-slate-500"
+            :pickup="b.pickupAddress"
+            :dropoff="b.dropoffAddress"
+          />
+          <p v-else class="text-xs text-slate-500">
+            Mise à disposition — {{ b.durationHours }} h<template v-if="b.pickupAddress"> · <NavAddress :address="b.pickupAddress" /></template>
           </p>
           <!-- Règlement de la course, en un coup d'œil -->
           <PaymentBadge
@@ -311,10 +317,10 @@ async function resend(quoteId: string) {
         </div>
         <div class="mt-2 space-y-1 text-sm text-slate-600">
           <p>📅 {{ formatDateTime(q.ride.scheduledAt) }}</p>
-          <p v-if="q.ride.type === 'TRANSFER'">
-            📍 <NavAddress :address="q.ride.pickupAddress ?? ''" /> → <NavAddress :address="q.ride.dropoffAddress ?? ''" />
-            <span v-if="q.ride.roundTrip" class="text-xs text-slate-400">(A/R)</span>
-          </p>
+          <div v-if="q.ride.type === 'TRANSFER'">
+            <RideRoute nav wrap :pickup="q.ride.pickupAddress" :dropoff="q.ride.dropoffAddress" />
+            <span v-if="q.ride.roundTrip" class="mt-0.5 inline-block text-xs text-slate-400">Aller-retour</span>
+          </div>
           <p v-else>⏱️ {{ q.ride.durationHours }} h</p>
         </div>
         <div class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
