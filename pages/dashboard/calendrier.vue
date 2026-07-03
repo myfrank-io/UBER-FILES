@@ -481,7 +481,13 @@ function eventTimeLabel(e: CalEvent): string {
                 <template v-else>{{ e.title ?? 'Indisponible' }}</template>
               </span>
               <span
-                v-if="e.type === 'PENDING_QUOTE'"
+                v-if="e.type === 'BOOKING'"
+                class="mt-0.5 inline-block rounded-full bg-brand-100 px-2 py-px text-[11px] font-semibold text-brand-800"
+              >
+                🚗 Course confirmée
+              </span>
+              <span
+                v-else-if="e.type === 'PENDING_QUOTE'"
                 class="mt-0.5 inline-block rounded-full bg-amber-100 px-2 py-px text-[11px] font-semibold text-amber-800"
               >
                 ⏳ En attente de paiement
