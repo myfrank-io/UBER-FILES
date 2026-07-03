@@ -120,6 +120,12 @@ model Driver {
   // (carte / espèces / chèque) sans passer par le prépaiement s'il le souhaite.
   paymentMethods PaymentMethod[] @default([STRIPE_PREPAYMENT])
 
+  // Paiement immédiat : le devis est envoyé automatiquement au client dès sa
+  // demande (sans validation manuelle) pour qu'il paie dans la foulée. Ne
+  // s'applique que si le paiement en ligne est opérationnel ; en cas de conflit
+  // calendrier détecté, la demande repasse en validation manuelle.
+  autoAcceptQuotes Boolean @default(false)
+
   // Paramètres métier (centimes / minutes)
   currency             String @default("eur")
   minimumFareCents     Int    @default(2500) // prix minimum de course

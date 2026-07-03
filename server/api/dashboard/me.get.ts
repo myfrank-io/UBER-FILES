@@ -27,6 +27,7 @@ export default defineEventHandler(async (event) => {
     status: driver.status,
     currency: driver.currency,
     paymentMethods: driver.paymentMethods,
+    autoAcceptQuotes: driver.autoAcceptQuotes,
     minimumFareCents: driver.minimumFareCents,
     minLeadTimeMinutes: driver.minLeadTimeMinutes,
     quoteExpiryHours: driver.quoteExpiryHours,

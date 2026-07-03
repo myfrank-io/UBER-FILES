@@ -166,6 +166,8 @@ export const emailTemplates = {
     hasConflict: boolean
     notes?: string | null
     dashboardUrl: string
+    // Paiement immédiat : le devis est déjà parti tout seul, pas d'action attendue.
+    autoSent?: boolean
   }) {
     const trajet =
       opts.type === 'TRANSFER'
@@ -181,8 +183,13 @@ export const emailTemplates = {
          <p>Prix calculé : <strong style="font-size:20px">${formatMoney(opts.amountCents, opts.currency)}</strong></p>
          ${opts.notes ? `<p style="font-size:13px;color:#6b7280">Note du client : ${esc(opts.notes)}</p>` : ''}
          ${opts.hasConflict ? '<p style="color:#b45309"><strong>⚠️ Conflit calendrier détecté</strong> — vérifiez votre planning avant de valider.</p>' : ''}
-         ${button(opts.dashboardUrl, 'Valider ou refuser le devis')}
-         <p style="font-size:13px;color:#6b7280">Le client recevra le lien de réservation dès que vous aurez validé le devis.</p>`,
+         ${
+           opts.autoSent
+             ? `${button(opts.dashboardUrl, 'Voir la demande')}
+         <p style="font-size:13px;color:#6b7280">Paiement immédiat activé : le devis a été envoyé automatiquement au client. Vous serez prévenu dès son paiement — aucune action attendue de votre part.</p>`
+             : `${button(opts.dashboardUrl, 'Valider ou refuser le devis')}
+         <p style="font-size:13px;color:#6b7280">Le client recevra le lien de réservation dès que vous aurez validé le devis.</p>`
+         }`,
       ),
     }
   },

@@ -88,11 +88,38 @@ watchEffect(() => {
   if (m) paymentMethods.value = [...m]
 })
 
-// Stripe doit être opérationnel pour proposer effectivement le prépaiement en ligne.
-const stripeReady = computed(() => {
-  const s = (me.value as Record<string, unknown>)?.stripe as Record<string, unknown> | undefined
+// Le prestataire actif (SumUp ou Stripe) doit être opérationnel pour proposer
+// effectivement le prépaiement en ligne.
+const onlineReady = computed(() => {
+  const d = me.value as Record<string, unknown> | null
+  if (!d) return false
+  if (d.paymentProvider === 'SUMUP') {
+    return Boolean((d.sumup as Record<string, unknown> | undefined)?.connected)
+  }
+  const s = d.stripe as Record<string, unknown> | undefined
   return Boolean(s?.connected && s?.chargesEnabled)
 })
+
+// ─── Validation des demandes (manuelle ou paiement immédiat) ──────────────
+
+const autoAcceptQuotes = ref(false)
+
+watchEffect(() => {
+  const v = (me.value as Record<string, unknown>)?.autoAcceptQuotes
+  if (typeof v === 'boolean') autoAcceptQuotes.value = v
+})
+
+// Le paiement immédiat suppose que le client PUISSE payer en ligne à la demande.
+const instantReady = computed(() => onlineReady.value && paymentMethods.value.includes('STRIPE_PREPAYMENT'))
+
+async function saveAutoAccept() {
+  await call('auto-accept', () =>
+    $fetch('/api/dashboard/settings', {
+      method: 'PATCH',
+      body: { autoAcceptQuotes: autoAcceptQuotes.value },
+    }),
+  )
+}
 
 function toggleMethod(method: PaymentMethod) {
   const i = paymentMethods.value.indexOf(method)
@@ -519,10 +546,10 @@ async function deleteSurcharge(id: string) {
           <span class="flex-1">
             <span class="text-sm font-medium text-slate-800">{{ PAYMENT_METHOD_LABELS[method] }}</span>
             <span
-              v-if="method === 'STRIPE_PREPAYMENT' && paymentMethods.includes(method) && !stripeReady"
+              v-if="method === 'STRIPE_PREPAYMENT' && paymentMethods.includes(method) && !onlineReady"
               class="mt-1 block text-xs text-amber-600"
             >
-              ⚠️ Configurez d'abord votre compte Stripe ci-dessus pour activer le paiement en ligne.
+              ⚠️ Connectez d'abord votre compte de paiement (SumUp) ci-dessus pour activer le paiement en ligne.
             </span>
           </span>
         </label>
@@ -539,6 +566,51 @@ async function deleteSurcharge(id: string) {
           :disabled="saving === 'payment-methods' || !paymentMethods.length"
         >
           {{ saving === 'payment-methods' ? 'Enregistrement…' : 'Enregistrer' }}
+        </button>
+      </div>
+    </form>
+
+    <!-- Validation des demandes : manuelle ou paiement immédiat -->
+    <form v-if="me" class="card space-y-4" @submit.prevent="saveAutoAccept">
+      <div>
+        <h2 class="font-semibold text-slate-900">Validation des demandes</h2>
+        <p class="mt-1 text-sm text-slate-600">
+          Choisissez ce qui se passe quand un client réserve sur votre page.
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
+          <input v-model="autoAcceptQuotes" type="radio" class="mt-0.5" :value="false" name="auto-accept" />
+          <span class="flex-1">
+            <span class="text-sm font-medium text-slate-800">Je valide chaque demande avant paiement</span>
+            <span class="mt-1 block text-xs text-slate-500">
+              Vous recevez la demande, vous validez (ou ajustez) le devis, puis le client
+              reçoit le lien pour payer. Vous gardez la main sur chaque course.
+            </span>
+          </span>
+        </label>
+
+        <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
+          <input v-model="autoAcceptQuotes" type="radio" class="mt-0.5" :value="true" name="auto-accept" />
+          <span class="flex-1">
+            <span class="text-sm font-medium text-slate-800">Paiement immédiat à la réservation</span>
+            <span class="mt-1 block text-xs text-slate-500">
+              Le devis est envoyé automatiquement et le client paie dans la foulée : la course
+              est confirmée sans action de votre part (vous êtes notifié). En cas de conflit
+              d'agenda détecté, la demande repasse en validation manuelle.
+            </span>
+            <span v-if="autoAcceptQuotes && !instantReady" class="mt-1 block text-xs text-amber-600">
+              ⚠️ Nécessite le paiement en ligne : compte SumUp connecté et case « Paiement en
+              ligne » cochée ci-dessus. En attendant, vos demandes restent validées manuellement.
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <div class="flex justify-end">
+        <button type="submit" class="btn-primary" :disabled="saving === 'auto-accept'">
+          {{ saving === 'auto-accept' ? 'Enregistrement…' : 'Enregistrer' }}
         </button>
       </div>
     </form>

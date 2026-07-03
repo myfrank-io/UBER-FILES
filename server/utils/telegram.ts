@@ -42,7 +42,11 @@ export async function answerCallbackQuery(callbackQueryId: string, text: string)
   })
 }
 
-/** Notifie le chauffeur d'une nouvelle demande, avec boutons valider / refuser. */
+/**
+ * Notifie le chauffeur d'une nouvelle demande, avec boutons valider / refuser.
+ * En paiement immédiat (`autoSent`), le devis est déjà parti : message informatif
+ * sans boutons — la course se confirmera d'elle-même au paiement du client.
+ */
 export function newRequestMessage(opts: {
   customerName: string
   type: 'TRANSFER' | 'HOURLY'
@@ -54,6 +58,7 @@ export function newRequestMessage(opts: {
   durationHours?: number | null
   quoteId: string
   hasConflict: boolean
+  autoSent?: boolean
 }): { text: string; buttons: InlineButton[][] } {
   const lines = [
     `🚗 <b>Nouvelle demande</b>`,
@@ -67,14 +72,17 @@ export function newRequestMessage(opts: {
   }
   lines.push(`Prix calculé : <b>${formatMoney(opts.amountCents, opts.currency)}</b>`)
   if (opts.hasConflict) lines.push(`⚠️ <b>Conflit calendrier détecté</b>`)
+  if (opts.autoSent) lines.push(`💳 Devis envoyé automatiquement — en attente du paiement du client.`)
 
   return {
     text: lines.join('\n'),
-    buttons: [
-      [
-        { text: '✅ Valider', callback_data: `quote:accept:${opts.quoteId}` },
-        { text: '❌ Refuser', callback_data: `quote:reject:${opts.quoteId}` },
-      ],
-    ],
+    buttons: opts.autoSent
+      ? []
+      : [
+          [
+            { text: '✅ Valider', callback_data: `quote:accept:${opts.quoteId}` },
+            { text: '❌ Refuser', callback_data: `quote:reject:${opts.quoteId}` },
+          ],
+        ],
   }
 }
