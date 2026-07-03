@@ -7,7 +7,6 @@ const schema = z.object({
   slug: z.string().min(2).max(60).regex(/^[a-z0-9-]+$/, 'Slug : minuscules, chiffres et tirets.').optional(),
   phone: z.string().max(30).optional().nullable(),
   contactEmail: z.string().email().optional().nullable(),
-  monthlyFeeCents: z.number().int().min(0).optional(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -22,7 +21,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: body.error.errors.map((e) => e.message).join(' ') })
   }
 
-  const { monthlyFeeCents, ...driverData } = body.data
+  const driverData = body.data
 
   // Vérifier l'unicité du slug si modifié
   if (driverData.slug && driverData.slug !== driver.slug) {
@@ -30,16 +29,7 @@ export default defineEventHandler(async (event) => {
     if (existing) throw createError({ statusCode: 409, statusMessage: 'Ce slug est déjà utilisé.' })
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.driver.update({ where: { id }, data: driverData })
-    if (monthlyFeeCents !== undefined) {
-      await tx.subscription.upsert({
-        where: { driverId: id },
-        create: { driverId: id, monthlyFeeCents, planName: 'Standard' },
-        update: { monthlyFeeCents },
-      })
-    }
-  })
+  await prisma.driver.update({ where: { id }, data: driverData })
 
   return { ok: true }
 })

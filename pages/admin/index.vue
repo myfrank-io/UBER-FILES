@@ -8,7 +8,7 @@ const { data, refresh } = await useFetch('/api/admin/overview')
 const { clear } = useUserSession()
 
 const showCreate = ref(false)
-const form = reactive({ slug: '', displayName: '', email: '', password: '', phone: '', siren: '', monthlyFee: 49 })
+const form = reactive({ slug: '', displayName: '', email: '', password: '', phone: '' })
 const errorMsg = ref('')
 const result = ref<{ telegramLinkCode: string; slug: string } | null>(null)
 const creating = ref(false)
@@ -26,8 +26,6 @@ async function createDriver() {
         email: form.email,
         password: form.password,
         phone: form.phone || undefined,
-        siren: form.siren || undefined,
-        monthlyFeeCents: Math.round(form.monthlyFee * 100),
       },
     })
     await refresh()
@@ -74,12 +72,11 @@ const filteredDrivers = computed(() => {
     </div>
 
     <!-- Stats -->
-    <div v-if="data" class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div v-if="data" class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
       <StatCard title="Chauffeurs" :value="data.stats.driversTotal" />
       <StatCard title="Actifs" :value="data.stats.driversActive" />
       <StatCard title="Courses" :value="data.stats.bookingsConfirmed" />
       <StatCard title="Volume encaissé" :value="formatMoney(data.stats.gmvCents)" />
-      <StatCard title="MRR forfaits" :value="formatMoney(data.stats.mrrCents)" />
     </div>
 
     <!-- Création -->
@@ -97,8 +94,6 @@ const filteredDrivers = computed(() => {
         <input v-model="form.email" class="field" type="email" placeholder="Email de connexion" />
         <input v-model="form.password" class="field" type="text" placeholder="Mot de passe initial (8+)" />
         <input v-model="form.phone" class="field" placeholder="Téléphone (optionnel)" />
-        <input v-model="form.siren" class="field" placeholder="SIREN (optionnel)" />
-        <input v-model.number="form.monthlyFee" class="field" type="number" placeholder="Forfait mensuel €" />
       </div>
       <p v-if="errorMsg" class="mt-3 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{{ errorMsg }}</p>
       <div v-if="result" class="mt-3 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800">
@@ -119,7 +114,7 @@ const filteredDrivers = computed(() => {
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
-            <th class="py-2">Chauffeur</th><th>Statut</th><th>SIREN</th><th>SumUp</th><th>Courses</th><th>Forfait</th><th></th>
+            <th class="py-2">Chauffeur</th><th>Statut</th><th>SumUp</th><th>Courses</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -130,10 +125,8 @@ const filteredDrivers = computed(() => {
               <NuxtLink :to="`/${d.slug}`" target="_blank" class="text-xs text-brand-600 hover:underline">/{{ d.slug }}</NuxtLink>
             </td>
             <td><span class="rounded-full px-2 py-0.5 text-xs font-semibold" :class="statusColors[d.status]">{{ d.status }}</span></td>
-            <td>{{ d.sirenVerified ? '✅' : '—' }}</td>
             <td>{{ d.sumupConnected ? '✅' : '⏳' }}</td>
             <td>{{ d.bookings }}</td>
-            <td>{{ formatMoney(d.monthlyFeeCents) }}</td>
             <td class="text-right">
               <NuxtLink :to="`/admin/drivers/${d.id}`" class="mr-2 text-xs text-slate-500 hover:text-slate-800">Détail →</NuxtLink>
               <button v-if="d.status !== 'ACTIVE'" class="text-xs font-semibold text-green-700 hover:underline" @click="setStatus(d.id, 'ACTIVE')">Activer</button>
