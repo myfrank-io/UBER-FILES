@@ -281,7 +281,11 @@ model Customer {
 
   name  String
   phone String
-  email String
+  // Optionnel : un client ajouté par le chauffeur (bouton « Partager ma page »)
+  // via SMS/WhatsApp peut n'avoir qu'un téléphone. Le flux de réservation public,
+  // lui, exige toujours l'email (validation côté API). Dédoublonnage : par email
+  // pour les réservations, par téléphone pour l'ajout manuel.
+  email String?
 
   rideRequests RideRequest[]
   bookings     Booking[]
@@ -291,6 +295,7 @@ model Customer {
 
   @@unique([driverId, email])
   @@index([driverId])
+  @@index([driverId, phone])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

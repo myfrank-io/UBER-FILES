@@ -614,6 +614,21 @@ export const emailTemplates = {
       ),
     }
   },
+  // Le chauffeur partage sa page publique de réservation à un client (depuis son
+  // espace, bouton « Partager ma page »). Canal email.
+  shareBookingPage(opts: { driverName: string; customerName: string; publicUrl: string }) {
+    return {
+      subject: `Réservez votre course — ${opts.driverName}`,
+      html: wrap(
+        `Bonjour ${esc(opts.customerName)} 👋`,
+        `<p><strong>${esc(opts.driverName)}</strong> vous invite à réserver vos prochaines
+            courses directement en ligne, en quelques secondes.</p>
+         ${button(opts.publicUrl, 'Réserver ma course')}
+         <p style="font-size:13px;color:#6C7889">Ou copiez ce lien dans votre navigateur :<br />
+            <a href="${opts.publicUrl}" style="color:#B5793F">${opts.publicUrl}</a></p>`,
+      ),
+    }
+  },
   passwordReset(opts: { resetUrl: string }) {
     return {
       subject: 'Réinitialisation de votre mot de passe',

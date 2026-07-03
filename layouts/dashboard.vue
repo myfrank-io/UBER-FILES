@@ -157,6 +157,9 @@ async function logout() {
 
     <AppToast />
 
+    <!-- Bouton flottant « Partager ma page » (hors profil suspendu : page publique hors-ligne) -->
+    <DashboardShare v-if="status !== 'SUSPENDED'" />
+
     <!-- Barre de navigation mobile : grandes zones tactiles + safe area iOS -->
     <nav class="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] sm:hidden">
       <NuxtLink
