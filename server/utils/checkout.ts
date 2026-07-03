@@ -1,7 +1,8 @@
+import { randomUUID } from 'node:crypto'
 import type { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 import { createCheckoutSession } from './stripe'
-import { getValidAccessToken, createHostedCheckout } from './sumup'
+import { getValidAccessToken, createHostedCheckout, getCheckout } from './sumup'
 
 // Création de la session de paiement en ligne d'un devis (Stripe ou SumUp selon
 // le prestataire du chauffeur). Partagé entre la page devis (paiement différé) et
@@ -46,17 +47,34 @@ export async function createQuoteCheckoutUrl(
       throw createError({ statusCode: 503, statusMessage: 'Le chauffeur n’a pas connecté son compte SumUp.' })
     }
     const accessToken = await getValidAccessToken(quote.driver)
+
+    // Un checkout existe déjà pour ce devis (le client a déjà tenté de payer) :
+    // SumUp refuse d'en recréer un avec la même référence (409 DUPLICATED_CHECKOUT).
+    // On vérifie d'abord son statut : s'il est déjà payé, retour direct au succès ;
+    // sinon on en crée un NOUVEAU avec une référence unique pour permettre de repayer.
+    let checkoutReference = quote.id
+    if (quote.sumupCheckoutId) {
+      try {
+        const existing = await getCheckout(accessToken, quote.sumupCheckoutId)
+        if (existing.status === 'PAID') return successUrl
+      } catch {
+        // Statut indisponible : on crée simplement un nouveau checkout.
+      }
+      checkoutReference = `${quote.id}-${randomUUID().slice(0, 8)}`
+    }
+
     const checkout = await createHostedCheckout({
       accessToken,
       merchantCode: quote.driver.sumupMerchantCode,
-      checkoutReference: quote.id,
+      checkoutReference,
       amount: quote.amountCents / 100, // SumUp attend des unités majeures (euros)
       currency: quote.currency,
       description,
       returnUrl: `${config.public.appBaseUrl}/api/webhooks/sumup`,
       redirectUrl: successUrl,
     })
-    // Mémorise l'id du checkout pour que le webhook retrouve ce devis.
+    // Mémorise l'id du dernier checkout pour que le webhook et la vérification de
+    // statut retrouvent ce devis (l'ancien checkout abandonné devient inutilisé).
     await prisma.quote.update({ where: { id: quote.id }, data: { sumupCheckoutId: checkout.id } })
     if (!checkout.hosted_checkout_url) {
       throw createError({ statusCode: 502, statusMessage: 'SumUp n’a pas renvoyé d’URL de paiement.' })
