@@ -99,12 +99,16 @@ model Driver {
   stripePayoutsEnabled  Boolean @default(false)
   stripeChargesEnabled  Boolean @default(false)
 
-  // Paiement (SumUp OAuth — le chauffeur est merchant of record, encaisse en direct).
-  // Les jetons OAuth sont stockés CHIFFRÉS (AES-256-GCM via SUMUP_TOKEN_ENCRYPTION_KEY).
+  // Paiement (SumUp — le chauffeur est merchant of record, encaisse en direct).
+  // Deux modes de connexion : OAuth (jetons + refresh), ou clé API générée par le
+  // chauffeur dans son espace SumUp (utilisée tant que le scope OAuth `payments`
+  // n'est pas accordé à l'app). Secrets stockés CHIFFRÉS (AES-256-GCM via
+  // SUMUP_TOKEN_ENCRYPTION_KEY). Si `sumupApiKey` est présente, elle prime.
   sumupMerchantCode    String?   @unique
   sumupAccessToken     String?   @db.Text // chiffré
   sumupRefreshToken    String?   @db.Text // chiffré
   sumupTokenExpiresAt  DateTime?
+  sumupApiKey          String?   @db.Text // chiffré
   sumupConnected       Boolean   @default(false)
 
   // Notifications

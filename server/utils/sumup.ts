@@ -1,6 +1,7 @@
-// Intégration SumUp (OAuth2 + Hosted Checkout). Modèle « merchant of record » :
-// chaque chauffeur connecte SON compte SumUp, l'argent va directement chez lui.
-// La plateforme n'encaisse rien — elle crée les checkouts au nom du chauffeur via son token.
+// Intégration SumUp (OAuth2 ou clé API + Hosted Checkout). Modèle « merchant of
+// record » : chaque chauffeur connecte SON compte SumUp, l'argent va directement
+// chez lui. La plateforme n'encaisse rien — elle crée les checkouts au nom du
+// chauffeur via son jeton OAuth, ou via la clé API qu'il a générée dans son espace.
 import type { Driver } from '@prisma/client'
 import { prisma } from '~/server/utils/prisma'
 import { encryptSecret, decryptSecret } from '~/server/utils/crypto'
@@ -90,6 +91,8 @@ export async function persistTokens(driverId: string, tokens: TokenResponse, mer
       sumupAccessToken: encryptSecret(tokens.access_token),
       sumupRefreshToken: encryptSecret(tokens.refresh_token),
       sumupTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+      // Une connexion OAuth remplace une éventuelle clé API (qui aurait priorité sinon).
+      sumupApiKey: null,
       sumupConnected: true,
       paymentProvider: 'SUMUP',
       ...(merchantCode ? { sumupMerchantCode: merchantCode } : {}),
@@ -98,10 +101,14 @@ export async function persistTokens(driverId: string, tokens: TokenResponse, mer
 }
 
 /**
- * Renvoie un access_token valide pour le chauffeur, en le rafraîchissant si nécessaire.
+ * Renvoie un jeton Bearer valide pour le chauffeur : sa clé API s'il en a enregistré
+ * une (elle n'expire pas), sinon son access_token OAuth, rafraîchi si nécessaire.
  * Lève une erreur si le chauffeur n'est pas connecté à SumUp.
  */
 export async function getValidAccessToken(driver: Driver): Promise<string> {
+  if (driver.sumupConnected && driver.sumupApiKey) {
+    return decryptSecret(driver.sumupApiKey)
+  }
   if (!driver.sumupConnected || !driver.sumupAccessToken || !driver.sumupRefreshToken) {
     throw createError({ statusCode: 503, statusMessage: 'Chauffeur non connecté à SumUp.' })
   }

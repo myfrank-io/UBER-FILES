@@ -51,6 +51,22 @@ async function disconnectSumup() {
   await call('sumup-disconnect', () => $fetch('/api/payments/sumup/disconnect', { method: 'POST' }))
 }
 
+// Connexion par clé API : le chauffeur colle la clé générée dans son espace SumUp.
+// Utilisée tant que la connexion OAuth n'est pas disponible (scope `payments`
+// en attente d'accord SumUp) — le bouton OAuth est masqué via SUMUP_OAUTH_ENABLED.
+const sumupOauthEnabled = useRuntimeConfig().public.sumupOauthEnabled
+const sumup = computed(() => (me.value as Record<string, unknown>)?.sumup as { connected?: boolean; viaApiKey?: boolean } | undefined)
+const sumupApiKey = ref('')
+
+async function saveSumupApiKey() {
+  if (!sumupApiKey.value.trim()) return
+  await call('sumup-api-key', () =>
+    $fetch('/api/payments/sumup/api-key', { method: 'POST', body: { apiKey: sumupApiKey.value } }),
+  )
+  // On ne vide le champ qu'en cas de succès, pour laisser corriger une faute de copie.
+  if (!errorMsg.value) sumupApiKey.value = ''
+}
+
 const route = useRoute()
 onMounted(() => {
   if (route.query.stripe) refresh()
@@ -403,20 +419,55 @@ async function deleteSurcharge(id: string) {
     <div v-if="me" class="card">
       <h2 class="font-semibold text-slate-900">Paiement (SumUp)</h2>
       <p class="mt-1 text-sm text-slate-600">
-        Connectez votre compte SumUp : les paiements de vos courses arrivent directement chez vous.
+        Reliez votre compte SumUp : les paiements en ligne de vos courses arrivent directement chez vous.
       </p>
+
       <div class="mt-3">
-        <p v-if="((me as Record<string, unknown>).sumup as Record<string, unknown>)?.connected" class="inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm text-green-800">
-          ✅ Compte SumUp connecté — encaissement actif
+        <p v-if="sumup?.connected" class="inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm text-green-800">
+          ✅ Compte SumUp connecté ({{ sumup?.viaApiKey ? 'clé API' : 'OAuth' }}) — encaissement actif
         </p>
         <p v-else class="text-sm text-slate-500">Aucun compte SumUp connecté.</p>
       </div>
-      <div class="mt-4 flex gap-2">
-        <button class="btn-primary" :disabled="connecting" @click="connectSumup">
-          {{ connecting ? '…' : ((me as Record<string, unknown>).sumup as Record<string, unknown>)?.connected ? 'Reconnecter SumUp' : 'Connecter SumUp' }}
+
+      <!-- Connexion par clé API (générée par le chauffeur dans son espace SumUp) -->
+      <form v-if="!sumup?.connected" class="mt-4 space-y-3" @submit.prevent="saveSumupApiKey">
+        <div>
+          <label class="label" for="sumup-api-key">Clé API SumUp</label>
+          <input
+            id="sumup-api-key"
+            v-model="sumupApiKey"
+            type="password"
+            class="field"
+            placeholder="sup_sk_…"
+            autocomplete="off"
+          />
+        </div>
+        <button class="btn-primary" :disabled="saving === 'sumup-api-key' || !sumupApiKey.trim()">
+          {{ saving === 'sumup-api-key' ? 'Vérification auprès de SumUp…' : 'Enregistrer la clé' }}
+        </button>
+        <details class="text-sm text-slate-600">
+          <summary class="cursor-pointer font-medium text-slate-700">Où trouver ma clé API SumUp ?</summary>
+          <ol class="mt-2 list-decimal space-y-1 pl-5">
+            <li>
+              Connectez-vous sur
+              <a href="https://me.sumup.com" target="_blank" rel="noopener" class="text-brand-700 underline">me.sumup.com</a>
+              depuis un ordinateur (pas l'application mobile).
+            </li>
+            <li>Ouvrez votre profil puis <strong>Paramètres</strong>.</li>
+            <li>Descendez jusqu'à <strong>Pour les développeurs</strong> → <strong>Clés API</strong>.</li>
+            <li>Cliquez sur <strong>Créer une clé API</strong> et donnez-lui un nom (par exemple « ma page de réservation »).</li>
+            <li>Copiez la clé affichée (elle commence par <code>sup_sk_</code>) — elle n'est visible qu'une seule fois.</li>
+            <li>Collez-la ci-dessus puis « Enregistrer la clé ».</li>
+          </ol>
+        </details>
+      </form>
+
+      <div v-if="sumupOauthEnabled || sumup?.connected" class="mt-4 flex gap-2">
+        <button v-if="sumupOauthEnabled" class="btn-primary" :disabled="connecting" @click="connectSumup">
+          {{ connecting ? '…' : sumup?.connected ? 'Reconnecter SumUp' : 'Connecter avec SumUp' }}
         </button>
         <button
-          v-if="((me as Record<string, unknown>).sumup as Record<string, unknown>)?.connected"
+          v-if="sumup?.connected"
           class="btn-ghost"
           :disabled="saving === 'sumup-disconnect'"
           @click="disconnectSumup"
