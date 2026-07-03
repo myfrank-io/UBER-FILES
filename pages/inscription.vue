@@ -20,7 +20,6 @@ const form = reactive({
   vehicleSeats: null as number | null,
   serviceArea: '',
   services: '',
-  siren: '',
 })
 
 const errorMsg = ref('')
@@ -77,7 +76,6 @@ async function register() {
         vehicleSeats: form.vehicleSeats || undefined,
         serviceArea: form.serviceArea || undefined,
         services: form.services || undefined,
-        siren: form.siren || undefined,
       },
     })
     await refreshSession()
@@ -177,16 +175,6 @@ async function register() {
           <div>
             <label class="label" for="services">Description des prestations</label>
             <textarea id="services" v-model="form.services" class="field min-h-[80px]" maxlength="1000" placeholder="Transferts aéroport, mise à disposition, mariage…" />
-          </div>
-        </div>
-
-        <!-- Identité légale -->
-        <div class="card space-y-4">
-          <h2 class="font-semibold text-slate-900">Identité légale</h2>
-          <div>
-            <label class="label" for="siren">SIREN</label>
-            <input id="siren" v-model="form.siren" type="text" class="field" maxlength="20" placeholder="123 456 789" inputmode="numeric" />
-            <p class="mt-1 text-xs text-slate-400">Vérifié automatiquement auprès de l'INSEE (facultatif à l'inscription).</p>
           </div>
         </div>
 
