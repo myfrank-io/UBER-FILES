@@ -4,6 +4,7 @@ import { bookingSlot, findConflict } from './calendar'
 import { sendEmail, emailTemplates } from './email'
 import { notifyDriver } from './notify-driver'
 import { signClientToken } from './tokens'
+import { isQuotePaymentExpired } from './quote-status'
 import type { PaymentMethod } from '~/lib/payment-methods'
 
 type QuoteForConfirm = Prisma.QuoteGetPayload<{
@@ -48,8 +49,9 @@ export async function confirmQuoteOnSite(
   }
   // L'expiration ne concerne que le lien client (devis SENT) : le chauffeur reste
   // libre d'accepter une demande DRAFT ancienne — le conflit calendrier est
-  // re-vérifié juste en dessous de toute façon.
-  if (quote.status === 'SENT' && quote.expiresAt.getTime() < Date.now()) {
+  // re-vérifié juste en dessous de toute façon. Un devis SENT est expiré si son
+  // délai est dépassé OU si la date de la course est déjà passée.
+  if (isQuotePaymentExpired(quote)) {
     throw createError({ statusCode: 410, statusMessage: 'Ce devis a expiré.' })
   }
 

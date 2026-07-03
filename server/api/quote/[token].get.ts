@@ -1,6 +1,7 @@
 import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
 import { driverBookingMode } from '~/server/utils/driver'
+import { isQuotePaymentExpired } from '~/server/utils/quote-status'
 
 // Consultation d'un devis par le client via son jeton signé (sans compte).
 export default defineEventHandler(async (event) => {
@@ -17,7 +18,8 @@ export default defineEventHandler(async (event) => {
   })
   if (!quote) throw createError({ statusCode: 404, statusMessage: 'Devis introuvable.' })
 
-  const expired = quote.status === 'SENT' && quote.expiresAt.getTime() < Date.now()
+  // Expiré si le délai de validité est passé OU si la date de la course est passée.
+  const expired = isQuotePaymentExpired(quote)
 
   // Options de paiement proposées au client selon les réglages du chauffeur :
   // prépaiement en ligne si opérationnel, encaissement sur place si accepté

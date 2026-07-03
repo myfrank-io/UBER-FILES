@@ -2,6 +2,7 @@ import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
 import { createQuoteCheckoutUrl } from '~/server/utils/checkout'
 import { bookingSlot, findConflict } from '~/server/utils/calendar'
+import { isQuotePaymentExpired } from '~/server/utils/quote-status'
 
 // Crée la session de paiement pour un devis validé et renvoie l'URL hébergée.
 // Bascule entre Stripe et SumUp selon le prestataire configuré par le chauffeur.
@@ -24,7 +25,8 @@ export default defineEventHandler(async (event) => {
   if (quote.status !== 'SENT') {
     throw createError({ statusCode: 409, statusMessage: 'Ce devis ne peut pas être payé.' })
   }
-  if (quote.expiresAt.getTime() < Date.now()) {
+  // Expiré si le délai est dépassé ou si la date de la course est déjà passée.
+  if (isQuotePaymentExpired(quote)) {
     throw createError({ statusCode: 410, statusMessage: 'Ce devis a expiré.' })
   }
 
