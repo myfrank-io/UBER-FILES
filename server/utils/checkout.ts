@@ -35,11 +35,13 @@ export async function createQuoteCheckoutUrl(
       ? `Transfert — ${quote.driver.displayName}`
       : `Mise à disposition — ${quote.driver.displayName}`
 
-  const successUrl = `${config.public.appBaseUrl}/devis/${token}?paid=1`
   const cancelUrl = `${config.public.appBaseUrl}/devis/${token}`
 
   // ─── SumUp (chauffeur merchant of record) ───────────────────────────────
   if (quote.driver.paymentProvider === 'SUMUP') {
+    // SumUp redirige vers cette URL même si le client quitte sans payer : la page
+    // devis vérifie donc le statut réel du checkout avant d'afficher « payé ».
+    const successUrl = `${config.public.appBaseUrl}/devis/${token}?paid=1`
     if (!quote.driver.sumupConnected || !quote.driver.sumupMerchantCode) {
       throw createError({ statusCode: 503, statusMessage: 'Le chauffeur n’a pas connecté son compte SumUp.' })
     }
@@ -69,6 +71,9 @@ export async function createQuoteCheckoutUrl(
       statusMessage: 'Le chauffeur n’a pas finalisé sa configuration de paiement.',
     })
   }
+  // `{CHECKOUT_SESSION_ID}` est remplacé par Stripe : la page devis relit ainsi
+  // le vrai statut de la session au retour, plutôt que de se fier au seul `paid=1`.
+  const successUrl = `${config.public.appBaseUrl}/devis/${token}?paid=1&session_id={CHECKOUT_SESSION_ID}`
   const session = await createCheckoutSession({
     quoteId: quote.id,
     amountCents: quote.amountCents,

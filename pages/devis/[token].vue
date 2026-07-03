@@ -13,8 +13,38 @@ useHead({ title: t('quote.title') })
 
 const paying = ref(false)
 const errorMsg = ref('')
-const justPaid = computed(() => route.query.paid === '1')
 const justConfirmed = computed(() => route.query.confirmed === '1')
+
+// Retour d'un paiement en ligne : on NE se fie PAS au paramètre `paid=1` (SumUp
+// renvoie ici même si le client a quitté sans payer). On interroge le serveur
+// pour connaître le vrai statut avant d'afficher « payé ».
+const verifying = ref(false)
+const verifiedPaid = ref(false)
+const paymentUnconfirmed = ref(false)
+const isPaid = computed(() => Boolean(quote.value?.alreadyPaid) || verifiedPaid.value)
+
+onMounted(async () => {
+  if (route.query.paid !== '1' || !quote.value || quote.value.alreadyPaid) return
+  verifying.value = true
+  const sessionId = route.query.session_id as string | undefined
+  // Le webhook peut être légèrement en retard sur un vrai paiement : on réessaie.
+  for (let i = 0; i < 4; i++) {
+    try {
+      const res = await $fetch<{ paid: boolean }>(`/api/quote/${token}/payment-status`, {
+        query: sessionId ? { session_id: sessionId } : undefined,
+      })
+      if (res.paid) {
+        verifiedPaid.value = true
+        break
+      }
+    } catch {
+      // On réessaie au tour suivant.
+    }
+    if (i < 3) await new Promise((r) => setTimeout(r, 1500))
+  }
+  verifying.value = false
+  if (!verifiedPaid.value) paymentUnconfirmed.value = true
+})
 
 // Moyens d'encaissement sur place proposés par le chauffeur.
 const onSiteMethods = computed<PaymentMethod[]>(() => (quote.value?.payment?.onSiteMethods ?? []) as PaymentMethod[])
@@ -81,8 +111,14 @@ async function devConfirm() {
       <p class="text-sm text-slate-500">{{ quote.driver.displayName }}</p>
       <h1 class="mt-1 text-xl font-bold text-slate-900">{{ $t('quote.title') }}</h1>
 
-      <!-- Confirmée + payée en ligne -->
-      <div v-if="justPaid || quote.alreadyPaid" class="mt-4 rounded-xl bg-green-50 p-4 text-center">
+      <!-- Vérification du paiement en cours (retour du prestataire) -->
+      <div v-if="verifying" class="mt-4 rounded-xl bg-slate-50 p-4 text-center">
+        <p class="text-2xl">⏳</p>
+        <p class="mt-2 font-semibold text-slate-700">{{ $t('quote.verifying') }}</p>
+      </div>
+
+      <!-- Confirmée + payée en ligne (statut réel confirmé par le serveur) -->
+      <div v-else-if="isPaid" class="mt-4 rounded-xl bg-green-50 p-4 text-center">
         <p class="text-3xl">✅</p>
         <p class="mt-2 font-semibold text-green-900">{{ $t('quote.paidTitle') }}</p>
         <p class="text-sm text-green-800">{{ $t('quote.paidBody') }}</p>
@@ -124,6 +160,11 @@ async function devConfirm() {
         </div>
         <template v-else-if="quote.status === 'SENT'">
           <p class="mt-2 text-xs text-slate-400">{{ $t('quote.validUntil', { date: formatDateTime(quote.expiresAt) }) }}</p>
+
+          <!-- Retour de paiement sans confirmation : le client a peut-être quitté sans payer -->
+          <p v-if="paymentUnconfirmed" class="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {{ $t('quote.paymentUnconfirmed') }}
+          </p>
           <p v-if="errorMsg" class="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
 
           <!-- Paiement en ligne (prépaiement Stripe/SumUp) -->
