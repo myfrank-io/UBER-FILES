@@ -13,7 +13,6 @@ const adjustValue = reactive<Record<string, number>>({})
 
 async function validate(quoteId: string, custom = false) {
   busyId.value = quoteId
-  errorMsg.value = ''
   try {
     const body = custom && adjustValue[quoteId] ? { amountCents: Math.round(adjustValue[quoteId] * 100) } : {}
     await $fetch(`/api/dashboard/quotes/${quoteId}/validate`, { method: 'POST', body })
@@ -38,7 +37,6 @@ async function reject(quoteId: string) {
 
 async function resend(quoteId: string) {
   busyId.value = quoteId
-  errorMsg.value = ''
   try {
     await $fetch(`/api/dashboard/quotes/${quoteId}/resend`, { method: 'POST' })
     await refresh()
