@@ -12,7 +12,7 @@ créneau est **bloqué dans le calendrier** du chauffeur.
 - **Tailwind CSS** + **@nuxtjs/i18n** (FR / EN, mobile-first)
 - **SumUp** (chauffeur merchant of record — connexion OAuth ou clé API, encaissement direct)
 - **Stripe** Connect Express + destination charges (alternative historique, encaissement centralisé)
-- **Google Maps Platform** (Places + Routes) — proxifié côté serveur, repli haversine/Nominatim sans clé
+- **Google Maps Platform** (Places + Routes) — proxifié côté serveur, repli haversine + Base Adresse Nationale (data.gouv.fr) sans clé
 - **Resend** (emails transactionnels — canal de notification principal) · **Telegram Bot**
   (optionnel, coupé par défaut) · **API Sirene INSEE**
 - Tests : **Vitest** (logique métier) + **Playwright** (E2E)
@@ -137,7 +137,7 @@ curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://votre-domaine/api/c
 |---|---|---|
 | SumUp | `SUMUP_CLIENT_ID`, `SUMUP_CLIENT_SECRET`, `SUMUP_REDIRECT_URI`, `SUMUP_TOKEN_ENCRYPTION_KEY`, `SUMUP_OAUTH_ENABLED` | Connexion chauffeur par OAuth (nécessite le scope `payments`, accordé par le support SumUp — mettre `SUMUP_OAUTH_ENABLED=1`) ou par clé API collée dans ses réglages. Webhook : `/api/webhooks/sumup` |
 | Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET` | Webhooks : `/api/webhooks/stripe` (checkout) et `/api/webhooks/stripe-connect` (account.updated) |
-| Google Maps | `GOOGLE_MAPS_API_KEY` | Restreindre la clé (Places + Routes). Sans clé : repli haversine/Nominatim |
+| Google Maps | `GOOGLE_MAPS_API_KEY` | Restreindre la clé (Places + Routes). Sans clé : repli haversine + Base Adresse Nationale (data.gouv.fr) |
 | Resend | `RESEND_API_KEY`, `EMAIL_FROM` | Vérifier SPF/DKIM du domaine |
 | Telegram | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_NOTIFICATIONS_ENABLED` | Webhook : `/api/webhooks/telegram`. Notifications coupées par défaut (mettre `1` pour réactiver) |
 | INSEE | `INSEE_API_KEY` | Vérification SIREN à l'onboarding |

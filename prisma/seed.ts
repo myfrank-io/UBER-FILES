@@ -76,6 +76,35 @@ async function main() {
     },
   })
 
+  // Véhicules de démo (flotte multi-véhicules)
+  await prisma.vehicle.deleteMany({ where: { driverId: driver.id } })
+  await prisma.vehicle.createMany({
+    data: [
+      {
+        driverId: driver.id,
+        make: 'mercedes-benz',
+        modelFamily: 'e-class',
+        modelLabel: 'Mercedes Classe E',
+        vehicleClass: 'Berline',
+        seats: 4,
+        color: 'Noir',
+        isPrimary: true,
+        position: 0,
+      },
+      {
+        driverId: driver.id,
+        make: 'mercedes-benz',
+        modelFamily: 'v-class',
+        modelLabel: 'Mercedes Classe V',
+        vehicleClass: 'Van',
+        seats: 7,
+        color: 'Noir',
+        isPrimary: false,
+        position: 1,
+      },
+    ],
+  })
+
   // Grilles transfert (jour / nuit / heures de pointe)
   await prisma.transferRateBand.deleteMany({ where: { driverId: driver.id } })
   await prisma.transferRateBand.createMany({
