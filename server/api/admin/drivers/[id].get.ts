@@ -8,7 +8,6 @@ export default defineEventHandler(async (event) => {
   const driver = await prisma.driver.findUnique({
     where: { id },
     include: {
-      subscription: true,
       user: { select: { id: true, email: true } },
       _count: { select: { bookings: true, customers: true, rideRequests: true } },
     },
@@ -34,8 +33,6 @@ export default defineEventHandler(async (event) => {
     status: driver.status,
     phone: driver.phone,
     contactEmail: driver.contactEmail,
-    siren: driver.siren,
-    sirenVerified: driver.sirenVerified,
     companyName: driver.companyName,
     currency: driver.currency,
     telegramLinked: Boolean(driver.telegramChatId),
@@ -45,7 +42,6 @@ export default defineEventHandler(async (event) => {
       connected: driver.sumupConnected,
       merchantCode: driver.sumupMerchantCode,
     },
-    subscription: driver.subscription,
     user: driver.user,
     stats: {
       bookings: driver._count.bookings,

@@ -16,7 +16,6 @@ const form = reactive({
   slug: '',
   phone: '',
   contactEmail: '',
-  monthlyFeeEuros: 0,
 })
 const saving = ref(false)
 const saveError = ref('')
@@ -29,7 +28,6 @@ function openEdit() {
   form.slug = d.slug
   form.phone = d.phone ?? ''
   form.contactEmail = d.contactEmail ?? ''
-  form.monthlyFeeEuros = (d.subscription?.monthlyFeeCents ?? 0) / 100
   editing.value = true
   saveError.value = ''
 }
@@ -45,7 +43,6 @@ async function save() {
         slug: form.slug,
         phone: form.phone || null,
         contactEmail: form.contactEmail || null,
-        monthlyFeeCents: Math.round(form.monthlyFeeEuros * 100),
       },
     })
     await refresh()
@@ -126,11 +123,10 @@ const statusColors: Record<string, string> = {
       <p v-if="archiveError" class="mt-2 text-sm text-red-600">{{ archiveError }}</p>
 
       <!-- Stats -->
-      <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div class="mt-6 grid grid-cols-3 gap-3">
         <StatCard title="Courses" :value="data.stats.bookings" />
         <StatCard title="À venir" :value="data.stats.upcomingBookings" />
         <StatCard title="Volume encaissé" :value="formatMoney(data.stats.revenueCents)" />
-        <StatCard title="Forfait / mois" :value="formatMoney(data.subscription?.monthlyFeeCents ?? 0)" />
       </div>
 
       <!-- Details grid -->
@@ -152,28 +148,16 @@ const statusColors: Record<string, string> = {
               <dd>{{ data.contactEmail ?? '—' }}</dd>
             </div>
             <div class="flex justify-between">
-              <dt class="text-slate-500">SIREN</dt>
-              <dd>{{ data.siren ?? '—' }} {{ data.sirenVerified ? '✅' : '' }}</dd>
-            </div>
-            <div class="flex justify-between">
               <dt class="text-slate-500">Membre depuis</dt>
               <dd>{{ formatDateTime(data.createdAt) }}</dd>
             </div>
           </dl>
         </div>
 
-        <!-- Facturation & encaissement -->
+        <!-- Encaissement -->
         <div class="card">
-          <h2 class="mb-3 font-semibold text-slate-900">Facturation & encaissement</h2>
+          <h2 class="mb-3 font-semibold text-slate-900">Encaissement</h2>
           <dl class="space-y-2 text-sm">
-            <div class="flex justify-between">
-              <dt class="text-slate-500">Forfait mensuel</dt>
-              <dd>{{ formatMoney(data.subscription?.monthlyFeeCents ?? 0) }}</dd>
-            </div>
-            <div class="flex justify-between">
-              <dt class="text-slate-500">Plan</dt>
-              <dd>{{ data.subscription?.planName ?? '—' }}</dd>
-            </div>
             <div class="flex justify-between">
               <dt class="text-slate-500">SumUp connecté</dt>
               <dd>{{ data.sumup.connected ? '✅' : '⏳' }}</dd>
@@ -233,10 +217,6 @@ const statusColors: Record<string, string> = {
         <div>
           <label class="label">Email contact</label>
           <input v-model="form.contactEmail" class="field" type="email" />
-        </div>
-        <div>
-          <label class="label">Forfait mensuel (€)</label>
-          <input v-model.number="form.monthlyFeeEuros" class="field" type="number" min="0" step="0.01" />
         </div>
       </div>
       <p v-if="saveError" class="mt-3 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{{ saveError }}</p>

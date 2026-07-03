@@ -2,23 +2,19 @@ import { z } from 'zod'
 import { requireAdmin } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import { hashUserPassword } from '~/server/utils/password'
-import { verifySiren } from '~/server/utils/insee'
 
 // Création d'un compte chauffeur (onboarding) : Driver + User + grilles par défaut +
-// vérification SIREN + code d'appairage Telegram.
+// code d'appairage Telegram.
 const schema = z.object({
   slug: z.string().min(2).max(60).regex(/^[a-z0-9-]+$/, 'Slug : minuscules, chiffres et tirets uniquement.'),
   displayName: z.string().min(2).max(120),
   email: z.string().email(),
   password: z.string().min(8),
   phone: z.string().max(30).optional(),
-  siren: z.string().optional(),
-  monthlyFeeCents: z.number().int().min(0).default(4900),
 })
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event)
-  const config = useRuntimeConfig()
   const body = await readValidatedBody(event, (b) => schema.safeParse(b))
   if (!body.success) {
     throw createError({ statusCode: 400, statusMessage: body.error.errors.map((e) => e.message).join(' ') })
@@ -30,8 +26,6 @@ export default defineEventHandler(async (event) => {
   const existingUser = await prisma.user.findUnique({ where: { email: data.email.toLowerCase() } })
   if (existingUser) throw createError({ statusCode: 409, statusMessage: 'Cet email est déjà utilisé.' })
 
-  const sirenCheck = data.siren ? await verifySiren(data.siren, config.inseeApiKey || undefined) : null
-
   const driver = await prisma.driver.create({
     data: {
       slug: data.slug,
@@ -39,9 +33,6 @@ export default defineEventHandler(async (event) => {
       status: 'PENDING',
       phone: data.phone,
       contactEmail: data.email.toLowerCase(),
-      siren: data.siren,
-      sirenVerified: sirenCheck?.verified ?? false,
-      companyName: sirenCheck?.companyName,
       telegramLinkCode: randomCode(),
       // Grilles par défaut pour démarrer
       transferBands: {
@@ -57,7 +48,6 @@ export default defineEventHandler(async (event) => {
         ],
       },
       cancellationPolicy: { create: { freeUntilHours: 24, retainedPercent: 50 } },
-      subscription: { create: { monthlyFeeCents: data.monthlyFeeCents, planName: 'Standard' } },
       user: {
         create: { email: data.email.toLowerCase(), passwordHash: hashUserPassword(data.password), role: 'DRIVER' },
       },
@@ -68,7 +58,6 @@ export default defineEventHandler(async (event) => {
     id: driver.id,
     slug: driver.slug,
     telegramLinkCode: driver.telegramLinkCode,
-    siren: sirenCheck,
   }
 })
 
