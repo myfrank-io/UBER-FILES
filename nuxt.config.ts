@@ -72,6 +72,10 @@ export default defineNuxtConfig({
     cronSecret: process.env.CRON_SECRET || '',
     public: {
       appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:3000',
+      // Bouton « Connecter avec SumUp » (OAuth) dans les réglages chauffeur.
+      // Laisser désactivé tant que SumUp n'a pas accordé le scope restreint
+      // `payments` à l'app — les chauffeurs se connectent alors par clé API.
+      sumupOauthEnabled: process.env.SUMUP_OAUTH_ENABLED === '1',
       // Outils de développement (commutateur admin/chauffeur/public).
       // Actifs automatiquement en local ; en ligne uniquement si DEV_TOOLS=1.
       // À RETIRER avant la mise en production finale.

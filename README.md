@@ -10,7 +10,8 @@ créneau est **bloqué dans le calendrier** du chauffeur.
 - **Nuxt 3** (full-stack, serveur Nitro) + **Vue 3** + **TypeScript strict**
 - **PostgreSQL** + **Prisma** (multi-tenant row-level par `driverId`)
 - **Tailwind CSS** + **@nuxtjs/i18n** (FR / EN, mobile-first)
-- **Stripe** Connect Express + destination charges (encaissement centralisé, reversement chauffeur)
+- **SumUp** (chauffeur merchant of record — connexion OAuth ou clé API, encaissement direct)
+- **Stripe** Connect Express + destination charges (alternative historique, encaissement centralisé)
 - **Google Maps Platform** (Places + Routes) — proxifié côté serveur, repli haversine/Nominatim sans clé
 - **Resend** (emails transactionnels) · **Telegram Bot** (notifs + validation devis) · **API Sirene INSEE**
 - Tests : **Vitest** (logique métier) + **Playwright** (E2E)
@@ -129,6 +130,7 @@ curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://votre-domaine/api/c
 
 | Intégration | Variable(s) | Notes |
 |---|---|---|
+| SumUp | `SUMUP_CLIENT_ID`, `SUMUP_CLIENT_SECRET`, `SUMUP_REDIRECT_URI`, `SUMUP_TOKEN_ENCRYPTION_KEY`, `SUMUP_OAUTH_ENABLED` | Connexion chauffeur par OAuth (nécessite le scope `payments`, accordé par le support SumUp — mettre `SUMUP_OAUTH_ENABLED=1`) ou par clé API collée dans ses réglages. Webhook : `/api/webhooks/sumup` |
 | Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET` | Webhooks : `/api/webhooks/stripe` (checkout) et `/api/webhooks/stripe-connect` (account.updated) |
 | Google Maps | `GOOGLE_MAPS_API_KEY` | Restreindre la clé (Places + Routes). Sans clé : repli haversine/Nominatim |
 | Resend | `RESEND_API_KEY`, `EMAIL_FROM` | Vérifier SPF/DKIM du domaine |

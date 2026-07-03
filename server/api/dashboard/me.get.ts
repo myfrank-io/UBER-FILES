@@ -39,6 +39,7 @@ export default defineEventHandler(async (event) => {
     sumup: {
       connected: driver.sumupConnected,
       merchantCode: driver.sumupMerchantCode,
+      viaApiKey: Boolean(driver.sumupApiKey),
     },
     telegramLinked: Boolean(driver.telegramChatId),
     transferBands: driver.transferBands,
