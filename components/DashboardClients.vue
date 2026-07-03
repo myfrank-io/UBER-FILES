@@ -11,13 +11,13 @@ function exportCsv() {
     ...customers.value.map((c) => [
       c.name,
       c.phone,
-      c.email,
+      c.email ?? '',
       String(c.ridesCount),
       (c.totalSpentCents / 100).toFixed(2),
       c.lastRideAt ? new Date(c.lastRideAt).toLocaleDateString('fr-FR') : '',
     ]),
   ]
-  const csv = rows.map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n')
+  const csv = rows.map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
