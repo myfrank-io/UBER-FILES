@@ -15,10 +15,20 @@ const query = z.object({
 
 export default defineEventHandler(async (event) => {
   const driverId = await requireDriverId(event)
+  const now = new Date()
   const q = await getValidatedQuery(event, (v) => query.safeParse(v))
   const from = q.success && q.data.from ? new Date(q.data.from) : new Date()
   const to =
-    q.success && q.data.to ? new Date(q.data.to) : new Date(Date.now() + 30 * 86_400_000)
+    q.success && q.data.to ? new Date(q.data.to) : new Date(now.getTime() + 30 * 86_400_000)
+
+  // Devis en attente : on n'affiche que les courses encore à venir. Un devis dont
+  // la date de course est passée est archivé (voir isQuotePaymentExpired) et ne
+  // doit plus apparaître dans le calendrier. On garde une marge de 2 jours en amont
+  // de la fenêtre affichée (durée de service + approche), sans jamais remonter
+  // avant maintenant.
+  const pendingScheduledFrom = new Date(
+    Math.max(now.getTime(), from.getTime() - 2 * 86_400_000),
+  )
 
   const [driver, events, sentQuotes] = await Promise.all([
     prisma.driver.findUniqueOrThrow({ where: { id: driverId } }),
@@ -35,15 +45,15 @@ export default defineEventHandler(async (event) => {
       },
       orderBy: { startAt: 'asc' },
     }),
-    // Devis envoyés, non expirés, dont la course tombe dans la plage (marge de
-    // 2 jours en amont pour couvrir la durée de service + trajets d'approche).
+    // Devis envoyés, non archivés (délai de validité non dépassé ET course encore
+    // à venir), dont la course tombe dans la plage affichée.
     prisma.quote.findMany({
       where: {
         driverId,
         status: 'SENT',
-        expiresAt: { gte: new Date() },
+        expiresAt: { gte: now },
         rideRequest: {
-          scheduledAt: { lt: to, gte: new Date(from.getTime() - 2 * 86_400_000) },
+          scheduledAt: { lt: to, gte: pendingScheduledFrom },
         },
       },
       include: { rideRequest: true },
