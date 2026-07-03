@@ -127,6 +127,10 @@ async function buildPayload() {
     base.dropoffAddress = dropoff.value
     base.roundTrip = roundTrip.value
   } else {
+    // Mise à disposition : le lieu de prise en charge est requis aussi.
+    const p = await geocode(pickup.value)
+    base.pickup = { lat: p.lat, lng: p.lng }
+    base.pickupAddress = pickup.value
     base.durationHours = durationHours.value
   }
   return base
@@ -179,7 +183,9 @@ function errMessage(e: unknown): string {
 }
 
 const canEstimate = computed(() =>
-  type.value === 'TRANSFER' ? pickup.value.length > 3 && dropoff.value.length > 3 : durationHours.value >= 1,
+  type.value === 'TRANSFER'
+    ? pickup.value.length > 3 && dropoff.value.length > 3
+    : pickup.value.length > 3 && durationHours.value >= 1,
 )
 const canSubmit = computed(
   () => canEstimate.value && customer.name.length >= 2 && customer.phone.length >= 6 && customer.email.includes('@'),
@@ -344,6 +350,10 @@ const canSubmit = computed(
 
       <!-- Mise à disposition -->
       <template v-else>
+        <div>
+          <label class="label" for="pickup-hourly">{{ $t('public.pickupLabel') }}</label>
+          <AddressField id="pickup-hourly" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" />
+        </div>
         <div>
           <label class="label" for="duration">{{ $t('public.durationLabel') }}</label>
           <input id="duration" v-model.number="durationHours" type="number" min="1" max="24" class="field" />

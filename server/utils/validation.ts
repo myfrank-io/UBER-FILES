@@ -28,6 +28,10 @@ export const estimateSchema = z
     message: 'Durée requise pour une mise à disposition.',
     path: ['durationHours'],
   })
+  .refine((d) => d.type !== 'HOURLY' || (d.pickup && d.pickupAddress), {
+    message: 'Adresse de départ requise pour une mise à disposition.',
+    path: ['pickup'],
+  })
 
 export const customerSchema = z.object({
   name: z.string().min(2).max(120),

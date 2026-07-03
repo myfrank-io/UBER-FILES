@@ -69,6 +69,7 @@ export function newRequestMessage(opts: {
     lines.push(`Trajet : ${opts.pickupAddress ?? '?'} → ${opts.dropoffAddress ?? '?'}`)
   } else {
     lines.push(`Mise à disposition : ${opts.durationHours} h`)
+    if (opts.pickupAddress) lines.push(`Départ : ${opts.pickupAddress}`)
   }
   lines.push(`Prix calculé : <b>${formatMoney(opts.amountCents, opts.currency)}</b>`)
   if (opts.hasConflict) lines.push(`⚠️ <b>Conflit calendrier détecté</b>`)

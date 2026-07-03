@@ -171,7 +171,7 @@ async function resend(quoteId: string) {
           <p class="text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
           <p class="text-xs text-slate-500">
             <template v-if="b.type === 'TRANSFER'">{{ b.pickupAddress }} → {{ b.dropoffAddress }}</template>
-            <template v-else>Mise à disposition — {{ b.durationHours }} h</template>
+            <template v-else>Mise à disposition — {{ b.durationHours }} h<template v-if="b.pickupAddress"> · {{ b.pickupAddress }}</template></template>
           </p>
         </div>
         <span class="font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</span>
