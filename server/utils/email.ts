@@ -197,6 +197,58 @@ export const emailTemplates = {
       ),
     }
   },
+  // Relance client : un devis a été envoyé mais la course n'est pas encore
+  // confirmée. Ton direct : « vous avez une demande de course pour tel jour,
+  // tel itinéraire — pour la confirmer, procédez au paiement ».
+  quoteReminder(opts: {
+    customerName?: string | null
+    driverName: string
+    amountCents: number
+    currency: string
+    payUrl: string
+    expiresAt: Date
+    // Règlement proposé : en ligne seul, au choix, ou sur place uniquement
+    // (l'invitation et le bouton s'adaptent).
+    prepayment?: boolean
+    onSiteAvailable?: boolean
+    type: 'TRANSFER' | 'HOURLY'
+    scheduledAt: Date
+    pickupAddress?: string | null
+    dropoffAddress?: string | null
+    roundTrip?: boolean
+    durationHours?: number | null
+  }) {
+    const trajet =
+      opts.type === 'TRANSFER'
+        ? `${esc(opts.pickupAddress ?? '?')} → ${esc(opts.dropoffAddress ?? '?')}${opts.roundTrip ? ' (aller-retour)' : ''}`
+        : `Mise à disposition ${opts.durationHours ?? '?'} h${opts.pickupAddress ? ` — départ : ${esc(opts.pickupAddress)}` : ''}`
+    const dateStr = opts.scheduledAt.toLocaleString('fr-FR', {
+      weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+    })
+    const onsiteOnly = opts.prepayment === false
+    const invite = onsiteOnly
+      ? `il ne vous reste qu'à <strong>confirmer votre réservation</strong> — le règlement se fera sur place, le jour de la course`
+      : opts.onSiteAvailable
+        ? `il ne vous reste qu'à <strong>procéder au paiement</strong> (ou à choisir le règlement sur place)`
+        : `il ne vous reste qu'à <strong>procéder au paiement</strong>`
+    const label = onsiteOnly ? 'Confirmer ma réservation' : 'Payer et confirmer ma course'
+    return {
+      subject: `Rappel — confirmez votre course du ${opts.scheduledAt.toLocaleDateString('fr-FR')} · ${opts.driverName}`,
+      html: wrap(
+        'Votre course attend votre confirmation ⏳',
+        `<p>Bonjour${opts.customerName ? ` ${esc(opts.customerName)}` : ''},</p>
+         <p>Vous avez une demande de course auprès de <strong>${esc(opts.driverName)}</strong> :</p>
+         <div style="background:#FBF7F0;border:1px solid #EFE7D8;border-radius:12px;padding:16px;margin:16px 0">
+           📅 <strong>${dateStr}</strong><br />
+           📍 ${trajet}
+         </div>
+         <p style="margin:8px 0;font-family:Georgia,'Times New Roman',serif;font-size:30px;color:#0E1B2C">${formatMoney(opts.amountCents, opts.currency)}</p>
+         <p>Le créneau n'est pas encore bloqué : ${invite}.</p>
+         ${button(opts.payUrl, label)}
+         <p style="font-size:13px;color:#6C7889">Offre valable jusqu'au ${opts.expiresAt.toLocaleString('fr-FR')} — passé ce délai, le créneau est libéré.</p>`,
+      ),
+    }
+  },
   paymentConfirmed(opts: {
     driverName: string
     amountCents: number
