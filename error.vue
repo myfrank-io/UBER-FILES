@@ -19,7 +19,7 @@ function goHome() {
 <template>
   <div class="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-5 text-center">
     <p class="text-6xl font-extrabold text-brand-600">{{ error.statusCode }}</p>
-    <h1 class="mt-4 text-2xl font-bold text-slate-900">{{ title }}</h1>
+    <h1 class="mt-4 font-serif text-2xl font-medium tracking-tight text-slate-900">{{ title }}</h1>
     <p class="mt-3 max-w-sm text-slate-600">{{ message }}</p>
     <button class="btn-primary mt-8" @click="goHome">Retour à l'accueil</button>
   </div>

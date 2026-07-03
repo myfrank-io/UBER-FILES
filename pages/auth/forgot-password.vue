@@ -28,7 +28,7 @@ async function submit() {
 <template>
   <div class="mx-auto flex min-h-screen max-w-sm items-center px-5">
     <div class="card w-full space-y-4">
-      <h1 class="text-xl font-bold text-slate-900">Mot de passe oublié</h1>
+      <h1 class="font-serif text-xl font-medium tracking-tight text-slate-900">Mot de passe oublié</h1>
 
       <div v-if="success" class="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
         Si un compte existe pour cet email, vous recevrez un lien de réinitialisation dans quelques minutes.

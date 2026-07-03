@@ -325,7 +325,7 @@ function goToContact() {
           {{ driver.displayName.charAt(0) }}
         </div>
         <div>
-          <h1 class="text-xl font-bold text-slate-900">{{ driver.displayName }}</h1>
+          <h1 class="font-serif text-xl font-medium tracking-tight text-slate-900">{{ driver.displayName }}</h1>
           <p v-if="driver.tagline" class="text-sm text-slate-500">{{ driver.tagline }}</p>
         </div>
       </div>
@@ -524,7 +524,7 @@ function goToContact() {
           <div class="rounded-xl bg-slate-50 p-4">
             <div class="flex items-baseline justify-between">
               <span class="text-sm text-slate-600">{{ $t('public.estimateLabel') }}</span>
-              <span class="text-2xl font-bold text-slate-900">
+              <span class="font-serif text-2xl font-medium tracking-tight text-slate-900">
                 {{ formatMoney(estimate.amountCents, estimate.currency) }}
               </span>
             </div>
@@ -550,7 +550,7 @@ function goToContact() {
         <div v-if="estimate" class="rounded-xl bg-slate-50 p-4">
           <div class="flex items-baseline justify-between">
             <span class="text-sm text-slate-600">{{ $t('public.estimateLabel') }}</span>
-            <span class="text-2xl font-bold text-slate-900">
+            <span class="font-serif text-2xl font-medium tracking-tight text-slate-900">
               {{ formatMoney(estimate.amountCents, estimate.currency) }}
             </span>
           </div>

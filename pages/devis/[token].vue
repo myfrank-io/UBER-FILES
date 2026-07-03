@@ -109,7 +109,7 @@ async function devConfirm() {
 
     <div v-else-if="quote" class="card">
       <p class="text-sm text-slate-500">{{ quote.driver.displayName }}</p>
-      <h1 class="mt-1 text-xl font-bold text-slate-900">{{ $t('quote.title') }}</h1>
+      <h1 class="mt-1 font-serif text-xl font-medium tracking-tight text-slate-900">{{ $t('quote.title') }}</h1>
 
       <!-- Course annulée : prime sur tous les autres états -->
       <div v-if="quote.cancelled" class="mt-4 rounded-xl bg-slate-50 p-4 text-center">
@@ -159,7 +159,7 @@ async function devConfirm() {
 
         <div class="mt-4 flex items-baseline justify-between border-t border-slate-100 pt-4">
           <span class="font-medium text-slate-700">{{ $t('quote.totalToPay') }}</span>
-          <span class="text-2xl font-bold text-slate-900">{{ formatMoney(quote.amountCents, quote.currency) }}</span>
+          <span class="font-serif text-2xl font-medium tracking-tight text-slate-900">{{ formatMoney(quote.amountCents, quote.currency) }}</span>
         </div>
         <p v-if="quote.adjusted" class="mt-1 text-xs text-slate-500">
           {{ $t('quote.adjustedNote') }}

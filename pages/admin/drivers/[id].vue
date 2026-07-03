@@ -102,7 +102,7 @@ const statusColors: Record<string, string> = {
       <!-- Header -->
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 class="text-2xl font-bold text-slate-900">{{ data.displayName }}</h1>
+          <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">{{ data.displayName }}</h1>
           <NuxtLink :to="`/${data.slug}`" target="_blank" class="text-sm text-brand-600 hover:underline">/{{ data.slug }}</NuxtLink>
         </div>
         <div class="flex items-center gap-2">

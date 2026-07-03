@@ -87,7 +87,7 @@ async function resend(quoteId: string) {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-slate-900">Tableau de bord</h1>
+    <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Tableau de bord</h1>
 
     <!-- Onglets internes -->
     <div class="mt-4 flex gap-1 border-b border-slate-200">
@@ -118,15 +118,15 @@ async function resend(quoteId: string) {
     <div v-if="data" class="mt-5 grid grid-cols-3 gap-3">
       <div class="card !p-4">
         <p class="text-xs text-slate-500">Courses confirmées</p>
-        <p class="mt-1 text-2xl font-bold text-slate-900">{{ data.stats.confirmed }}</p>
+        <p class="mt-1 font-serif text-2xl font-medium tracking-tight text-slate-900">{{ data.stats.confirmed }}</p>
       </div>
       <div class="card !p-4">
         <p class="text-xs text-slate-500">Annulées</p>
-        <p class="mt-1 text-2xl font-bold text-slate-900">{{ data.stats.cancelled }}</p>
+        <p class="mt-1 font-serif text-2xl font-medium tracking-tight text-slate-900">{{ data.stats.cancelled }}</p>
       </div>
       <div class="card !p-4">
         <p class="text-xs text-slate-500">Encaissé</p>
-        <p class="mt-1 text-2xl font-bold text-slate-900">
+        <p class="mt-1 font-serif text-2xl font-medium tracking-tight text-slate-900">
           {{ formatMoney(data.stats.totalRevenueCents) }}
         </p>
       </div>
@@ -178,7 +178,7 @@ async function resend(quoteId: string) {
 
         <div class="mt-3 flex items-baseline justify-between border-t border-slate-100 pt-3">
           <span class="text-xs text-slate-500">Prix calculé</span>
-          <span class="text-xl font-bold text-slate-900">{{ formatMoney(q.amountCents, q.currency) }}</span>
+          <span class="font-serif text-xl font-medium tracking-tight text-slate-900">{{ formatMoney(q.amountCents, q.currency) }}</span>
         </div>
 
         <div class="mt-3 flex flex-wrap items-center gap-2">

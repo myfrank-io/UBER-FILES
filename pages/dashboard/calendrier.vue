@@ -304,7 +304,7 @@ function eventTimeLabel(e: CalEvent): string {
   <div class="mx-auto max-w-5xl">
     <!-- En-tête -->
     <div class="flex items-center justify-between gap-3">
-      <h1 class="text-2xl font-bold text-slate-900">Calendrier</h1>
+      <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Calendrier</h1>
       <button class="btn-primary !px-4 !py-2 text-sm" @click="openBlock">+ Bloquer</button>
     </div>
 

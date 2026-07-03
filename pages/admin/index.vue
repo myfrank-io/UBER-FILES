@@ -67,7 +67,7 @@ const filteredDrivers = computed(() => {
 <template>
   <div class="mx-auto max-w-5xl px-5 py-8">
     <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold text-slate-900">Administration — Chams</h1>
+      <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Administration — Chams</h1>
       <button class="text-sm text-slate-400 hover:text-slate-700" @click="logout">Déconnexion</button>
     </div>
 

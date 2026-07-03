@@ -44,7 +44,7 @@ async function cancel() {
 
     <div v-else-if="booking" class="card">
       <p class="text-sm text-slate-500">{{ booking.driver.displayName }}</p>
-      <h1 class="mt-1 text-xl font-bold text-slate-900">{{ $t('reservation.title') }}</h1>
+      <h1 class="mt-1 font-serif text-xl font-medium tracking-tight text-slate-900">{{ $t('reservation.title') }}</h1>
 
       <div
         class="mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold"

@@ -101,7 +101,7 @@ async function markPaid(id: string) {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-slate-900">Réservations</h1>
+    <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Réservations</h1>
 
     <!-- Filtres -->
     <div class="mt-4 flex flex-wrap items-end gap-3">
@@ -266,7 +266,7 @@ async function markPaid(id: string) {
 
           <div class="card !p-4">
             <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Paiement</p>
-            <p class="mt-2 text-2xl font-bold text-slate-900">
+            <p class="mt-2 font-serif text-2xl font-medium tracking-tight text-slate-900">
               {{ formatMoney(detail.amountCents as number, detail.currency as string) }}
             </p>
             <p v-for="p in (detail.payments as Record<string, unknown>[])" :key="p.id as string" class="mt-1 text-xs">

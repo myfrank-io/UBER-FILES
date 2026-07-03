@@ -35,16 +35,25 @@ export async function sendEmail(args: SendArgs): Promise<{ sent: boolean }> {
   return { sent: true }
 }
 
+// Gabarit email — charte Ridewiz « Signature » : fond crème, bandeau nuit avec
+// le nom de marque en serif or, carte blanche arrondie, pied discret. Les polices
+// web étant peu fiables en email, on utilise Georgia (serif) et la pile système.
 const wrap = (title: string, body: string) => `
-  <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1f2937">
-    <h1 style="font-size:20px;color:#111827">${title}</h1>
-    ${body}
-    <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0" />
-    <p style="font-size:12px;color:#9ca3af">Email automatique — Réservation VTC</p>
+  <div style="background:#F6F1E9;padding:28px 14px;font-family:-apple-system,'Segoe UI',Arial,sans-serif">
+    <div style="max-width:560px;margin:0 auto">
+      <div style="background:#0E1B2C;border-radius:18px 18px 0 0;padding:20px 28px;text-align:center">
+        <span style="font-family:Georgia,'Times New Roman',serif;font-size:23px;color:#E0B579;letter-spacing:-.01em">Ridewiz</span>
+      </div>
+      <div style="background:#ffffff;border:1px solid #EFE7D8;border-top:none;border-radius:0 0 18px 18px;padding:30px 28px;color:#16283D;font-size:15px;line-height:1.6">
+        <h1 style="margin:0 0 16px;font-family:Georgia,'Times New Roman',serif;font-weight:500;font-size:23px;line-height:1.25;color:#0E1B2C">${title}</h1>
+        ${body}
+      </div>
+      <p style="text-align:center;font-size:12px;color:#9A8B72;margin:16px 0 0">Ridewiz · « Votre chauffeur, votre signature. »</p>
+    </div>
   </div>`
 
 const button = (url: string, label: string) =>
-  `<p style="margin:24px 0"><a href="${url}" style="background:#4f46e5;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">${label}</a></p>`
+  `<p style="margin:24px 0"><a href="${url}" style="background:#B5793F;color:#ffffff;padding:14px 24px;border-radius:12px;text-decoration:none;display:inline-block;font-weight:600;font-size:15px">${label}</a></p>`
 
 // Échappe les valeurs saisies par le client (nom, note, adresse…) injectées dans le HTML.
 const esc = (s: string) =>
@@ -87,13 +96,13 @@ export const emailTemplates = {
         `<p>Bonjour ${esc(opts.customerName)},</p>
          <p>Nous avons bien reçu votre demande de réservation : elle vient d'être
             <strong>transmise à ${esc(opts.driverName)}</strong>.</p>
-         <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0">
+         <div style="background:#FBF7F0;border:1px solid #EFE7D8;border-radius:8px;padding:16px;margin:16px 0">
            📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
            📍 ${trajet}<br />
            💶 Montant estimé : <strong>${formatMoney(opts.amountCents, opts.currency)}</strong>
          </div>
          ${nextStep}
-         <p style="font-size:13px;color:#6b7280">Le montant ci-dessus est une estimation, susceptible
+         <p style="font-size:13px;color:#6C7889">Le montant ci-dessus est une estimation, susceptible
             d'être ajustée par le chauffeur lors de la validation. Aucune somme ne vous est débitée à ce stade.</p>`,
       ),
     }
@@ -141,9 +150,9 @@ export const emailTemplates = {
       ? `<p>${esc(opts.driverName)} a validé votre devis en <strong>ajustant le tarif</strong> :</p>`
       : `<p>${esc(opts.driverName)} a validé votre devis :</p>`
     const priceBlock = adjusted
-      ? `<p style="margin:0"><span style="text-decoration:line-through;color:#9ca3af;font-size:16px">${formatMoney(opts.originalAmountCents!, opts.currency)}</span></p>
+      ? `<p style="margin:0"><span style="text-decoration:line-through;color:#9A8B72;font-size:16px">${formatMoney(opts.originalAmountCents!, opts.currency)}</span></p>
          <p style="font-size:28px;font-weight:700;margin:4px 0">${formatMoney(opts.amountCents, opts.currency)}</p>
-         <p style="font-size:13px;color:#6b7280">Tarif ajusté par le chauffeur (estimation initiale : ${formatMoney(opts.originalAmountCents!, opts.currency)}).</p>`
+         <p style="font-size:13px;color:#6C7889">Tarif ajusté par le chauffeur (estimation initiale : ${formatMoney(opts.originalAmountCents!, opts.currency)}).</p>`
       : `<p style="font-size:28px;font-weight:700">${formatMoney(opts.amountCents, opts.currency)}</p>`
     return {
       subject: adjusted
@@ -152,13 +161,13 @@ export const emailTemplates = {
       html: wrap(
         'Votre devis est prêt',
         `${intro}
-         <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0">
+         <div style="background:#FBF7F0;border:1px solid #EFE7D8;border-radius:8px;padding:16px;margin:16px 0">
            📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
            📍 ${trajet}
          </div>
          ${priceBlock}
          ${button(opts.payUrl, label)}
-         <p style="font-size:13px;color:#6b7280">Devis valable jusqu'au ${opts.expiresAt.toLocaleString('fr-FR')}.</p>`,
+         <p style="font-size:13px;color:#6C7889">Devis valable jusqu'au ${opts.expiresAt.toLocaleString('fr-FR')}.</p>`,
       ),
     }
   },
@@ -192,11 +201,11 @@ export const emailTemplates = {
         'Votre réservation est confirmée ✅',
         `<p>Le paiement de <strong>${formatMoney(opts.amountCents, opts.currency)}</strong> a bien été reçu.</p>
          <p>Prise en charge le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
-         ${contact ? `<p style="font-size:13px;color:#374151">Contact chauffeur : ${contact}</p>` : ''}
+         ${contact ? `<p style="font-size:13px;color:#3C4A5A">Contact chauffeur : ${contact}</p>` : ''}
          ${button(opts.manageUrl, 'Gérer ma réservation')}
-         <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
-         <p style="font-size:11px;color:#9ca3af">${legalLines}</p>
-         <p style="font-size:11px;color:#9ca3af">Conformément à l'art. L221-28 du Code de la consommation, le droit de rétractation de 14 jours ne s'applique pas à ce service de transport daté.</p>`,
+         <hr style="border:none;border-top:1px solid #EFE7D8;margin:16px 0" />
+         <p style="font-size:11px;color:#9A8B72">${legalLines}</p>
+         <p style="font-size:11px;color:#9A8B72">Conformément à l'art. L221-28 du Code de la consommation, le droit de rétractation de 14 jours ne s'applique pas à ce service de transport daté.</p>`,
       ),
     }
   },
@@ -239,13 +248,13 @@ export const emailTemplates = {
       html: wrap(
         'Votre réservation est confirmée ✅',
         `${intro}
-         <p style="font-size:13px;color:#374151">Moyen de paiement prévu : <strong>${PAYMENT_METHOD_LABELS[opts.method]}</strong>.</p>
+         <p style="font-size:13px;color:#3C4A5A">Moyen de paiement prévu : <strong>${PAYMENT_METHOD_LABELS[opts.method]}</strong>.</p>
          <p>Prise en charge le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
-         ${contact ? `<p style="font-size:13px;color:#374151">Contact chauffeur : ${contact}</p>` : ''}
+         ${contact ? `<p style="font-size:13px;color:#3C4A5A">Contact chauffeur : ${contact}</p>` : ''}
          ${button(opts.manageUrl, 'Gérer ma réservation')}
-         <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
-         <p style="font-size:11px;color:#9ca3af">${legalLines}</p>
-         <p style="font-size:11px;color:#9ca3af">Conformément à l'art. L221-28 du Code de la consommation, le droit de rétractation de 14 jours ne s'applique pas à ce service de transport daté.</p>`,
+         <hr style="border:none;border-top:1px solid #EFE7D8;margin:16px 0" />
+         <p style="font-size:11px;color:#9A8B72">${legalLines}</p>
+         <p style="font-size:11px;color:#9A8B72">Conformément à l'art. L221-28 du Code de la consommation, le droit de rétractation de 14 jours ne s'applique pas à ce service de transport daté.</p>`,
       ),
     }
   },
@@ -277,12 +286,12 @@ export const emailTemplates = {
         : `Mise à disposition ${opts.durationHours ?? '?'} h${opts.pickupAddress ? ` — départ : ${esc(opts.pickupAddress)}` : ''}`
     const action = opts.autoSent
       ? `${button(opts.dashboardUrl, 'Voir la demande')}
-         <p style="font-size:13px;color:#6b7280">Paiement immédiat activé : le devis a été envoyé automatiquement au client. Vous serez prévenu dès son paiement — aucune action attendue de votre part.</p>`
+         <p style="font-size:13px;color:#6C7889">Paiement immédiat activé : le devis a été envoyé automatiquement au client. Vous serez prévenu dès son paiement — aucune action attendue de votre part.</p>`
       : opts.directAccept
         ? `${button(opts.dashboardUrl, 'Accepter ou refuser la réservation')}
-         <p style="font-size:13px;color:#6b7280">En acceptant, la course est <strong>confirmée immédiatement</strong> — règlement sur place. Le client est prévenu par email. Vous pouvez aussi ajuster le prix : le client devra alors accepter le nouveau tarif.</p>`
+         <p style="font-size:13px;color:#6C7889">En acceptant, la course est <strong>confirmée immédiatement</strong> — règlement sur place. Le client est prévenu par email. Vous pouvez aussi ajuster le prix : le client devra alors accepter le nouveau tarif.</p>`
         : `${button(opts.dashboardUrl, 'Valider ou refuser le devis')}
-         <p style="font-size:13px;color:#6b7280">Le client recevra le lien de réservation dès que vous aurez validé le devis.</p>`
+         <p style="font-size:13px;color:#6C7889">Le client recevra le lien de réservation dès que vous aurez validé le devis.</p>`
     return {
       subject: `Nouvelle demande de course — ${opts.customerName}`,
       html: wrap(
@@ -291,9 +300,9 @@ export const emailTemplates = {
          <p>📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
             📍 ${trajet}</p>
          <p>Prix calculé : <strong style="font-size:20px">${formatMoney(opts.amountCents, opts.currency)}</strong></p>
-         ${opts.paymentLabel ? `<p style="font-size:13px;color:#374151">💶 Règlement prévu : <strong>${esc(opts.paymentLabel)}</strong></p>` : ''}
-         ${opts.notes ? `<p style="font-size:13px;color:#6b7280">Note du client : ${esc(opts.notes)}</p>` : ''}
-         ${opts.hasConflict ? '<p style="color:#b45309"><strong>⚠️ Conflit calendrier détecté</strong> — vérifiez votre planning avant de valider.</p>' : ''}
+         ${opts.paymentLabel ? `<p style="font-size:13px;color:#3C4A5A">💶 Règlement prévu : <strong>${esc(opts.paymentLabel)}</strong></p>` : ''}
+         ${opts.notes ? `<p style="font-size:13px;color:#6C7889">Note du client : ${esc(opts.notes)}</p>` : ''}
+         ${opts.hasConflict ? '<p style="color:#96691E"><strong>⚠️ Conflit calendrier détecté</strong> — vérifiez votre planning avant de valider.</p>' : ''}
          ${action}`,
       ),
     }
@@ -340,9 +349,9 @@ export const emailTemplates = {
         'Course confirmée ✅',
         `${intro}
          <p>${paiement}</p>
-         ${opts.conflictWarning ? '<p style="color:#b45309"><strong>⚠️ Attention :</strong> cette course chevauche un autre événement de votre calendrier. Vérifiez votre planning et contactez le client si besoin.</p>' : ''}
-         ${contact ? `<p style="font-size:13px;color:#374151">Contact client : ${contact}</p>` : ''}
-         <p style="font-size:13px;color:#6b7280">Le créneau est bloqué dans votre calendrier.</p>
+         ${opts.conflictWarning ? '<p style="color:#96691E"><strong>⚠️ Attention :</strong> cette course chevauche un autre événement de votre calendrier. Vérifiez votre planning et contactez le client si besoin.</p>' : ''}
+         ${contact ? `<p style="font-size:13px;color:#3C4A5A">Contact client : ${contact}</p>` : ''}
+         <p style="font-size:13px;color:#6C7889">Le créneau est bloqué dans votre calendrier.</p>
          ${button(opts.dashboardUrl, 'Voir mes réservations')}`,
       ),
     }
@@ -415,7 +424,7 @@ export const emailTemplates = {
         `<p>Bonjour ${esc(opts.customerName)},</p>
          <p>${esc(opts.driverName)} n'est malheureusement <strong>pas disponible</strong> pour
             cette course :</p>
-         <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0">
+         <div style="background:#FBF7F0;border:1px solid #EFE7D8;border-radius:8px;padding:16px;margin:16px 0">
            📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
            📍 ${trajet}
          </div>
@@ -462,7 +471,7 @@ export const emailTemplates = {
          <p>En attendant la validation, vous pouvez dès maintenant accéder à votre espace
           pour compléter et personnaliser votre profil (présentation, véhicule, tarifs, zone…).</p>
          ${button(opts.dashboardUrl, 'Accéder à mon espace')}
-         <p style="font-size:13px;color:#6b7280">Dès que votre profil sera approuvé, votre page
+         <p style="font-size:13px;color:#6C7889">Dès que votre profil sera approuvé, votre page
           publique de réservation sera mise en ligne et vous en serez informé par email.</p>`,
       ),
     }
@@ -474,11 +483,11 @@ export const emailTemplates = {
         'Votre profil est validé ✅',
         `<p>Bonne nouvelle ${opts.displayName} ! Votre profil a été approuvé.</p>
          <p>Votre page publique de réservation est désormais en ligne :</p>
-         <p><a href="${opts.publicUrl}" style="color:#4f46e5;font-weight:600">${opts.publicUrl}</a></p>
+         <p><a href="${opts.publicUrl}" style="color:#B5793F;font-weight:600">${opts.publicUrl}</a></p>
          ${button(opts.publicUrl, 'Voir ma page publique')}
-         <p style="font-size:13px;color:#6b7280">Partagez ce lien avec vos clients pour
+         <p style="font-size:13px;color:#6C7889">Partagez ce lien avec vos clients pour
           recevoir vos premières demandes de course. Gérez tout depuis
-          <a href="${opts.dashboardUrl}" style="color:#4f46e5">votre espace</a>.</p>`,
+          <a href="${opts.dashboardUrl}" style="color:#B5793F">votre espace</a>.</p>`,
       ),
     }
   },
@@ -489,7 +498,7 @@ export const emailTemplates = {
         'Réinitialisation de mot de passe',
         `<p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
          ${button(opts.resetUrl, 'Choisir un nouveau mot de passe')}
-         <p style="font-size:13px;color:#6b7280">Ce lien est valable 1 heure. Si vous n'avez pas fait cette demande, ignorez cet email.</p>`,
+         <p style="font-size:13px;color:#6C7889">Ce lien est valable 1 heure. Si vous n'avez pas fait cette demande, ignorez cet email.</p>`,
       ),
     }
   },

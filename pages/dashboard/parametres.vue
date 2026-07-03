@@ -455,7 +455,7 @@ async function deleteSurcharge(id: string) {
 
 <template>
   <div class="max-w-2xl space-y-6">
-    <h1 class="text-2xl font-bold text-slate-900">Réglages</h1>
+    <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Réglages</h1>
     <p v-if="!me" class="mt-4 text-sm text-slate-400">Chargement…</p>
 
     <!-- Notifications globales -->
