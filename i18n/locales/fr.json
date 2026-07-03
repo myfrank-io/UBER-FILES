@@ -54,6 +54,8 @@
     "title": "Votre devis",
     "paidTitle": "Course confirmée et payée.",
     "paidBody": "Un email de confirmation vous a été envoyé.",
+    "verifying": "Vérification du paiement en cours…",
+    "paymentUnconfirmed": "Le paiement n'a pas été confirmé. Si vous venez de payer, patientez quelques instants puis rafraîchissez la page. Sinon, vous pouvez réessayer ci-dessous.",
     "transfer": "Transfert",
     "hourly": "Mise à disposition",
     "hourlyDuration": "{hours} h",

@@ -54,6 +54,8 @@
     "title": "Your quote",
     "paidTitle": "Ride confirmed and paid.",
     "paidBody": "A confirmation email has been sent to you.",
+    "verifying": "Checking your payment…",
+    "paymentUnconfirmed": "Payment was not confirmed. If you just paid, wait a moment and refresh the page. Otherwise, you can try again below.",
     "transfer": "Transfer",
     "hourly": "Hourly hire",
     "hourlyDuration": "{hours} h",
