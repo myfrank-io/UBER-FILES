@@ -171,6 +171,25 @@ const monthStats = computed(() => {
 
 const openedBooking = ref<CalEvent | null>(null)
 
+// Relance d'un devis en attente : renvoie l'email avec le lien de paiement au
+// client, directement depuis la fiche (l'id du « booking » d'un PENDING_QUOTE
+// est l'id du devis).
+const { success: toastSuccess, error: toastError } = useToast()
+const resending = ref(false)
+async function resendQuote(quoteId: string) {
+  resending.value = true
+  try {
+    await $fetch(`/api/dashboard/quotes/${quoteId}/resend`, { method: 'POST', body: {} })
+    toastSuccess('Email envoyé au client.')
+    openedBooking.value = null
+    await refresh()
+  } catch (e) {
+    toastError((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.')
+  } finally {
+    resending.value = false
+  }
+}
+
 // ─── Blocage de créneau ──────────────────────────────────────────────────────
 
 const showBlock = ref(false)
@@ -603,14 +622,16 @@ function eventTimeLabel(e: CalEvent): string {
           >
             Voir plus
           </NuxtLink>
-          <NuxtLink
+          <!-- Devis en attente : relance directe du client (renvoi du lien de paiement) -->
+          <button
             v-else
-            to="/dashboard"
+            type="button"
             class="btn-ghost !px-2 !py-2.5 text-sm"
-            @click="openedBooking = null"
+            :disabled="resending"
+            @click="resendQuote(openedBooking.booking!.id)"
           >
-            Voir plus
-          </NuxtLink>
+            {{ resending ? '…' : '↩ Relancer' }}
+          </button>
         </div>
       </div>
     </div>
