@@ -63,7 +63,7 @@ async function reject(quoteId: string) {
 async function resend(quoteId: string) {
   busyId.value = quoteId
   try {
-    await $fetch(`/api/dashboard/quotes/${quoteId}/resend`, { method: 'POST' })
+    await $fetch(`/api/dashboard/quotes/${quoteId}/resend`, { method: 'POST', body: {} })
     toastSuccess('Email envoyé au client.')
     await refresh()
   } catch (e) {

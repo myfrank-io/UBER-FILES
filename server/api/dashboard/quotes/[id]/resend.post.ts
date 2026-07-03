@@ -12,7 +12,9 @@ export default defineEventHandler(async (event) => {
   const driverId = await requireDriverId(event)
   const id = getRouterParam(event, 'id')!
 
-  const body = await readValidatedBody(event, (b) => schema.safeParse(b))
+  // Le corps est entièrement optionnel : un POST sans corps (relance simple, sans
+  // ajustement de montant) doit passer — safeParse(undefined) échouerait sinon.
+  const body = await readValidatedBody(event, (b) => schema.safeParse(b ?? {}))
   if (!body.success) throw createError({ statusCode: 400, statusMessage: 'Montant invalide.' })
 
   const quote = await prisma.quote.findFirst({
