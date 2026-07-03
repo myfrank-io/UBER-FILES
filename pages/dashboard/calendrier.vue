@@ -398,7 +398,7 @@ function eventTimeLabel(e: CalEvent): string {
                       : day.key === selectedKey ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-700',
                 ]"
               >
-                <template v-if="e.type === 'BOOKING'">{{ e.booking?.customerName ?? 'Course' }}</template>
+                <template v-if="e.type === 'BOOKING'">🚗 {{ e.booking?.customerName ?? 'Course' }}</template>
                 <template v-else-if="e.type === 'PENDING_QUOTE'">⏳ {{ e.booking?.customerName ?? 'Devis' }}</template>
                 <template v-else>{{ e.title ?? 'Indispo' }}</template>
               </span>
