@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Layout du back-office chauffeur : navigation latérale (desktop) / barre basse (mobile).
-const { user, session, clear } = useUserSession()
+const { user, session, clear, fetch: refreshSession } = useUserSession()
 
 // Usurpation admin : quand un admin visite l'espace d'un chauffeur, la session
 // mémorise son identité. On affiche alors un bandeau pour revenir à l'admin.
@@ -9,6 +9,9 @@ const impersonator = computed(
 )
 async function stopImpersonation() {
   await $fetch('/api/admin/stop-impersonation', { method: 'POST' })
+  // Recharger l'état de session client (redevenu ADMIN) AVANT de naviguer,
+  // sinon le middleware `admin` lit l'ancien rôle DRIVER et renvoie au login.
+  await refreshSession()
   await navigateTo('/admin')
 }
 
