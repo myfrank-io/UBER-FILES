@@ -78,6 +78,9 @@ export default defineNuxtConfig({
     cronSecret: process.env.CRON_SECRET || '',
     public: {
       appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:3000',
+      // Email de contact/support affiché dans certains messages (ex: « ce n'était
+      // pas vous ? » après un changement de mot de passe). Facultatif.
+      supportEmail: process.env.SUPPORT_EMAIL || '',
       // Bouton « Connecter avec SumUp » (OAuth) dans les réglages chauffeur.
       // Laisser désactivé tant que SumUp n'a pas accordé le scope restreint
       // `payments` à l'app — les chauffeurs se connectent alors par clé API.

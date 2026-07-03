@@ -36,6 +36,12 @@ model User {
   passwordResetToken  String?   @unique
   passwordResetExpiry DateTime?
 
+  // Vérification de l'adresse email (confirmée par un lien envoyé à l'inscription).
+  emailVerified          Boolean   @default(false)
+  emailVerificationToken String?   @unique
+  emailVerificationExpiry DateTime?
+  emailVerificationSentAt DateTime? // horodatage du dernier envoi (throttle du renvoi)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

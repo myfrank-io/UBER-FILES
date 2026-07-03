@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { prisma } from '~/server/utils/prisma'
 import { hashUserPassword } from '~/server/utils/password'
 import { verifySiren } from '~/server/utils/insee'
-import { sendEmail, emailTemplates } from '~/server/utils/email'
+import { sendInitialVerificationEmail } from '~/server/utils/email-verification'
 
 // Inscription en self-service d'un chauffeur depuis la landing publique.
 // Crée Driver + User + grilles tarifaires par défaut, statut PENDING :
@@ -103,12 +103,9 @@ export default defineEventHandler(async (event) => {
     include: { user: true },
   })
 
-  // Email de bienvenue : profil reçu, en attente de validation.
-  const tpl = emailTemplates.driverWelcomePending({
-    displayName: driver.displayName,
-    dashboardUrl: `${config.public.appBaseUrl}/dashboard`,
-  })
-  await sendEmail({ to: email, ...tpl })
+  // Email de bienvenue + confirmation de l'adresse email (un seul message :
+  // accueille, demande la confirmation, rappelle que le profil est en attente).
+  await sendInitialVerificationEmail({ id: driver.user!.id, email }, driver.displayName)
 
   // Connexion automatique : le chauffeur arrive dans son espace pour le personnaliser.
   await setUserSession(event, {

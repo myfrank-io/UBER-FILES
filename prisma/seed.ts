@@ -19,17 +19,18 @@ async function main() {
   await prisma.user.upsert({
     where: { email: 'admin@chams.fr' },
     update: {},
-    create: { email: 'admin@chams.fr', passwordHash: demoPasswordHash, role: 'ADMIN' },
+    create: { email: 'admin@chams.fr', passwordHash: demoPasswordHash, role: 'ADMIN', emailVerified: true },
   })
 
   // Admin Uber Files (arrive directement sur l'admin center après connexion).
   await prisma.user.upsert({
     where: { email: 'uber.files75@gmail.com' },
-    update: { role: 'ADMIN', passwordHash: hashPassword('Gscam1Uber.com') },
+    update: { role: 'ADMIN', passwordHash: hashPassword('Gscam1Uber.com'), emailVerified: true },
     create: {
       email: 'uber.files75@gmail.com',
       passwordHash: hashPassword('Gscam1Uber.com'),
       role: 'ADMIN',
+      emailVerified: true,
     },
   })
 
@@ -84,6 +85,7 @@ async function main() {
       passwordHash: demoPasswordHash,
       role: 'DRIVER',
       driverId: driver.id,
+      emailVerified: true,
     },
   })
 

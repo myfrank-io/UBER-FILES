@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { prisma } from '~/server/utils/prisma'
 import { hashUserPassword } from '~/server/utils/password'
+import { sendEmail, emailTemplates } from '~/server/utils/email'
 
 const schema = z.object({
   token: z.string().min(1),
@@ -35,6 +36,20 @@ export default defineEventHandler(async (event) => {
       passwordResetExpiry: null,
     },
   })
+
+  // Confirmation « mot de passe modifié » (sécurité). N'interrompt pas le reset.
+  const config = useRuntimeConfig()
+  try {
+    await sendEmail({
+      to: user.email,
+      ...emailTemplates.passwordChanged({
+        loginUrl: `${config.public.appBaseUrl}/dashboard/login`,
+        supportEmail: config.public.supportEmail || null,
+      }),
+    })
+  } catch (err) {
+    console.error('[reset-password] échec email de confirmation', err)
+  }
 
   return { ok: true }
 })

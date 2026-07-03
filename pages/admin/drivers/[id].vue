@@ -141,7 +141,16 @@ const statusColors: Record<string, string> = {
           <dl class="space-y-2 text-sm">
             <div class="flex justify-between">
               <dt class="text-slate-500">Email</dt>
-              <dd>{{ data.user?.email ?? '—' }}</dd>
+              <dd class="text-right">
+                {{ data.user?.email ?? '—' }}
+                <span
+                  v-if="data.user"
+                  class="ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
+                  :class="data.user.emailVerified ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'"
+                >
+                  {{ data.user.emailVerified ? '✓ vérifié' : 'non vérifié' }}
+                </span>
+              </dd>
             </div>
             <div class="flex justify-between">
               <dt class="text-slate-500">Téléphone</dt>
