@@ -161,9 +161,15 @@ async function devConfirm() {
           <span class="font-medium text-slate-700">{{ $t('quote.totalToPay') }}</span>
           <span class="text-2xl font-bold text-slate-900">{{ formatMoney(quote.amountCents, quote.currency) }}</span>
         </div>
+        <p v-if="quote.adjusted" class="mt-1 text-xs text-slate-500">
+          {{ $t('quote.adjustedNote') }}
+        </p>
 
         <div v-if="quote.status === 'EXPIRED'" class="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {{ $t('quote.expired') }}
+        </div>
+        <div v-else-if="quote.status === 'REJECTED'" class="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          {{ $t('quote.rejectedBody') }}
         </div>
         <template v-else-if="quote.status === 'SENT'">
           <p class="mt-2 text-xs text-slate-400">{{ $t('quote.validUntil', { date: formatDateTime(quote.expiresAt) }) }}</p>

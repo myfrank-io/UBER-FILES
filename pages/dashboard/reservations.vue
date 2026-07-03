@@ -55,6 +55,18 @@ async function openDetail(id: string) {
 
 function closeDetail() { selected.value = null; detail.value = null }
 
+// Paiement le plus parlant pour la pastille du détail : un règlement effectué
+// (PAID) prime sur un encaissement attendu (PENDING), sinon le dernier connu.
+const detailPayment = computed(() => {
+  const payments = (detail.value?.payments as { method?: string; status?: string }[] | undefined) ?? []
+  return (
+    payments.find((p) => p.status === 'PAID') ??
+    payments.find((p) => p.status === 'PENDING') ??
+    payments[payments.length - 1] ??
+    null
+  )
+})
+
 async function markComplete(id: string) {
   if (!confirm('Marquer cette course comme terminée ?')) return
   completing.value = id
@@ -146,10 +158,14 @@ async function markPaid(id: string) {
               </template>
               <template v-else>Mise à disposition — {{ b.ride.durationHours }}h</template>
             </p>
-            <p v-if="b.payment" class="mt-1 text-xs">
-              <span v-if="b.payment.status === 'PAID'" class="text-green-700">● Réglé</span>
-              <span v-else-if="b.payment.status === 'PENDING' && b.status !== 'CANCELLED'" class="text-amber-600">● À encaisser sur place — {{ methodLabel(b.payment.method) }}</span>
-            </p>
+            <!-- Règlement de la course, en un coup d'œil (payé en ligne / sur place / à encaisser) -->
+            <PaymentBadge
+              v-if="b.payment"
+              class="mt-1.5"
+              :method="b.payment.method"
+              :status="b.payment.status"
+              :booking-status="b.status"
+            />
           </div>
           <p class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</p>
         </div>
@@ -202,8 +218,14 @@ async function markPaid(id: string) {
         <div v-if="loadingDetail" class="p-5 text-sm text-slate-400">Chargement…</div>
 
         <div v-else-if="detail" class="space-y-5 p-5">
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <StatusBadge :status="(detail.status as string)" />
+            <PaymentBadge
+              v-if="detailPayment"
+              :method="detailPayment.method"
+              :status="detailPayment.status"
+              :booking-status="(detail.status as string)"
+            />
             <span class="text-sm text-slate-500">{{ formatDateTime(detail.scheduledAt as string) }}</span>
           </div>
 

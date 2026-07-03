@@ -1,6 +1,6 @@
 import { prisma } from '~/server/utils/prisma'
 import { answerCallbackQuery, sendTelegramMessage } from '~/server/utils/telegram'
-import { sendQuoteToClient, rejectQuote } from '~/server/utils/quote-actions'
+import { acceptQuote, rejectQuote } from '~/server/utils/quote-actions'
 
 // Webhook du bot Telegram. Sécurisé par l'en-tête secret de Telegram. Gère :
 //  - l'appairage chauffeur via /start <code>
@@ -43,9 +43,16 @@ export default defineEventHandler(async (event) => {
     if (scope === 'quote' && driver && quoteId) {
       try {
         if (action === 'accept') {
-          const res = await sendQuoteToClient(quoteId, driver.id)
-          await answerCallbackQuery(cb.id, 'Devis validé et envoyé au client.')
-          await sendTelegramMessage(chatId, `✅ Devis validé (${(res.amountCents / 100).toFixed(2)} €). Le client a reçu le lien de paiement.`)
+          // Même logique que le dashboard : règlement sur place → course confirmée
+          // directement ; paiement en ligne → devis envoyé avec lien de paiement.
+          const res = await acceptQuote(quoteId, driver.id)
+          if (res.confirmed) {
+            await answerCallbackQuery(cb.id, 'Course confirmée.')
+            await sendTelegramMessage(chatId, '✅ Course confirmée — règlement sur place. Le client a été prévenu par email.')
+          } else {
+            await answerCallbackQuery(cb.id, 'Devis validé et envoyé au client.')
+            await sendTelegramMessage(chatId, `✅ Devis validé (${((res.amountCents ?? 0) / 100).toFixed(2)} €). Le client a reçu le lien de paiement.`)
+          }
         } else if (action === 'reject') {
           await rejectQuote(quoteId, driver.id)
           await answerCallbackQuery(cb.id, 'Devis refusé.')

@@ -24,6 +24,14 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   ONSITE_CHECK: 'Chèque sur place',
 }
 
+/** Libellé compact (pastilles, chips, lignes de récap). */
+export const PAYMENT_METHOD_SHORT_LABELS: Record<PaymentMethod, string> = {
+  STRIPE_PREPAYMENT: 'En ligne',
+  ONSITE_CARD: 'Carte',
+  ONSITE_CASH: 'Espèces',
+  ONSITE_CHECK: 'Chèque',
+}
+
 /** True si le moyen est un encaissement sur place (pas de prépaiement Stripe). */
 export function isOnSiteMethod(method: PaymentMethod): boolean {
   return ONSITE_METHODS.includes(method)

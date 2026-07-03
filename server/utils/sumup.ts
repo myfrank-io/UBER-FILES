@@ -189,6 +189,22 @@ export async function getCheckout(accessToken: string, checkoutId: string): Prom
   return res.json()
 }
 
+/**
+ * Désactive un checkout hébergé (DELETE). Utilisé quand on en recrée un pour le
+ * même devis : l'ancien lien de paiement ne doit plus pouvoir encaisser, sinon un
+ * paiement sur l'ancien checkout ne serait jamais rapproché du devis.
+ */
+export async function deactivateCheckout(accessToken: string, checkoutId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/v0.1/checkouts/${checkoutId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  // 404/409 : déjà désactivé, expiré ou payé entre-temps — rien à faire de plus.
+  if (!res.ok && res.status !== 404 && res.status !== 409) {
+    throw createError({ statusCode: 502, statusMessage: `Désactivation du checkout SumUp échouée (${res.status}).` })
+  }
+}
+
 /** Rembourse une transaction SumUp (totale si amount omis, sinon partielle). */
 export async function refundTransaction(accessToken: string, transactionId: string, amount?: number): Promise<void> {
   const res = await fetch(`${API_BASE}/v0.1/me/refund/${transactionId}`, {

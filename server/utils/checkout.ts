@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 import { createCheckoutSession } from './stripe'
-import { getValidAccessToken, createHostedCheckout, getCheckout } from './sumup'
+import { getValidAccessToken, createHostedCheckout, getCheckout, deactivateCheckout } from './sumup'
 
 // Création de la session de paiement en ligne d'un devis (Stripe ou SumUp selon
 // le prestataire du chauffeur). Partagé entre la page devis (paiement différé) et
@@ -51,14 +51,17 @@ export async function createQuoteCheckoutUrl(
     // Un checkout existe déjà pour ce devis (le client a déjà tenté de payer) :
     // SumUp refuse d'en recréer un avec la même référence (409 DUPLICATED_CHECKOUT).
     // On vérifie d'abord son statut : s'il est déjà payé, retour direct au succès ;
-    // sinon on en crée un NOUVEAU avec une référence unique pour permettre de repayer.
+    // sinon on le DÉSACTIVE (un paiement sur l'ancien lien ne serait jamais
+    // rapproché du devis) puis on en crée un nouveau avec une référence unique.
     let checkoutReference = quote.id
     if (quote.sumupCheckoutId) {
       try {
         const existing = await getCheckout(accessToken, quote.sumupCheckoutId)
         if (existing.status === 'PAID') return successUrl
+        await deactivateCheckout(accessToken, quote.sumupCheckoutId)
       } catch {
-        // Statut indisponible : on crée simplement un nouveau checkout.
+        // Statut/désactivation indisponibles : on crée quand même un nouveau
+        // checkout (le webhook ignorera un éventuel paiement sur l'ancien).
       }
       checkoutReference = `${quote.id}-${randomUUID().slice(0, 8)}`
     }

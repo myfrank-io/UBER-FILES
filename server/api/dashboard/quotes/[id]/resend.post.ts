@@ -3,6 +3,9 @@ import { requireDriverId } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import { signClientToken } from '~/server/utils/tokens'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
+import { canAcceptBookings } from '~/server/utils/driver'
+import { onSitePaymentMethods } from '~/lib/booking-policy'
+import type { PaymentMethod } from '~/lib/payment-methods'
 
 const schema = z.object({
   amountCents: z.number().int().positive().optional(),
@@ -47,6 +50,12 @@ export default defineEventHandler(async (event) => {
   )
   const payUrl = `${config.public.appBaseUrl}/devis/${token}`
 
+  // Mêmes libellés de bouton que l'envoi initial (en ligne / au choix / sur place).
+  const prepayment =
+    quote.driver.paymentMethods.includes('STRIPE_PREPAYMENT') && canAcceptBookings(quote.driver)
+  const onSiteAvailable =
+    onSitePaymentMethods(quote.driver.paymentMethods as PaymentMethod[]).length > 0
+
   await sendEmail({
     to: quote.rideRequest.customerEmail,
     ...emailTemplates.quoteSent({
@@ -55,6 +64,8 @@ export default defineEventHandler(async (event) => {
       currency: quote.currency,
       payUrl,
       expiresAt,
+      prepayment,
+      onSiteAvailable,
       type: quote.rideRequest.type,
       scheduledAt: quote.rideRequest.scheduledAt,
       pickupAddress: quote.rideRequest.pickupAddress,

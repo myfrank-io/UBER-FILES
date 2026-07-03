@@ -52,7 +52,9 @@ const esc = (s: string) =>
 
 export const emailTemplates = {
   // Accusé de réception envoyé au client juste après sa demande, tant que le
-  // chauffeur n'a pas encore validé le devis (flux à validation manuelle).
+  // chauffeur n'a pas encore validé (flux à validation manuelle). La « prochaine
+  // étape » s'adapte au règlement prévu : lien de paiement en ligne, ou simple
+  // confirmation quand le règlement se fera sur place.
   orderReceived(opts: {
     customerName: string
     driverName: string
@@ -64,11 +66,20 @@ export const emailTemplates = {
     durationHours?: number | null
     amountCents: number
     currency: string
+    // True si le règlement de cette demande se fera sur place le jour de la course.
+    paymentOnSite?: boolean
   }) {
     const trajet =
       opts.type === 'TRANSFER'
         ? `${esc(opts.pickupAddress ?? '?')} → ${esc(opts.dropoffAddress ?? '?')}${opts.roundTrip ? ' (aller-retour)' : ''}`
         : `Mise à disposition ${opts.durationHours ?? '?'} h${opts.pickupAddress ? ` — départ : ${esc(opts.pickupAddress)}` : ''}`
+    const nextStep = opts.paymentOnSite
+      ? `<p><strong>Prochaine étape :</strong> dès que le chauffeur aura confirmé votre
+            réservation, vous recevrez un <strong>email de confirmation</strong>. Le règlement
+            se fera <strong>sur place</strong>, le jour de la course.</p>`
+      : `<p><strong>Prochaine étape :</strong> dès que le chauffeur aura validé votre course,
+            vous recevrez un <strong>nouvel email</strong> avec le lien pour confirmer et régler
+            votre réservation.</p>`
     return {
       subject: `Demande de réservation bien reçue — ${opts.driverName}`,
       html: wrap(
@@ -81,9 +92,7 @@ export const emailTemplates = {
            📍 ${trajet}<br />
            💶 Montant estimé : <strong>${formatMoney(opts.amountCents, opts.currency)}</strong>
          </div>
-         <p><strong>Prochaine étape :</strong> dès que le chauffeur aura validé votre course,
-            vous recevrez un <strong>nouvel email</strong> avec le lien pour confirmer et régler
-            votre réservation.</p>
+         ${nextStep}
          <p style="font-size:13px;color:#6b7280">Le montant ci-dessus est une estimation, susceptible
             d'être ajustée par le chauffeur lors de la validation. Aucune somme ne vous est débitée à ce stade.</p>`,
       ),
@@ -98,6 +107,9 @@ export const emailTemplates = {
     // True si le chauffeur propose le prépaiement en ligne ; sinon le client
     // réserve et règle sur place (le libellé du bouton s'adapte).
     prepayment?: boolean
+    // True si l'encaissement sur place est aussi proposé (le bouton devient neutre :
+    // le client choisit son règlement sur la page devis).
+    onSiteAvailable?: boolean
     // Récap de la course (rappelé dans l'email).
     type: 'TRANSFER' | 'HOURLY'
     scheduledAt: Date
@@ -108,7 +120,6 @@ export const emailTemplates = {
     // Estimation initiale : si différente du montant final, le chauffeur a ajusté le tarif.
     originalAmountCents?: number
   }) {
-    const label = opts.prepayment === false ? 'Voir mon devis et réserver' : 'Payer et confirmer la course'
     const trajet =
       opts.type === 'TRANSFER'
         ? `${esc(opts.pickupAddress ?? '?')} → ${esc(opts.dropoffAddress ?? '?')}${opts.roundTrip ? ' (aller-retour)' : ''}`
@@ -116,6 +127,16 @@ export const emailTemplates = {
     // Le chauffeur a-t-il ajusté le tarif par rapport à l'estimation initiale ?
     const adjusted =
       opts.originalAmountCents != null && opts.originalAmountCents !== opts.amountCents
+    // Libellé du bouton selon le règlement proposé : paiement en ligne seul, choix
+    // en ligne/sur place, ou sur place uniquement (avec cas « nouveau tarif à accepter »).
+    const label =
+      opts.prepayment === false
+        ? adjusted
+          ? 'Accepter le nouveau tarif et réserver'
+          : 'Voir mon devis et réserver'
+        : opts.onSiteAvailable
+          ? 'Voir mon devis et confirmer'
+          : 'Payer et confirmer la course'
     const intro = adjusted
       ? `<p>${esc(opts.driverName)} a validé votre devis en <strong>ajustant le tarif</strong> :</p>`
       : `<p>${esc(opts.driverName)} a validé votre devis :</p>`
@@ -192,6 +213,9 @@ export const emailTemplates = {
     companyName?: string | null
     vehicleMake?: string | null
     vehicleModel?: string | null
+    // True quand la confirmation résulte de l'acceptation manuelle du chauffeur
+    // (flux à validation) — l'intro le dit explicitement au client.
+    acceptedByDriver?: boolean
   }) {
     const contact = [
       opts.driverPhone ? `📞 ${opts.driverPhone}` : '',
@@ -204,11 +228,17 @@ export const emailTemplates = {
       opts.vehicleMake && opts.vehicleModel ? `Véhicule : ${opts.vehicleMake} ${opts.vehicleModel}` : '',
     ].filter(Boolean).join(' &nbsp;·&nbsp; ')
 
+    const intro = opts.acceptedByDriver
+      ? `<p><strong>${esc(opts.driverName)}</strong> a accepté votre réservation : votre course est
+         confirmée. Le règlement de <strong>${formatMoney(opts.amountCents, opts.currency)}</strong>
+         se fera <strong>sur place</strong>, le jour de la course.</p>`
+      : `<p>Votre course est réservée. Le règlement de <strong>${formatMoney(opts.amountCents, opts.currency)}</strong> se fera <strong>sur place</strong>, le jour de la course.</p>`
+
     return {
       subject: `Confirmation de réservation — ${opts.driverName}`,
       html: wrap(
         'Votre réservation est confirmée ✅',
-        `<p>Votre course est réservée. Le règlement de <strong>${formatMoney(opts.amountCents, opts.currency)}</strong> se fera <strong>sur place</strong>, le jour de la course.</p>
+        `${intro}
          <p style="font-size:13px;color:#374151">Moyen de paiement prévu : <strong>${PAYMENT_METHOD_LABELS[opts.method]}</strong>.</p>
          <p>Prise en charge le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
          ${contact ? `<p style="font-size:13px;color:#374151">Contact chauffeur : ${contact}</p>` : ''}
@@ -236,11 +266,23 @@ export const emailTemplates = {
     dashboardUrl: string
     // Paiement immédiat : le devis est déjà parti tout seul, pas d'action attendue.
     autoSent?: boolean
+    // Règlement sur place : en acceptant, le chauffeur confirme directement la course.
+    directAccept?: boolean
+    // Règlement prévu pour cette demande (ex : « Sur place — Espèces », « En ligne (carte) »).
+    paymentLabel?: string
   }) {
     const trajet =
       opts.type === 'TRANSFER'
         ? `${esc(opts.pickupAddress ?? '?')} → ${esc(opts.dropoffAddress ?? '?')}${opts.roundTrip ? ' (aller-retour)' : ''}`
         : `Mise à disposition ${opts.durationHours ?? '?'} h${opts.pickupAddress ? ` — départ : ${esc(opts.pickupAddress)}` : ''}`
+    const action = opts.autoSent
+      ? `${button(opts.dashboardUrl, 'Voir la demande')}
+         <p style="font-size:13px;color:#6b7280">Paiement immédiat activé : le devis a été envoyé automatiquement au client. Vous serez prévenu dès son paiement — aucune action attendue de votre part.</p>`
+      : opts.directAccept
+        ? `${button(opts.dashboardUrl, 'Accepter ou refuser la réservation')}
+         <p style="font-size:13px;color:#6b7280">En acceptant, la course est <strong>confirmée immédiatement</strong> — règlement sur place. Le client est prévenu par email. Vous pouvez aussi ajuster le prix : le client devra alors accepter le nouveau tarif.</p>`
+        : `${button(opts.dashboardUrl, 'Valider ou refuser le devis')}
+         <p style="font-size:13px;color:#6b7280">Le client recevra le lien de réservation dès que vous aurez validé le devis.</p>`
     return {
       subject: `Nouvelle demande de course — ${opts.customerName}`,
       html: wrap(
@@ -249,15 +291,10 @@ export const emailTemplates = {
          <p>📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
             📍 ${trajet}</p>
          <p>Prix calculé : <strong style="font-size:20px">${formatMoney(opts.amountCents, opts.currency)}</strong></p>
+         ${opts.paymentLabel ? `<p style="font-size:13px;color:#374151">💶 Règlement prévu : <strong>${esc(opts.paymentLabel)}</strong></p>` : ''}
          ${opts.notes ? `<p style="font-size:13px;color:#6b7280">Note du client : ${esc(opts.notes)}</p>` : ''}
          ${opts.hasConflict ? '<p style="color:#b45309"><strong>⚠️ Conflit calendrier détecté</strong> — vérifiez votre planning avant de valider.</p>' : ''}
-         ${
-           opts.autoSent
-             ? `${button(opts.dashboardUrl, 'Voir la demande')}
-         <p style="font-size:13px;color:#6b7280">Paiement immédiat activé : le devis a été envoyé automatiquement au client. Vous serez prévenu dès son paiement — aucune action attendue de votre part.</p>`
-             : `${button(opts.dashboardUrl, 'Valider ou refuser le devis')}
-         <p style="font-size:13px;color:#6b7280">Le client recevra le lien de réservation dès que vous aurez validé le devis.</p>`
-         }`,
+         ${action}`,
       ),
     }
   },
@@ -272,6 +309,15 @@ export const emailTemplates = {
     paidOnline: boolean
     method?: PaymentMethod
     dashboardUrl: string
+    // True quand la course a été confirmée automatiquement (créneau libre, sans
+    // action du chauffeur) — l'email est alors sa seule notification.
+    autoConfirmed?: boolean
+    // True quand c'est le chauffeur lui-même qui vient d'accepter la demande
+    // (l'email sert de trace : « vous avez accepté », pas « le client a confirmé »).
+    acceptedByDriver?: boolean
+    // True si la course confirmée chevauche un autre événement du calendrier
+    // (paiement déjà encaissé : on confirme mais on alerte le chauffeur).
+    conflictWarning?: boolean
   }) {
     const contact = [
       opts.customerPhone ? `📞 ${esc(opts.customerPhone)}` : '',
@@ -280,12 +326,21 @@ export const emailTemplates = {
     const paiement = opts.paidOnline
       ? `<strong>${formatMoney(opts.amountCents, opts.currency)}</strong> payés en ligne.`
       : `<strong>${formatMoney(opts.amountCents, opts.currency)}</strong> à encaisser sur place${opts.method ? ` (${PAYMENT_METHOD_LABELS[opts.method]})` : ''}.`
+    const intro = opts.autoConfirmed
+      ? `<p><strong>${esc(opts.customerName)}</strong> vient de réserver : la course du
+         <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong> a été <strong>confirmée
+         automatiquement</strong> (créneau libre).</p>`
+      : opts.acceptedByDriver
+        ? `<p>Vous avez accepté la réservation de <strong>${esc(opts.customerName)}</strong> :
+           la course du <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong> est confirmée.</p>`
+        : `<p><strong>${esc(opts.customerName)}</strong> a confirmé sa course du <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>`
     return {
       subject: `Course confirmée — ${opts.customerName} (${opts.scheduledAt.toLocaleString('fr-FR')})`,
       html: wrap(
         'Course confirmée ✅',
-        `<p><strong>${esc(opts.customerName)}</strong> a confirmé sa course du <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
+        `${intro}
          <p>${paiement}</p>
+         ${opts.conflictWarning ? '<p style="color:#b45309"><strong>⚠️ Attention :</strong> cette course chevauche un autre événement de votre calendrier. Vérifiez votre planning et contactez le client si besoin.</p>' : ''}
          ${contact ? `<p style="font-size:13px;color:#374151">Contact client : ${contact}</p>` : ''}
          <p style="font-size:13px;color:#6b7280">Le créneau est bloqué dans votre calendrier.</p>
          ${button(opts.dashboardUrl, 'Voir mes réservations')}`,
@@ -311,13 +366,62 @@ export const emailTemplates = {
       ),
     }
   },
-  reminder(opts: { driverName: string; scheduledAt: Date; manageUrl: string }) {
+  reminder(opts: {
+    driverName: string
+    scheduledAt: Date
+    manageUrl: string
+    // Renseignés quand un encaissement sur place est encore attendu : le rappel
+    // précise le montant et le moyen prévus pour le jour J.
+    amountCents?: number
+    currency?: string
+    onSiteMethod?: PaymentMethod | null
+  }) {
+    const paymentLine =
+      opts.onSiteMethod && opts.amountCents != null
+        ? `<p>💶 Pensez à votre règlement sur place : <strong>${formatMoney(opts.amountCents, opts.currency ?? 'eur')}
+           (${PAYMENT_METHOD_LABELS[opts.onSiteMethod]})</strong>.</p>`
+        : ''
     return {
       subject: `Rappel : votre course demain — ${opts.driverName}`,
       html: wrap(
         'Rappel de course',
         `<p>Votre course avec ${opts.driverName} est prévue le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
+         ${paymentLine}
          ${button(opts.manageUrl, 'Voir ma réservation')}`,
+      ),
+    }
+  },
+  // Refus d'une demande par le chauffeur : le client est prévenu et peut refaire
+  // une demande sur un autre créneau (aujourd'hui rien n'a été débité).
+  requestRejected(opts: {
+    customerName: string
+    driverName: string
+    type: 'TRANSFER' | 'HOURLY'
+    scheduledAt: Date
+    pickupAddress?: string | null
+    dropoffAddress?: string | null
+    roundTrip?: boolean
+    durationHours?: number | null
+    rebookUrl: string
+  }) {
+    const trajet =
+      opts.type === 'TRANSFER'
+        ? `${esc(opts.pickupAddress ?? '?')} → ${esc(opts.dropoffAddress ?? '?')}${opts.roundTrip ? ' (aller-retour)' : ''}`
+        : `Mise à disposition ${opts.durationHours ?? '?'} h${opts.pickupAddress ? ` — départ : ${esc(opts.pickupAddress)}` : ''}`
+    return {
+      subject: `Votre demande n'a pas pu être acceptée — ${opts.driverName}`,
+      html: wrap(
+        'Demande non retenue',
+        `<p>Bonjour ${esc(opts.customerName)},</p>
+         <p>${esc(opts.driverName)} n'est malheureusement <strong>pas disponible</strong> pour
+            cette course :</p>
+         <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0">
+           📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
+           📍 ${trajet}
+         </div>
+         <p>Aucune somme ne vous a été débitée.</p>
+         <p>Vous pouvez refaire une demande sur un autre créneau :</p>
+         ${button(opts.rebookUrl, 'Réserver un autre créneau')}`,
       ),
     }
   },

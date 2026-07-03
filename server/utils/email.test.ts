@@ -69,6 +69,116 @@ describe('emailTemplates client', () => {
   })
 })
 
+describe('emailTemplates client — variantes des flux', () => {
+  it('orderReceived (règlement sur place) : annonce une confirmation, pas un lien de paiement', () => {
+    const tpl = emailTemplates.orderReceived({
+      ...base,
+      driverName: 'Karim VTC',
+      type: 'TRANSFER',
+      pickupAddress: 'Gare de Lyon',
+      dropoffAddress: 'Orly',
+      roundTrip: false,
+      amountCents: 8000,
+      currency: 'EUR',
+      paymentOnSite: true,
+    })
+    expect(tpl.html).toContain('confirmé votre')
+    expect(tpl.html).toContain('sur place')
+    expect(tpl.html).not.toContain('lien pour confirmer et régler')
+  })
+
+  it('quoteSent : libellé neutre quand en ligne ET sur place sont proposés', () => {
+    const tpl = emailTemplates.quoteSent({
+      driverName: 'Karim VTC',
+      amountCents: 5000,
+      currency: 'EUR',
+      payUrl: 'https://app.test/devis/tok',
+      expiresAt: new Date('2026-08-16T14:30:00Z'),
+      prepayment: true,
+      onSiteAvailable: true,
+      type: 'TRANSFER',
+      scheduledAt: base.scheduledAt,
+      pickupAddress: 'A',
+      dropoffAddress: 'B',
+      originalAmountCents: 5000,
+    })
+    expect(tpl.html).toContain('Voir mon devis et confirmer')
+    expect(tpl.html).not.toContain('Payer et confirmer la course')
+  })
+
+  it('quoteSent : « accepter le nouveau tarif » quand le prix est ajusté et le règlement sur place', () => {
+    const tpl = emailTemplates.quoteSent({
+      driverName: 'Karim VTC',
+      amountCents: 9000,
+      currency: 'EUR',
+      payUrl: 'https://app.test/devis/tok',
+      expiresAt: new Date('2026-08-16T14:30:00Z'),
+      prepayment: false,
+      onSiteAvailable: true,
+      type: 'HOURLY',
+      scheduledAt: base.scheduledAt,
+      durationHours: 3,
+      originalAmountCents: 6000,
+    })
+    expect(tpl.html).toContain('Accepter le nouveau tarif et réserver')
+    expect(tpl.subject).toContain('tarif ajusté')
+  })
+
+  it('bookingConfirmedOnSite : intro « acceptée par le chauffeur » sur le flux à validation', () => {
+    const tpl = emailTemplates.bookingConfirmedOnSite({
+      driverName: 'Karim VTC',
+      amountCents: 8000,
+      currency: 'EUR',
+      scheduledAt: base.scheduledAt,
+      method: 'ONSITE_CASH',
+      manageUrl: 'https://app.test/reservation/tok',
+      acceptedByDriver: true,
+    })
+    expect(tpl.html).toContain('a accepté votre réservation')
+    expect(tpl.html).toContain('sur place')
+    expect(tpl.html).toContain('Espèces')
+  })
+
+  it('requestRejected : prévient poliment, rassure sur le débit et propose de re-réserver', () => {
+    const tpl = emailTemplates.requestRejected({
+      ...base,
+      driverName: 'Karim VTC',
+      type: 'TRANSFER',
+      pickupAddress: 'Gare de Lyon <b>Paris</b>',
+      dropoffAddress: 'Orly',
+      roundTrip: false,
+      rebookUrl: 'https://app.test/karim-paris',
+    })
+    expect(tpl.subject).toContain("n'a pas pu être acceptée")
+    expect(tpl.html).toContain('pas disponible')
+    expect(tpl.html).toContain('Aucune somme ne vous a été débitée')
+    expect(tpl.html).toContain('https://app.test/karim-paris')
+    expect(tpl.html).not.toContain('<script>')
+    expect(tpl.html).toContain('Gare de Lyon &lt;b&gt;Paris&lt;/b&gt;')
+  })
+
+  it('reminder : rappelle le règlement sur place quand un encaissement est attendu', () => {
+    const tpl = emailTemplates.reminder({
+      driverName: 'Karim VTC',
+      scheduledAt: base.scheduledAt,
+      manageUrl: 'https://app.test/reservation/tok',
+      amountCents: 8550,
+      currency: 'EUR',
+      onSiteMethod: 'ONSITE_CARD',
+    })
+    expect(tpl.html).toContain('règlement sur place')
+    expect(tpl.html).toContain('85,50')
+    expect(tpl.html).toContain('Carte sur place')
+
+    const noPayment = emailTemplates.reminder({
+      driverName: 'Karim VTC',
+      scheduledAt: base.scheduledAt,
+      manageUrl: 'https://app.test/reservation/tok',
+    })
+    expect(noPayment.html).not.toContain('règlement sur place')
+  })
+})
+
 describe('emailTemplates chauffeur', () => {
   it('newRequestDriver : rend les détails et échappe les saisies client', () => {
     const tpl = emailTemplates.newRequestDriver({
@@ -127,6 +237,75 @@ describe('emailTemplates chauffeur', () => {
     })
     expect(onsite.html).toContain('à encaisser sur place')
     expect(onsite.html).toContain('client@test.fr')
+  })
+
+  it('newRequestDriver : acceptation directe (règlement sur place) avec moyen affiché', () => {
+    const tpl = emailTemplates.newRequestDriver({
+      ...base,
+      type: 'TRANSFER',
+      pickupAddress: 'A',
+      dropoffAddress: 'B',
+      amountCents: 8000,
+      currency: 'EUR',
+      hasConflict: false,
+      dashboardUrl: 'https://app.test/dashboard',
+      directAccept: true,
+      paymentLabel: 'Sur place — Espèces',
+    })
+    expect(tpl.html).toContain('Accepter ou refuser la réservation')
+    expect(tpl.html).toContain('confirmée immédiatement')
+    expect(tpl.html).toContain('Sur place — Espèces')
+    expect(tpl.html).not.toContain('Valider ou refuser le devis')
+  })
+
+  it('bookingConfirmedDriver : mention explicite de la confirmation automatique', () => {
+    const tpl = emailTemplates.bookingConfirmedDriver({
+      ...base,
+      amountCents: 8000,
+      currency: 'EUR',
+      paidOnline: false,
+      method: 'ONSITE_CASH',
+      autoConfirmed: true,
+      dashboardUrl: 'https://app.test/dashboard/reservations',
+    })
+    expect(tpl.html).toContain('confirmée')
+    expect(tpl.html).toContain('automatiquement')
+    expect(tpl.html).toContain('à encaisser sur place')
+  })
+
+  it('bookingConfirmedDriver : « vous avez accepté » quand le chauffeur est à l\'origine', () => {
+    const tpl = emailTemplates.bookingConfirmedDriver({
+      ...base,
+      amountCents: 8000,
+      currency: 'EUR',
+      paidOnline: false,
+      method: 'ONSITE_CASH',
+      acceptedByDriver: true,
+      dashboardUrl: 'https://app.test/dashboard/reservations',
+    })
+    expect(tpl.html).toContain('Vous avez accepté')
+    expect(tpl.html).not.toContain('a confirmé sa course')
+  })
+
+  it('bookingConfirmedDriver : alerte de chevauchement quand le paiement a confirmé malgré un conflit', () => {
+    const tpl = emailTemplates.bookingConfirmedDriver({
+      ...base,
+      amountCents: 8000,
+      currency: 'EUR',
+      paidOnline: true,
+      conflictWarning: true,
+      dashboardUrl: 'https://app.test/dashboard/reservations',
+    })
+    expect(tpl.html).toContain('chevauche')
+
+    const noWarn = emailTemplates.bookingConfirmedDriver({
+      ...base,
+      amountCents: 8000,
+      currency: 'EUR',
+      paidOnline: true,
+      dashboardUrl: 'https://app.test/dashboard/reservations',
+    })
+    expect(noWarn.html).not.toContain('chevauche')
   })
 
   it('bookingCancelledDriver : avec et sans remboursement', () => {

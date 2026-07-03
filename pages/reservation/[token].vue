@@ -1,9 +1,15 @@
 <script setup lang="ts">
 // Page client : gestion d'une réservation confirmée (consultation + annulation).
+import { PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
+
 const route = useRoute()
 const token = route.params.token as string
 const { formatMoney, formatDateTime } = useFormat()
 const { t } = useI18n()
+
+function shortMethod(method: unknown): string {
+  return PAYMENT_METHOD_SHORT_LABELS[method as PaymentMethod] ?? ''
+}
 
 const { data: booking, error, refresh } = await useFetch(`/api/booking/${token}`)
 useHead({ title: t('reservation.title') })
@@ -55,6 +61,17 @@ async function cancel() {
         <p v-else><strong>{{ $t('reservation.hourly') }}</strong> — {{ $t('reservation.hourlyDuration', { hours: booking.ride.durationHours }) }}</p>
         <p>{{ $t('reservation.on', { date: formatDateTime(booking.scheduledAt) }) }}</p>
         <p class="font-semibold text-slate-900">{{ formatMoney(booking.amountCents, booking.currency) }}</p>
+        <!-- Situation de règlement, en un coup d'œil -->
+        <p v-if="booking.payment?.paid" class="text-xs font-medium text-green-700">
+          {{
+            booking.payment.paidOnline
+              ? $t('reservation.paymentPaidOnline')
+              : $t('reservation.paymentPaidOnSite', { method: shortMethod(booking.payment.method) })
+          }}
+        </p>
+        <p v-else-if="booking.payment?.method && booking.status === 'CONFIRMED'" class="text-xs font-medium text-amber-600">
+          {{ $t('reservation.paymentDueOnSite', { method: shortMethod(booking.payment.method) }) }}
+        </p>
       </div>
 
       <!-- Coordonnées chauffeur -->

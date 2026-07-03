@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import { signClientToken } from './tokens'
 import { sendEmail, emailTemplates } from './email'
+import { isOnSiteMethod, type PaymentMethod } from '~/lib/payment-methods'
 
 // Envoi des rappels J-1 : pour chaque course confirmée dont la prise en charge a lieu
 // dans ~24h et qui n'a pas encore reçu de rappel, on notifie le client par email.
@@ -12,7 +13,7 @@ export async function sendDueReminders(now: Date = new Date()): Promise<{ sent: 
 
   const bookings = await prisma.booking.findMany({
     where: { status: 'CONFIRMED', scheduledAt: { gte: windowStart, lte: windowEnd } },
-    include: { driver: true, quote: { include: { rideRequest: true } } },
+    include: { driver: true, quote: { include: { rideRequest: true } }, payments: true },
   })
 
   let sent = 0
@@ -22,11 +23,19 @@ export async function sendDueReminders(now: Date = new Date()): Promise<{ sent: 
     const existing = await prisma.webhookEvent.findUnique({ where: { id: reminderKey } })
     if (existing) continue
 
+    // Encaissement sur place encore attendu : le rappel précise montant et moyen.
+    const pendingOnSite = b.payments.find(
+      (p) => p.status === 'PENDING' && isOnSiteMethod(p.method as PaymentMethod),
+    )
+
     const manageToken = await signClientToken({ purpose: 'manage', ref: b.id }, config.linkTokenSecret, '90d')
     const tpl = emailTemplates.reminder({
       driverName: b.driver.displayName,
       scheduledAt: b.scheduledAt,
       manageUrl: `${config.public.appBaseUrl}/reservation/${manageToken}`,
+      amountCents: pendingOnSite?.amountCents,
+      currency: pendingOnSite?.currency,
+      onSiteMethod: (pendingOnSite?.method as PaymentMethod | undefined) ?? null,
     })
     await sendEmail({ to: b.quote.rideRequest.customerEmail, ...tpl })
     await prisma.webhookEvent.create({
