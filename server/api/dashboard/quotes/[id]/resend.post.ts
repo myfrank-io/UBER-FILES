@@ -56,9 +56,12 @@ export default defineEventHandler(async (event) => {
   const onSiteAvailable =
     onSitePaymentMethods(quote.driver.paymentMethods as PaymentMethod[]).length > 0
 
+  // Gabarit de relance dédié : « vous avez une demande de course pour tel jour,
+  // tel itinéraire — pour la confirmer, procédez au paiement ».
   await sendEmail({
     to: quote.rideRequest.customerEmail,
-    ...emailTemplates.quoteSent({
+    ...emailTemplates.quoteReminder({
+      customerName: quote.rideRequest.customerName,
       driverName: quote.driver.displayName,
       amountCents,
       currency: quote.currency,
@@ -72,7 +75,6 @@ export default defineEventHandler(async (event) => {
       dropoffAddress: quote.rideRequest.dropoffAddress,
       roundTrip: quote.rideRequest.roundTrip,
       durationHours: quote.rideRequest.durationHours,
-      originalAmountCents: quote.computedAmountCents,
     }),
   })
 

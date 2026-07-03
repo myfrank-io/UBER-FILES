@@ -232,8 +232,12 @@ async function markPaid(id: string) {
           <div class="card !p-4">
             <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Client</p>
             <p class="mt-2 font-semibold text-slate-900">{{ (detail.customer as Record<string, string>).name }}</p>
-            <p class="text-sm text-slate-600">{{ (detail.customer as Record<string, string>).phone }}</p>
-            <p class="text-sm text-slate-600">{{ (detail.customer as Record<string, string>).email }}</p>
+            <ContactActions
+              class="mt-2"
+              :phone="(detail.customer as Record<string, string>).phone"
+              :email="(detail.customer as Record<string, string>).email"
+            />
+            <p class="mt-1.5 text-xs text-slate-400">{{ (detail.customer as Record<string, string>).email }}</p>
           </div>
 
           <div class="card !p-4">

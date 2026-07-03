@@ -149,7 +149,7 @@ async function resend(quoteId: string) {
         <div class="flex items-start justify-between gap-3">
           <div>
             <p class="font-semibold text-slate-900">{{ q.ride.customerName }}</p>
-            <p class="text-xs text-slate-500">{{ q.ride.customerPhone }}</p>
+            <ContactActions class="mt-1" :phone="q.ride.customerPhone" />
           </div>
           <div class="flex flex-col items-end gap-1">
             <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
@@ -232,7 +232,7 @@ async function resend(quoteId: string) {
         <div class="flex items-start justify-between gap-3">
           <div>
             <p class="font-semibold text-slate-900">{{ q.ride.customerName }}</p>
-            <p class="text-xs text-slate-500">{{ q.ride.customerPhone }} · {{ q.ride.customerEmail }}</p>
+            <ContactActions class="mt-1" :phone="q.ride.customerPhone" :email="q.ride.customerEmail" />
           </div>
           <!-- Ce que l'on attend du client : paiement en ligne ou acceptation (sur place) -->
           <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
@@ -287,6 +287,7 @@ async function resend(quoteId: string) {
             :method="b.payment.method"
             :status="b.payment.status"
           />
+          <ContactActions class="mt-2" :phone="b.customerPhone" :show-phone="false" />
         </div>
         <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</span>
       </div>
@@ -311,7 +312,7 @@ async function resend(quoteId: string) {
         <div class="flex items-start justify-between gap-3">
           <div>
             <p class="font-semibold text-slate-900">{{ q.ride.customerName }}</p>
-            <p class="text-xs text-slate-500">{{ q.ride.customerEmail }}</p>
+            <ContactActions class="mt-1" :email="q.ride.customerEmail" />
           </div>
           <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">Expiré</span>
         </div>

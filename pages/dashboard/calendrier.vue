@@ -171,6 +171,25 @@ const monthStats = computed(() => {
 
 const openedBooking = ref<CalEvent | null>(null)
 
+// Relance d'un devis en attente : renvoie l'email avec le lien de paiement au
+// client, directement depuis la fiche (l'id du « booking » d'un PENDING_QUOTE
+// est l'id du devis).
+const { success: toastSuccess, error: toastError } = useToast()
+const resending = ref(false)
+async function resendQuote(quoteId: string) {
+  resending.value = true
+  try {
+    await $fetch(`/api/dashboard/quotes/${quoteId}/resend`, { method: 'POST', body: {} })
+    toastSuccess('Email envoyé au client.')
+    openedBooking.value = null
+    await refresh()
+  } catch (e) {
+    toastError((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.')
+  } finally {
+    resending.value = false
+  }
+}
+
 // ─── Blocage de créneau ──────────────────────────────────────────────────────
 
 const showBlock = ref(false)
@@ -398,7 +417,7 @@ function eventTimeLabel(e: CalEvent): string {
                       : day.key === selectedKey ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-700',
                 ]"
               >
-                <template v-if="e.type === 'BOOKING'">{{ e.booking?.customerName ?? 'Course' }}</template>
+                <template v-if="e.type === 'BOOKING'">🚗 {{ e.booking?.customerName ?? 'Course' }}</template>
                 <template v-else-if="e.type === 'PENDING_QUOTE'">⏳ {{ e.booking?.customerName ?? 'Devis' }}</template>
                 <template v-else>{{ e.title ?? 'Indispo' }}</template>
               </span>
@@ -586,26 +605,37 @@ function eventTimeLabel(e: CalEvent): string {
           🧭 Y aller (Waze)
         </a>
 
-        <div class="mt-2 grid grid-cols-2 gap-2">
-          <a :href="`tel:${openedBooking.booking?.customerPhone}`" class="btn-ghost !py-2.5 text-center text-sm">
+        <div class="mt-2 grid grid-cols-3 gap-2">
+          <a
+            :href="`tel:${(openedBooking.booking?.customerPhone ?? '').replace(/[^+\d]/g, '')}`"
+            class="btn-ghost !px-2 !py-2.5 text-center text-sm"
+          >
             📞 Appeler
+          </a>
+          <a
+            :href="`sms:${(openedBooking.booking?.customerPhone ?? '').replace(/[^+\d]/g, '')}`"
+            class="btn-ghost !px-2 !py-2.5 text-center text-sm"
+          >
+            💬 SMS
           </a>
           <NuxtLink
             v-if="openedBooking.type === 'BOOKING'"
             to="/dashboard/reservations"
-            class="btn-ghost !py-2.5 text-sm"
+            class="btn-ghost !px-2 !py-2.5 text-sm"
             @click="openedBooking = null"
           >
-            Voir la réservation
+            Voir plus
           </NuxtLink>
-          <NuxtLink
+          <!-- Devis en attente : relance directe du client (renvoi du lien de paiement) -->
+          <button
             v-else
-            to="/dashboard"
-            class="btn-ghost !py-2.5 text-sm"
-            @click="openedBooking = null"
+            type="button"
+            class="btn-ghost !px-2 !py-2.5 text-sm"
+            :disabled="resending"
+            @click="resendQuote(openedBooking.booking!.id)"
           >
-            Voir le devis
-          </NuxtLink>
+            {{ resending ? '…' : '↩ Relancer' }}
+          </button>
         </div>
       </div>
     </div>

@@ -33,6 +33,8 @@ export async function sendDueReminders(now: Date = new Date()): Promise<{ sent: 
       driverName: b.driver.displayName,
       scheduledAt: b.scheduledAt,
       manageUrl: `${config.public.appBaseUrl}/reservation/${manageToken}`,
+      driverPhone: b.driver.phone,
+      driverEmail: b.driver.contactEmail,
       amountCents: pendingOnSite?.amountCents,
       currency: pendingOnSite?.currency,
       onSiteMethod: (pendingOnSite?.method as PaymentMethod | undefined) ?? null,
