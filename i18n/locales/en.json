@@ -32,7 +32,7 @@
     "dropoffPlaceholder": "e.g. 10 rue de Rivoli, Paris",
     "roundTrip": "Round trip",
     "durationLabel": "Desired duration (hours)",
-    "datetimeLabel": "Date and time",
+    "datetimeLabel": "Pickup date and time",
     "leadTime": "Book at least {hours}h in advance.",
     "estimateButton": "Estimate the price",
     "estimating": "Calculating…",
