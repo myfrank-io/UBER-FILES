@@ -98,14 +98,44 @@ export const emailTemplates = {
     // True si le chauffeur propose le prépaiement en ligne ; sinon le client
     // réserve et règle sur place (le libellé du bouton s'adapte).
     prepayment?: boolean
+    // Récap de la course (rappelé dans l'email).
+    type: 'TRANSFER' | 'HOURLY'
+    scheduledAt: Date
+    pickupAddress?: string | null
+    dropoffAddress?: string | null
+    roundTrip?: boolean
+    durationHours?: number | null
+    // Estimation initiale : si différente du montant final, le chauffeur a ajusté le tarif.
+    originalAmountCents?: number
   }) {
     const label = opts.prepayment === false ? 'Voir mon devis et réserver' : 'Payer et confirmer la course'
+    const trajet =
+      opts.type === 'TRANSFER'
+        ? `${esc(opts.pickupAddress ?? '?')} → ${esc(opts.dropoffAddress ?? '?')}${opts.roundTrip ? ' (aller-retour)' : ''}`
+        : `Mise à disposition ${opts.durationHours ?? '?'} h${opts.pickupAddress ? ` — départ : ${esc(opts.pickupAddress)}` : ''}`
+    // Le chauffeur a-t-il ajusté le tarif par rapport à l'estimation initiale ?
+    const adjusted =
+      opts.originalAmountCents != null && opts.originalAmountCents !== opts.amountCents
+    const intro = adjusted
+      ? `<p>${esc(opts.driverName)} a validé votre devis en <strong>ajustant le tarif</strong> :</p>`
+      : `<p>${esc(opts.driverName)} a validé votre devis :</p>`
+    const priceBlock = adjusted
+      ? `<p style="margin:0"><span style="text-decoration:line-through;color:#9ca3af;font-size:16px">${formatMoney(opts.originalAmountCents!, opts.currency)}</span></p>
+         <p style="font-size:28px;font-weight:700;margin:4px 0">${formatMoney(opts.amountCents, opts.currency)}</p>
+         <p style="font-size:13px;color:#6b7280">Tarif ajusté par le chauffeur (estimation initiale : ${formatMoney(opts.originalAmountCents!, opts.currency)}).</p>`
+      : `<p style="font-size:28px;font-weight:700">${formatMoney(opts.amountCents, opts.currency)}</p>`
     return {
-      subject: `Votre devis — ${opts.driverName}`,
+      subject: adjusted
+        ? `Votre devis (tarif ajusté) — ${opts.driverName}`
+        : `Votre devis — ${opts.driverName}`,
       html: wrap(
         'Votre devis est prêt',
-        `<p>${opts.driverName} a validé votre devis :</p>
-         <p style="font-size:28px;font-weight:700">${formatMoney(opts.amountCents, opts.currency)}</p>
+        `${intro}
+         <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0">
+           📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
+           📍 ${trajet}
+         </div>
+         ${priceBlock}
          ${button(opts.payUrl, label)}
          <p style="font-size:13px;color:#6b7280">Devis valable jusqu'au ${opts.expiresAt.toLocaleString('fr-FR')}.</p>`,
       ),
