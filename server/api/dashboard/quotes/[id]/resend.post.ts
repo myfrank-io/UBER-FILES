@@ -4,6 +4,7 @@ import { prisma } from '~/server/utils/prisma'
 import { signClientToken } from '~/server/utils/tokens'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { canAcceptBookings } from '~/server/utils/driver'
+import { isQuotePaymentExpired } from '~/server/utils/quote-status'
 import { onSitePaymentMethods } from '~/lib/booking-policy'
 import type { PaymentMethod } from '~/lib/payment-methods'
 
@@ -26,10 +27,19 @@ export default defineEventHandler(async (event) => {
   })
   if (!quote) throw createError({ statusCode: 404, statusMessage: 'Devis introuvable.' })
 
-  // Renvoi possible pour tout devis envoyé : relance d'un client qui n'a pas
-  // encore payé, ou remise en vie d'un devis expiré (l'expiration est prolongée).
+  // Relance possible uniquement pour un devis ENVOYÉ et encore actif (le client
+  // n'a pas encore payé). Un devis brouillon/accepté/annulé ne se relance pas…
   if (quote.status !== 'SENT') {
     throw createError({ statusCode: 409, statusMessage: 'Ce devis ne peut pas être renvoyé.' })
+  }
+  // …et un devis expiré ou archivé (délai de paiement dépassé OU course déjà
+  // passée) non plus : on ne « ressuscite » pas une demande périmée. Le client
+  // doit refaire une demande.
+  if (isQuotePaymentExpired(quote)) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Cette demande a expiré : elle ne peut plus être relancée. Le client peut refaire une demande.',
+    })
   }
 
   const amountCents = body.data.amountCents ?? quote.amountCents
