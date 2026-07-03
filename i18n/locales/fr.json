@@ -66,7 +66,9 @@
     "payButton": "Payer et confirmer la course",
     "redirecting": "Redirection…",
     "unavailable": "Ce devis n'est pas disponible au paiement.",
-    "payError": "Paiement indisponible."
+    "payError": "Paiement indisponible.",
+    "cancelledTitle": "Course annulée.",
+    "cancelledBody": "Cette réservation a été annulée. Pour une nouvelle course, refaites une demande auprès du chauffeur."
   },
   "reservation": {
     "title": "Ma réservation",
@@ -79,6 +81,7 @@
     "driverContact": "Contact chauffeur",
     "freeCancel": "Annulation gratuite (remboursement intégral de {amount}).",
     "lateCancel": "Passé le délai de {hours}h, {percent}% sont retenus. Remboursement actuel : {amount}.",
+    "cancelNoPayment": "Aucun paiement n'a été prélevé : vous pouvez annuler librement. Le règlement était prévu sur place.",
     "cancelConfirm": "Confirmer l'annulation de cette course ?",
     "cancelButton": "Annuler la course",
     "cancelling": "Annulation…",

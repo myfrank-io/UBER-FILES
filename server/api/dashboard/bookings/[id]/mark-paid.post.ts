@@ -14,6 +14,9 @@ export default defineEventHandler(async (event) => {
   if (!booking || booking.driverId !== driverId) {
     throw createError({ statusCode: 404, statusMessage: 'Réservation introuvable.' })
   }
+  if (booking.status === 'CANCELLED') {
+    throw createError({ statusCode: 409, statusMessage: 'Cette course a été annulée.' })
+  }
 
   const pending = booking.payments.find((p) => p.status === 'PENDING')
   if (!pending) {

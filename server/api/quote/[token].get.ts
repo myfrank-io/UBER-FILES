@@ -29,6 +29,10 @@ export default defineEventHandler(async (event) => {
     ? []
     : methods.filter((m) => ONSITE_METHODS.includes(m))
 
+  // Une course annulée ne doit plus apparaître « confirmée » quand le client
+  // rouvre son lien devis.
+  const bookingCancelled = quote.booking?.status === 'CANCELLED'
+
   return {
     id: quote.id,
     status: expired ? 'EXPIRED' : quote.status,
@@ -36,7 +40,9 @@ export default defineEventHandler(async (event) => {
     currency: quote.currency,
     breakdown: quote.breakdown,
     expiresAt: quote.expiresAt,
-    confirmed: quote.status === 'ACCEPTED' || Boolean(quote.booking),
+    confirmed:
+      !bookingCancelled && (quote.status === 'ACCEPTED' || Boolean(quote.booking)),
+    cancelled: bookingCancelled || quote.status === 'CANCELLED',
     // True si la course est déjà confirmée ET réglée en ligne (sinon : règlement sur place).
     alreadyPaid: Boolean(quote.booking?.payments.some((p) => p.status === 'PAID')),
     payment: {

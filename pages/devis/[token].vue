@@ -24,7 +24,7 @@ const paymentUnconfirmed = ref(false)
 const isPaid = computed(() => Boolean(quote.value?.alreadyPaid) || verifiedPaid.value)
 
 onMounted(async () => {
-  if (route.query.paid !== '1' || !quote.value || quote.value.alreadyPaid) return
+  if (route.query.paid !== '1' || !quote.value || quote.value.alreadyPaid || quote.value.cancelled) return
   verifying.value = true
   const sessionId = route.query.session_id as string | undefined
   // Le webhook peut être légèrement en retard sur un vrai paiement : on réessaie.
@@ -111,8 +111,15 @@ async function devConfirm() {
       <p class="text-sm text-slate-500">{{ quote.driver.displayName }}</p>
       <h1 class="mt-1 text-xl font-bold text-slate-900">{{ $t('quote.title') }}</h1>
 
+      <!-- Course annulée : prime sur tous les autres états -->
+      <div v-if="quote.cancelled" class="mt-4 rounded-xl bg-slate-50 p-4 text-center">
+        <p class="text-3xl">❌</p>
+        <p class="mt-2 font-semibold text-slate-700">{{ $t('quote.cancelledTitle') }}</p>
+        <p class="text-sm text-slate-600">{{ $t('quote.cancelledBody') }}</p>
+      </div>
+
       <!-- Vérification du paiement en cours (retour du prestataire) -->
-      <div v-if="verifying" class="mt-4 rounded-xl bg-slate-50 p-4 text-center">
+      <div v-else-if="verifying" class="mt-4 rounded-xl bg-slate-50 p-4 text-center">
         <p class="text-2xl">⏳</p>
         <p class="mt-2 font-semibold text-slate-700">{{ $t('quote.verifying') }}</p>
       </div>

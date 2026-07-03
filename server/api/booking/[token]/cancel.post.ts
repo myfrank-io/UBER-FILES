@@ -6,9 +6,11 @@ import { getValidAccessToken, refundTransaction } from '~/server/utils/sumup'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { notifyDriver } from '~/server/utils/notify-driver'
 import { formatMoney } from '~/lib/money'
+import { isOnSiteMethod } from '~/lib/payment-methods'
 
-// Annulation d'une réservation par le client. Calcule le remboursement selon la
-// politique, déclenche le remboursement Stripe, libère le créneau calendrier.
+// Annulation d'une réservation par le client. Rembourse le paiement en ligne selon
+// la politique du chauffeur, clôt un éventuel encaissement sur place en attente,
+// libère le créneau calendrier et prévient les deux parties.
 export default defineEventHandler(async (event) => {
   const token = getRouterParam(event, 'token')!
   const config = useRuntimeConfig()
@@ -22,7 +24,7 @@ export default defineEventHandler(async (event) => {
     include: {
       driver: { include: { cancellationPolicy: true } },
       quote: { include: { rideRequest: true } },
-      payments: { where: { status: 'PAID' } },
+      payments: true,
     },
   })
   if (!booking) throw createError({ statusCode: 404, statusMessage: 'Réservation introuvable.' })
@@ -30,23 +32,32 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'Réservation déjà annulée.' })
   }
 
-  const policy = booking.driver.cancellationPolicy ?? { freeUntilHours: 24, retainedPercent: 50 }
-  const refund = computeRefund(booking.amountCents, booking.scheduledAt, policy)
-  const payment = booking.payments[0]
+  // Situation de paiement : payé en ligne (remboursable automatiquement), payé sur
+  // place (le remboursement éventuel se règle entre client et chauffeur), ou rien
+  // d'encaissé (encaissement sur place encore en attente).
+  const paidPayment = booking.payments.find((p) => p.status === 'PAID')
+  const paidOnline = Boolean(paidPayment && !isOnSiteMethod(paidPayment.method))
 
-  // Remboursement (si paiement présent et montant > 0), selon le prestataire.
-  if (payment && refund.refundCents > 0) {
-    let refunded = false
+  const policy = booking.driver.cancellationPolicy ?? { freeUntilHours: 24, retainedPercent: 50 }
+  // La retenue ne s'applique qu'à un paiement en ligne : sans encaissement, il n'y a
+  // rien à rembourser ni à retenir.
+  const refund = paidOnline
+    ? computeRefund(booking.amountCents, booking.scheduledAt, policy)
+    : { refundCents: 0, retainedCents: 0, isFree: true }
+
+  // Remboursement automatique du paiement en ligne, selon le prestataire.
+  let refunded = false
+  if (paidOnline && paidPayment && refund.refundCents > 0) {
     let refundRef: { stripeRefundId?: string; sumupRefundTxId?: string } = {}
 
-    if (payment.provider === 'SUMUP' && payment.sumupTransactionCode) {
+    if (paidPayment.provider === 'SUMUP' && paidPayment.sumupTransactionCode) {
       // SumUp rembourse en unités majeures (euros) sur la transaction d'origine.
       const accessToken = await getValidAccessToken(booking.driver)
-      await refundTransaction(accessToken, payment.sumupTransactionCode, refund.refundCents / 100)
-      refundRef = { sumupRefundTxId: payment.sumupTransactionCode }
+      await refundTransaction(accessToken, paidPayment.sumupTransactionCode, refund.refundCents / 100)
+      refundRef = { sumupRefundTxId: paidPayment.sumupTransactionCode }
       refunded = true
-    } else if (payment.stripePaymentIntentId && config.stripeSecretKey) {
-      const stripeRefund = await createRefund(payment.stripePaymentIntentId, refund.refundCents)
+    } else if (paidPayment.stripePaymentIntentId && config.stripeSecretKey) {
+      const stripeRefund = await createRefund(paidPayment.stripePaymentIntentId, refund.refundCents)
       refundRef = { stripeRefundId: stripeRefund.id }
       refunded = true
     }
@@ -54,7 +65,7 @@ export default defineEventHandler(async (event) => {
     if (refunded) {
       await prisma.refund.create({
         data: {
-          paymentId: payment.id,
+          paymentId: paidPayment.id,
           bookingId: booking.id,
           ...refundRef,
           amountCents: refund.refundCents,
@@ -63,41 +74,56 @@ export default defineEventHandler(async (event) => {
         },
       })
       await prisma.payment.update({
-        where: { id: payment.id },
+        where: { id: paidPayment.id },
         data: { status: refund.refundCents === booking.amountCents ? 'REFUNDED' : 'PARTIALLY_REFUNDED' },
       })
     }
   }
 
-  // Annulation + libération du créneau (transaction).
+  // Annulation + libération du créneau + clôture des encaissements sur place en
+  // attente (sinon la course annulée resterait « à encaisser » côté chauffeur).
   await prisma.$transaction([
     prisma.booking.update({ where: { id: booking.id }, data: { status: 'CANCELLED' } }),
     prisma.quote.update({ where: { id: booking.quoteId }, data: { status: 'CANCELLED' } }),
+    prisma.payment.updateMany({
+      where: { bookingId: booking.id, status: 'PENDING' },
+      data: { status: 'FAILED' },
+    }),
     prisma.calendarEvent.deleteMany({ where: { bookingId: booking.id } }),
   ])
 
-  // Email d'annulation au client
+  // Email d'annulation au client, adapté à sa situation de paiement.
+  const paymentSituation = paidOnline
+    ? refunded
+      ? ('REFUNDED' as const)
+      : ('NO_REFUND' as const)
+    : paidPayment
+      ? ('PAID_ON_SITE' as const)
+      : ('NOTHING_PAID' as const)
   await sendEmail({
     to: booking.quote.rideRequest.customerEmail,
     ...emailTemplates.cancelled({
       driverName: booking.driver.displayName,
       refundCents: refund.refundCents,
       currency: booking.quote.currency,
+      situation: paymentSituation,
     }),
   })
 
   // Notification chauffeur : email (canal principal) + Telegram si réactivé.
   const req = booking.quote.rideRequest
   const scheduledStr = booking.scheduledAt.toLocaleString('fr-FR')
-  const refundStr = refund.refundCents > 0
+  const refundStr = refunded
     ? `Remboursement : ${formatMoney(refund.refundCents, booking.quote.currency)}`
-    : 'Aucun remboursement (annulation hors délai).'
+    : paidPayment
+      ? 'Réglé sur place : remboursement éventuel à voir directement avec le client.'
+      : 'Rien n’avait été encaissé : aucun remboursement à faire.'
 
   await notifyDriver(booking.driver, {
     email: emailTemplates.bookingCancelledDriver({
       customerName: req.customerName,
       scheduledAt: booking.scheduledAt,
-      refundCents: refund.refundCents,
+      refundCents: refunded ? refund.refundCents : 0,
       currency: booking.quote.currency,
     }),
     telegram: {

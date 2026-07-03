@@ -66,7 +66,9 @@
     "payButton": "Pay and confirm the ride",
     "redirecting": "Redirecting…",
     "unavailable": "This quote is not available for payment.",
-    "payError": "Payment unavailable."
+    "payError": "Payment unavailable.",
+    "cancelledTitle": "Ride cancelled.",
+    "cancelledBody": "This booking has been cancelled. For a new ride, please submit a new request to the driver."
   },
   "reservation": {
     "title": "My booking",
@@ -79,6 +81,7 @@
     "driverContact": "Driver contact",
     "freeCancel": "Free cancellation (full refund of {amount}).",
     "lateCancel": "After the {hours}h deadline, {percent}% is retained. Current refund: {amount}.",
+    "cancelNoPayment": "No payment has been taken: you can cancel freely. Payment was due on site.",
     "cancelConfirm": "Confirm cancellation of this ride?",
     "cancelButton": "Cancel the ride",
     "cancelling": "Cancelling…",
