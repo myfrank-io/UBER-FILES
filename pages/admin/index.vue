@@ -8,23 +8,21 @@ const { data, refresh } = await useFetch('/api/admin/overview')
 const { clear } = useUserSession()
 
 const showCreate = ref(false)
-const form = reactive({ slug: '', displayName: '', email: '', password: '', phone: '' })
+const form = reactive({ firstName: '', email: '', phone: '' })
 const errorMsg = ref('')
-const result = ref<{ telegramLinkCode: string; slug: string } | null>(null)
+const result = ref<{ slug: string; firstName: string; inviteUrl: string } | null>(null)
 const creating = ref(false)
 
-async function createDriver() {
+async function inviteDriver() {
   creating.value = true
   errorMsg.value = ''
   result.value = null
   try {
-    result.value = await $fetch('/api/admin/drivers', {
+    result.value = await $fetch('/api/admin/invite-driver', {
       method: 'POST',
       body: {
-        slug: form.slug,
-        displayName: form.displayName,
+        firstName: form.firstName,
         email: form.email,
-        password: form.password,
         phone: form.phone || undefined,
       },
     })
@@ -34,6 +32,30 @@ async function createDriver() {
   } finally {
     creating.value = false
   }
+}
+
+// Lien WhatsApp pré-rempli avec le message d'invitation. Le numéro est normalisé
+// au format international (les numéros français commençant par 0 → +33).
+function normalizePhone(phone: string): string {
+  let d = phone.replace(/\D/g, '')
+  if (d.startsWith('00')) d = d.slice(2)
+  else if (d.length === 10 && d.startsWith('0')) d = '33' + d.slice(1)
+  return d
+}
+const whatsappUrl = computed(() => {
+  if (!result.value || !form.phone) return null
+  const digits = normalizePhone(form.phone)
+  if (!digits) return null
+  const message = `Bonjour ${result.value.firstName}, voici votre lien pour créer votre espace chauffeur Ridewiz : ${result.value.inviteUrl}`
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+})
+
+function resetInvite() {
+  form.firstName = ''
+  form.email = ''
+  form.phone = ''
+  result.value = null
+  errorMsg.value = ''
 }
 
 async function setStatus(id: string, status: string) {
@@ -79,7 +101,7 @@ const filteredDrivers = computed(() => {
       <StatCard title="Volume encaissé" :value="formatMoney(data.stats.gmvCents)" />
     </div>
 
-    <!-- Création -->
+    <!-- Invitation d'un chauffeur -->
     <div class="mt-8">
       <button class="btn-primary" @click="showCreate = !showCreate">
         {{ showCreate ? 'Fermer' : '+ Nouveau chauffeur' }}
@@ -87,23 +109,53 @@ const filteredDrivers = computed(() => {
     </div>
 
     <div v-if="showCreate" class="card mt-4">
-      <h2 class="font-semibold text-slate-900">Onboarder un chauffeur</h2>
-      <div class="mt-4 grid gap-3 sm:grid-cols-2">
-        <input v-model="form.displayName" class="field" placeholder="Nom affiché" />
-        <input v-model="form.slug" class="field" placeholder="slug-url (ex: karim-paris)" />
-        <input v-model="form.email" class="field" type="email" placeholder="Email de connexion" />
-        <input v-model="form.password" class="field" type="text" placeholder="Mot de passe initial (8+)" />
-        <input v-model="form.phone" class="field" placeholder="Téléphone (optionnel)" />
+      <h2 class="font-semibold text-slate-900">Inviter un chauffeur</h2>
+      <p class="mt-1 text-sm text-slate-500">
+        Renseignez son prénom et son email : il recevra un lien pour créer son compte.
+      </p>
+
+      <!-- Formulaire d'invitation -->
+      <template v-if="!result">
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+          <input v-model="form.firstName" class="field" placeholder="Prénom" />
+          <input v-model="form.email" class="field" type="email" placeholder="Email" />
+          <input v-model="form.phone" class="field" placeholder="Téléphone (optionnel)" />
+        </div>
+        <p v-if="errorMsg" class="mt-3 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{{ errorMsg }}</p>
+        <button
+          class="btn-primary mt-4"
+          :disabled="creating || !form.firstName.trim() || !form.email.trim()"
+          @click="inviteDriver"
+        >
+          {{ creating ? 'Envoi…' : '✉️ Envoyer l’invitation' }}
+        </button>
+      </template>
+
+      <!-- Confirmation + option WhatsApp -->
+      <div v-else class="mt-4 space-y-3">
+        <div class="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800">
+          ✅ Invitation envoyée à <strong>{{ result.firstName }}</strong> par email.
+          Sa page sera <strong>/{{ result.slug }}</strong> une fois son compte activé.
+        </div>
+        <div class="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-600">
+          Lien d’invitation :
+          <a :href="result.inviteUrl" target="_blank" class="break-all text-brand-600 hover:underline">{{ result.inviteUrl }}</a>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <a
+            v-if="whatsappUrl"
+            :href="whatsappUrl"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex items-center gap-2 rounded-lg bg-[#25D366] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1EBE5B]"
+          >
+            💬 Envoyer l’invitation sur WhatsApp
+          </a>
+          <button class="rounded-lg border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50" @click="resetInvite">
+            Inviter un autre chauffeur
+          </button>
+        </div>
       </div>
-      <p v-if="errorMsg" class="mt-3 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{{ errorMsg }}</p>
-      <div v-if="result" class="mt-3 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800">
-        ✅ Chauffeur créé. Page : <strong>/{{ result.slug }}</strong>.
-        Code d'appairage Telegram : <code class="rounded bg-white px-1.5 py-0.5">{{ result.telegramLinkCode }}</code>
-        (le chauffeur envoie <code>/start {{ result.telegramLinkCode }}</code> au bot).
-      </div>
-      <button class="btn-primary mt-4" :disabled="creating" @click="createDriver">
-        {{ creating ? '…' : 'Créer le compte' }}
-      </button>
     </div>
 
     <!-- Liste chauffeurs -->
