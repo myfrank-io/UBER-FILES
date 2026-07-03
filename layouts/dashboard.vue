@@ -40,7 +40,14 @@ async function logout() {
   <div class="min-h-screen bg-slate-50 pb-20 sm:flex sm:pb-0">
     <!-- Sidebar desktop -->
     <aside class="hidden w-60 shrink-0 border-r border-slate-200 bg-white p-5 sm:block">
-      <p class="text-lg font-bold text-slate-900">Réservation VTC</p>
+      <div class="flex items-center gap-2.5">
+        <svg width="24" height="24" viewBox="0 -2 32 32" fill="none" aria-hidden="true">
+          <circle cx="7" cy="24" r="3.1" fill="#B5793F" />
+          <circle cx="25" cy="3.5" r="3.1" stroke="#B5793F" stroke-width="2.2" />
+          <path d="M9.5 23.5h7.5a5 5 0 0 0 0-10h-4a5 5 0 0 1 0-10H20.8" stroke="#B5793F" stroke-width="2.2" stroke-linecap="round" />
+        </svg>
+        <p class="font-serif text-xl font-medium tracking-tight text-slate-950">Ridewiz</p>
+      </div>
       <p class="mt-1 truncate text-xs text-slate-400">{{ (user as { email?: string })?.email }}</p>
       <nav class="mt-6 space-y-1">
         <NuxtLink
@@ -107,16 +114,16 @@ async function logout() {
 
     <AppToast />
 
-    <!-- Barre de navigation mobile -->
-    <nav class="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white sm:hidden">
+    <!-- Barre de navigation mobile : grandes zones tactiles + safe area iOS -->
+    <nav class="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] sm:hidden">
       <NuxtLink
         v-for="item in nav"
         :key="item.to"
         :to="item.to"
-        class="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs text-slate-500"
-        active-class="text-brand-700"
+        class="flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-slate-500"
+        active-class="!text-brand-700"
       >
-        <span class="text-lg">{{ item.icon }}</span>{{ item.label }}
+        <span class="text-lg leading-none">{{ item.icon }}</span>{{ item.label }}
       </NuxtLink>
     </nav>
   </div>

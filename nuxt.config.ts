@@ -99,7 +99,7 @@ export default defineNuxtConfig({
 
   app: {
     head: {
-      title: 'Réservation VTC',
+      title: 'Ridewiz — Réservation VTC',
       htmlAttrs: { lang: 'fr' },
       meta: [
         { charset: 'utf-8' },
@@ -107,14 +107,22 @@ export default defineNuxtConfig({
         {
           name: 'description',
           content:
-            'Réservez votre chauffeur VTC privé : devis instantané, paiement sécurisé, créneau garanti.',
+            'Ridewiz — Réservez votre chauffeur VTC privé : devis instantané, paiement sécurisé, créneau garanti.',
         },
+        { name: 'theme-color', content: '#0E1B2C' },
       ],
-      // Favicon Ridewiz (picto « itinéraire », variante fond nuit de la charte).
+      // Favicon Ridewiz (picto « itinéraire », variante fond nuit de la charte)
+      // + typographies de la charte (DM Serif Display, DM Sans, Space Grotesk).
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
         { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png' },
         { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600&display=swap',
+        },
       ],
     },
   },

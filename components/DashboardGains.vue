@@ -55,7 +55,7 @@ function exportCsv() {
     <div v-if="data" class="mt-5 grid grid-cols-3 gap-3">
       <div class="card !p-4">
         <p class="text-xs text-slate-500">Total encaissé</p>
-        <p class="mt-1 text-xl font-bold text-slate-900">{{ formatMoney(totals.grossCents) }}</p>
+        <p class="mt-1 font-serif text-xl font-medium tracking-tight text-slate-900">{{ formatMoney(totals.grossCents) }}</p>
       </div>
       <div class="card !p-4">
         <p class="text-xs text-slate-500">Net (après commission)</p>
@@ -63,7 +63,7 @@ function exportCsv() {
       </div>
       <div class="card !p-4">
         <p class="text-xs text-slate-500">Courses à venir</p>
-        <p class="mt-1 text-xl font-bold text-slate-900">{{ totals.upcomingBookings }}</p>
+        <p class="mt-1 font-serif text-xl font-medium tracking-tight text-slate-900">{{ totals.upcomingBookings }}</p>
       </div>
     </div>
 

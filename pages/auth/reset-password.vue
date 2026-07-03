@@ -40,7 +40,7 @@ async function submit() {
 <template>
   <div class="mx-auto flex min-h-screen max-w-sm items-center px-5">
     <div class="card w-full space-y-4">
-      <h1 class="text-xl font-bold text-slate-900">Nouveau mot de passe</h1>
+      <h1 class="font-serif text-xl font-medium tracking-tight text-slate-900">Nouveau mot de passe</h1>
 
       <div v-if="!token" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
         Lien invalide. <NuxtLink to="/auth/forgot-password" class="underline">Refaire une demande</NuxtLink>.

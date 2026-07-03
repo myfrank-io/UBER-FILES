@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Réservation VTC",
+    "appName": "Ridewiz",
     "securePayment": "Paiement sécurisé · Créneau garanti après paiement",
     "genericError": "Une erreur est survenue.",
     "invalidLink": "Lien invalide ou expiré.",
