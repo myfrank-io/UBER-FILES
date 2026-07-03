@@ -31,13 +31,25 @@ export default defineEventHandler(async (event) => {
       orderBy: { createdAt: 'desc' },
     }),
     // Devis validés, envoyés au client, en attente de son paiement/confirmation.
+    // Toujours actifs : délai de validité non dépassé ET course encore à venir.
     prisma.quote.findMany({
-      where: { driverId, status: 'SENT', expiresAt: { gte: now } },
+      where: {
+        driverId,
+        status: 'SENT',
+        expiresAt: { gte: now },
+        rideRequest: { scheduledAt: { gte: now } },
+      },
       include: { rideRequest: true },
       orderBy: { expiresAt: 'asc' },
     }),
+    // Archivés automatiquement : délai de validité dépassé OU date de la course
+    // déjà passée (le client n'a pas réglé à temps).
     prisma.quote.findMany({
-      where: { driverId, status: 'SENT', expiresAt: { lt: now } },
+      where: {
+        driverId,
+        status: 'SENT',
+        OR: [{ expiresAt: { lt: now } }, { rideRequest: { scheduledAt: { lt: now } } }],
+      },
       include: { rideRequest: true },
       orderBy: { expiresAt: 'desc' },
       take: 10,
