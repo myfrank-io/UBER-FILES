@@ -6,6 +6,29 @@ const base = {
   scheduledAt: new Date('2026-08-15T14:30:00Z'),
 }
 
+describe('emailTemplates client', () => {
+  it('orderReceived : accuse réception, annonce la validation à venir et échappe les saisies', () => {
+    const tpl = emailTemplates.orderReceived({
+      ...base,
+      driverName: 'Karim VTC',
+      type: 'TRANSFER',
+      pickupAddress: 'Gare de Lyon <b>Paris</b>',
+      dropoffAddress: 'Orly',
+      roundTrip: false,
+      amountCents: 48766,
+      currency: 'EUR',
+    })
+    expect(tpl.subject).toContain('bien reçue')
+    expect(tpl.html).toContain('transmise à Karim VTC')
+    expect(tpl.html).toContain('nouvel email')
+    expect(tpl.html).toContain('487,66')
+    expect(tpl.html).toContain('estimation')
+    expect(tpl.html).not.toContain('<script>')
+    expect(tpl.html).toContain('&lt;script&gt;')
+    expect(tpl.html).toContain('Gare de Lyon &lt;b&gt;Paris&lt;/b&gt; → Orly')
+  })
+})
+
 describe('emailTemplates chauffeur', () => {
   it('newRequestDriver : rend les détails et échappe les saisies client', () => {
     const tpl = emailTemplates.newRequestDriver({
