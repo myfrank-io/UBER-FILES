@@ -32,7 +32,7 @@
     "dropoffPlaceholder": "Ex : 10 rue de Rivoli, Paris",
     "roundTrip": "Aller-retour",
     "durationLabel": "Durée souhaitée (heures)",
-    "datetimeLabel": "Date et heure",
+    "datetimeLabel": "Date et heure de prise en charge",
     "leadTime": "Réservation au plus tôt {hours}h à l'avance.",
     "estimateButton": "Estimer le prix",
     "estimating": "Calcul…",
