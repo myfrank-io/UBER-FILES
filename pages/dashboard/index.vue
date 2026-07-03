@@ -44,7 +44,14 @@ async function validate(quoteId: string, custom = false) {
   busyId.value = quoteId
   try {
     const body = custom && adjustValue[quoteId] ? { amountCents: Math.round(adjustValue[quoteId] * 100) } : {}
-    await $fetch(`/api/dashboard/quotes/${quoteId}/validate`, { method: 'POST', body })
+    const res = await $fetch<{ confirmed?: boolean }>(`/api/dashboard/quotes/${quoteId}/validate`, { method: 'POST', body })
+    // Acceptation directe (règlement sur place) : la course est confirmée sans
+    // étape client ; sinon le devis part au client (lien de paiement/confirmation).
+    toastSuccess(
+      res?.confirmed
+        ? 'Course confirmée — le client a été prévenu par email.'
+        : 'Devis envoyé au client.',
+    )
     await refresh()
   } catch (e) {
     toastError((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.')
@@ -54,7 +61,7 @@ async function validate(quoteId: string, custom = false) {
 }
 
 async function reject(quoteId: string) {
-  if (!confirm('Refuser ce devis ?')) return
+  if (!confirm('Refuser cette demande ? Le client sera prévenu par email.')) return
   busyId.value = quoteId
   try {
     await $fetch(`/api/dashboard/quotes/${quoteId}/reject`, { method: 'POST' })
@@ -144,9 +151,19 @@ async function resend(quoteId: string) {
             <p class="font-semibold text-slate-900">{{ q.ride.customerName }}</p>
             <p class="text-xs text-slate-500">{{ q.ride.customerPhone }}</p>
           </div>
-          <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
-            {{ q.ride.type === 'TRANSFER' ? 'Transfert' : 'Mise à dispo' }}
-          </span>
+          <div class="flex flex-col items-end gap-1">
+            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
+              {{ q.ride.type === 'TRANSFER' ? 'Transfert' : 'Mise à dispo' }}
+            </span>
+            <!-- Règlement attendu, en un coup d'œil -->
+            <span
+              v-if="q.payment"
+              class="rounded-full px-2.5 py-1 text-xs font-medium"
+              :class="q.payment.kind === 'ONLINE' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'"
+            >
+              {{ q.payment.kind === 'ONLINE' ? '💳' : '📍' }} {{ q.payment.label }}
+            </span>
+          </div>
         </div>
 
         <div class="mt-3 space-y-1 text-sm text-slate-600">
@@ -166,10 +183,13 @@ async function resend(quoteId: string) {
 
         <div class="mt-3 flex flex-wrap items-center gap-2">
           <button class="btn-primary flex-1" :disabled="busyId === q.id" @click="validate(q.id)">
-            {{ busyId === q.id ? '…' : 'Valider & envoyer' }}
+            {{ busyId === q.id ? '…' : q.directAccept ? 'Accepter la réservation' : 'Valider & envoyer' }}
           </button>
           <button class="btn-ghost" :disabled="busyId === q.id" @click="reject(q.id)">Refuser</button>
         </div>
+        <p v-if="q.directAccept" class="mt-2 text-xs text-slate-500">
+          En acceptant, la course est confirmée immédiatement — le client est prévenu par email.
+        </p>
         <div class="mt-2 flex items-center gap-2">
           <input
             v-model.number="adjustValue[q.id]"
@@ -182,6 +202,9 @@ async function resend(quoteId: string) {
             Ajuster
           </button>
         </div>
+        <p class="mt-1 text-xs text-slate-400">
+          Si vous ajustez le prix, le client devra accepter le nouveau tarif (envoyé par email).
+        </p>
       </div>
     </section>
 
@@ -211,8 +234,9 @@ async function resend(quoteId: string) {
             <p class="font-semibold text-slate-900">{{ q.ride.customerName }}</p>
             <p class="text-xs text-slate-500">{{ q.ride.customerPhone }} · {{ q.ride.customerEmail }}</p>
           </div>
+          <!-- Ce que l'on attend du client : paiement en ligne ou acceptation (sur place) -->
           <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
-            ⏳ Attente paiement
+            ⏳ {{ q.payment?.kind === 'ONSITE' ? "Attente d'acceptation" : 'Attente paiement' }}
           </span>
         </div>
         <div class="mt-2 space-y-1 text-sm text-slate-600">
@@ -283,16 +307,23 @@ async function resend(quoteId: string) {
       <p v-if="data && !data.upcomingBookings.length" class="mt-3 text-sm text-slate-500">
         Aucune course planifiée.
       </p>
-      <div v-for="b in data?.upcomingBookings" :key="b.id" class="card mt-3 flex items-center justify-between">
-        <div>
+      <div v-for="b in data?.upcomingBookings" :key="b.id" class="card mt-3 flex items-center justify-between gap-3">
+        <div class="min-w-0">
           <p class="font-semibold text-slate-900">{{ b.customerName }}</p>
           <p class="text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
           <p class="text-xs text-slate-500">
             <template v-if="b.type === 'TRANSFER'"><NavAddress :address="b.pickupAddress ?? ''" /> → <NavAddress :address="b.dropoffAddress ?? ''" /></template>
             <template v-else>Mise à disposition — {{ b.durationHours }} h<template v-if="b.pickupAddress"> · <NavAddress :address="b.pickupAddress" /></template></template>
           </p>
+          <!-- Règlement de la course, en un coup d'œil -->
+          <PaymentBadge
+            v-if="b.payment"
+            class="mt-1.5"
+            :method="b.payment.method"
+            :status="b.payment.status"
+          />
         </div>
-        <span class="font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</span>
+        <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</span>
       </div>
     </section>
 

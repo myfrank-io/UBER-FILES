@@ -71,6 +71,7 @@ export async function confirmBookingFromQuote(quote: QuoteWithRelations, payment
         applicationFeeCents: payment.applicationFeeCents,
         currency: payment.currency,
         status: 'PAID',
+        method: 'STRIPE_PREPAYMENT', // prépaiement en ligne, quel que soit le prestataire
       },
     })
     return booking

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import {
-  PAYMENT_METHODS,
-  PAYMENT_METHOD_LABELS,
+  ONSITE_METHODS,
+  PAYMENT_METHOD_SHORT_LABELS,
   type PaymentMethod,
 } from '~/lib/payment-methods'
+import { onlinePaymentPolicy, onSitePaymentMethods } from '~/lib/booking-policy'
 
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Réglages' })
@@ -79,13 +80,26 @@ onMounted(() => {
   }
 })
 
-// ─── Moyens de paiement acceptés ───────────────────────────────────────────
+// ─── Réservations & paiement ───────────────────────────────────────────────
+// Deux questions simples qui produisent les quatre flux :
+//  1. paiement : en ligne exigé / au choix du client / sur place uniquement
+//  2. confirmation : automatique si créneau libre / validation manuelle
 
-const paymentMethods = ref<PaymentMethod[]>([])
+type PayChoice = 'ONLINE_REQUIRED' | 'CLIENT_CHOICE' | 'ONSITE_ONLY'
+
+const payChoice = ref<PayChoice>('ONSITE_ONLY')
+const onsiteMethods = ref<PaymentMethod[]>([])
+const autoConfirm = ref(false)
 
 watchEffect(() => {
-  const m = (me.value as Record<string, unknown>)?.paymentMethods as PaymentMethod[] | undefined
-  if (m) paymentMethods.value = [...m]
+  const d = me.value as Record<string, unknown> | null
+  if (!d) return
+  const methods = (d.paymentMethods as PaymentMethod[] | undefined) ?? []
+  const policy = onlinePaymentPolicy(methods)
+  payChoice.value =
+    policy === 'REQUIRED' ? 'ONLINE_REQUIRED' : policy === 'OPTIONAL' ? 'CLIENT_CHOICE' : 'ONSITE_ONLY'
+  onsiteMethods.value = onSitePaymentMethods(methods)
+  if (typeof d.autoAcceptQuotes === 'boolean') autoConfirm.value = d.autoAcceptQuotes
 })
 
 // Le prestataire actif (SumUp ou Stripe) doit être opérationnel pour proposer
@@ -100,38 +114,53 @@ const onlineReady = computed(() => {
   return Boolean(s?.connected && s?.chargesEnabled)
 })
 
-// ─── Validation des demandes (manuelle ou paiement immédiat) ──────────────
-
-const autoAcceptQuotes = ref(false)
-
-watchEffect(() => {
-  const v = (me.value as Record<string, unknown>)?.autoAcceptQuotes
-  if (typeof v === 'boolean') autoAcceptQuotes.value = v
+// Le sur-place devient nécessaire : pré-cocher carte + espèces si rien n'est coché.
+watch(payChoice, (choice) => {
+  if (choice !== 'ONLINE_REQUIRED' && onsiteMethods.value.length === 0) {
+    onsiteMethods.value = ['ONSITE_CARD', 'ONSITE_CASH']
+  }
 })
 
-// Le paiement immédiat suppose que le client PUISSE payer en ligne à la demande.
-const instantReady = computed(() => onlineReady.value && paymentMethods.value.includes('STRIPE_PREPAYMENT'))
-
-async function saveAutoAccept() {
-  await call('auto-accept', () =>
-    $fetch('/api/dashboard/settings', {
-      method: 'PATCH',
-      body: { autoAcceptQuotes: autoAcceptQuotes.value },
-    }),
-  )
+function toggleOnsiteMethod(method: PaymentMethod) {
+  const i = onsiteMethods.value.indexOf(method)
+  if (i === -1) onsiteMethods.value.push(method)
+  else onsiteMethods.value.splice(i, 1)
 }
 
-function toggleMethod(method: PaymentMethod) {
-  const i = paymentMethods.value.indexOf(method)
-  if (i === -1) paymentMethods.value.push(method)
-  else paymentMethods.value.splice(i, 1)
-}
+const needsOnsite = computed(() => payChoice.value !== 'ONLINE_REQUIRED')
+const onsiteMissing = computed(() => needsOnsite.value && onsiteMethods.value.length === 0)
 
-async function savePaymentMethods() {
-  await call('payment-methods', () =>
+// Phrase récapitulative du parcours client résultant des deux réglages.
+const recap = computed(() => {
+  const auto = autoConfirm.value
+  switch (payChoice.value) {
+    case 'ONLINE_REQUIRED':
+      return auto
+        ? 'Le client réserve et paie en ligne → course confirmée aussitôt, sans action de votre part.'
+        : 'Le client fait sa demande → vous validez le devis → il paie en ligne → course confirmée.'
+    case 'CLIENT_CHOICE':
+      return auto
+        ? 'Le client réserve en payant en ligne, ou en choisissant le règlement sur place → course confirmée aussitôt si le créneau est libre.'
+        : 'Le client fait sa demande → vous validez → il confirme en payant en ligne ou en réservant avec règlement sur place.'
+    default:
+      return auto
+        ? 'Le client réserve → course confirmée aussitôt si le créneau est libre → règlement sur place le jour J.'
+        : 'Le client fait sa demande → vous acceptez → course confirmée → règlement sur place le jour J.'
+  }
+})
+
+async function saveBookingSettings() {
+  const methods: PaymentMethod[] =
+    payChoice.value === 'ONLINE_REQUIRED'
+      ? ['STRIPE_PREPAYMENT']
+      : [
+          ...(payChoice.value === 'CLIENT_CHOICE' ? (['STRIPE_PREPAYMENT'] as PaymentMethod[]) : []),
+          ...ONSITE_METHODS.filter((m) => onsiteMethods.value.includes(m)),
+        ]
+  await call('booking-settings', () =>
     $fetch('/api/dashboard/settings', {
       method: 'PATCH',
-      body: { paymentMethods: paymentMethods.value },
+      body: { paymentMethods: methods, autoAcceptQuotes: autoConfirm.value },
     }),
   )
 }
@@ -520,98 +549,124 @@ async function deleteSurcharge(id: string) {
       </button>
     </div>
 
-    <!-- Moyens de paiement acceptés -->
-    <form v-if="me" class="card space-y-4" @submit.prevent="savePaymentMethods">
+    <!-- Réservations & paiement : deux questions simples → les quatre flux -->
+    <form v-if="me" class="card space-y-5" @submit.prevent="saveBookingSettings">
       <div>
-        <h2 class="font-semibold text-slate-900">Moyens de paiement acceptés</h2>
+        <h2 class="font-semibold text-slate-900">Réservations & paiement</h2>
         <p class="mt-1 text-sm text-slate-600">
-          Choisissez comment vos clients règlent leurs courses. Vous pouvez exiger un
-          paiement en ligne à l'avance, ou tout encaisser sur place le jour de la course
-          (carte, espèces, chèque) — c'est vous qui décidez.
+          Définissez comment vos clients réservent et règlent leurs courses.
         </p>
       </div>
 
-      <div class="space-y-2">
-        <label
-          v-for="method in PAYMENT_METHODS"
-          :key="method"
-          class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200"
-        >
-          <input
-            type="checkbox"
-            class="mt-0.5 rounded"
-            :checked="paymentMethods.includes(method)"
-            @change="toggleMethod(method)"
-          />
-          <span class="flex-1">
-            <span class="text-sm font-medium text-slate-800">{{ PAYMENT_METHOD_LABELS[method] }}</span>
-            <span
-              v-if="method === 'STRIPE_PREPAYMENT' && paymentMethods.includes(method) && !onlineReady"
-              class="mt-1 block text-xs text-amber-600"
-            >
-              ⚠️ Connectez d'abord votre compte de paiement (SumUp) ci-dessus pour activer le paiement en ligne.
+      <!-- 1. Paiement des courses -->
+      <fieldset>
+        <legend class="text-sm font-semibold text-slate-800">1. Paiement des courses</legend>
+        <div class="mt-2 space-y-2">
+          <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
+            <input v-model="payChoice" type="radio" class="mt-0.5" value="ONLINE_REQUIRED" name="pay-choice" />
+            <span class="flex-1">
+              <span class="text-sm font-medium text-slate-800">💳 En ligne, à la réservation</span>
+              <span class="mt-1 block text-xs text-slate-500">
+                Le client règle par carte pour confirmer sa course. Zéro impayé, zéro no-show.
+              </span>
+              <span v-if="payChoice === 'ONLINE_REQUIRED' && !onlineReady" class="mt-1 block text-xs text-amber-600">
+                ⚠️ Connectez d'abord votre compte de paiement (SumUp) ci-dessus. En attendant,
+                vos demandes passeront en validation manuelle, sans lien de paiement.
+              </span>
             </span>
-          </span>
-        </label>
-      </div>
+          </label>
 
-      <p v-if="!paymentMethods.length" class="text-xs text-red-600">
-        Sélectionnez au moins un moyen de paiement.
-      </p>
+          <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
+            <input v-model="payChoice" type="radio" class="mt-0.5" value="CLIENT_CHOICE" name="pay-choice" />
+            <span class="flex-1">
+              <span class="text-sm font-medium text-slate-800">🤝 Au choix du client : en ligne ou sur place</span>
+              <span class="mt-1 block text-xs text-slate-500">
+                Le client prépaie par carte en ligne, ou règle le jour de la course.
+              </span>
+              <span v-if="payChoice === 'CLIENT_CHOICE' && !onlineReady" class="mt-1 block text-xs text-amber-600">
+                ⚠️ Connectez d'abord votre compte de paiement (SumUp) ci-dessus. En attendant,
+                seul le règlement sur place sera proposé à vos clients.
+              </span>
+            </span>
+          </label>
+
+          <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
+            <input v-model="payChoice" type="radio" class="mt-0.5" value="ONSITE_ONLY" name="pay-choice" />
+            <span class="flex-1">
+              <span class="text-sm font-medium text-slate-800">📍 Sur place uniquement</span>
+              <span class="mt-1 block text-xs text-slate-500">
+                Le client règle le jour de la course. Aucun paiement en ligne proposé.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <!-- Moyens acceptés sur place -->
+        <div v-if="needsOnsite" class="mt-3 rounded-lg bg-slate-50 p-3">
+          <p class="text-xs font-medium text-slate-600">Moyens acceptés sur place</p>
+          <div class="mt-2 flex flex-wrap gap-4">
+            <label
+              v-for="method in ONSITE_METHODS"
+              :key="method"
+              class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                class="rounded"
+                :checked="onsiteMethods.includes(method)"
+                @change="toggleOnsiteMethod(method)"
+              />
+              {{ PAYMENT_METHOD_SHORT_LABELS[method] }}
+            </label>
+          </div>
+          <p v-if="onsiteMissing" class="mt-2 text-xs text-red-600">
+            Sélectionnez au moins un moyen d'encaissement sur place.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- 2. Confirmation des réservations -->
+      <fieldset>
+        <legend class="text-sm font-semibold text-slate-800">2. Confirmation des réservations</legend>
+        <div class="mt-2 space-y-2">
+          <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
+            <input v-model="autoConfirm" type="radio" class="mt-0.5" :value="true" name="auto-confirm" />
+            <span class="flex-1">
+              <span class="text-sm font-medium text-slate-800">⚡ Automatique — si le créneau est libre</span>
+              <span class="mt-1 block text-xs text-slate-500">
+                La course est confirmée dès la demande (et le paiement, si vous l'exigez), sans
+                action de votre part — vous êtes prévenu par email. En cas de conflit d'agenda,
+                la demande repasse en validation manuelle.
+              </span>
+            </span>
+          </label>
+
+          <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
+            <input v-model="autoConfirm" type="radio" class="mt-0.5" :value="false" name="auto-confirm" />
+            <span class="flex-1">
+              <span class="text-sm font-medium text-slate-800">✋ Je valide chaque demande</span>
+              <span class="mt-1 block text-xs text-slate-500">
+                Rien n'est confirmé sans vous : vous acceptez, ajustez le prix ou refusez.
+                Le client est prévenu par email.
+              </span>
+            </span>
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Récapitulatif du parcours résultant -->
+      <div class="rounded-xl border border-brand-100 bg-brand-50 p-4">
+        <p class="text-xs font-medium uppercase tracking-wide text-brand-700">Votre parcours client</p>
+        <p class="mt-1 text-sm text-brand-900">{{ recap }}</p>
+      </div>
 
       <div class="flex justify-end">
         <button
           type="submit"
           class="btn-primary"
-          :disabled="saving === 'payment-methods' || !paymentMethods.length"
+          :disabled="saving === 'booking-settings' || onsiteMissing"
         >
-          {{ saving === 'payment-methods' ? 'Enregistrement…' : 'Enregistrer' }}
-        </button>
-      </div>
-    </form>
-
-    <!-- Validation des demandes : manuelle ou paiement immédiat -->
-    <form v-if="me" class="card space-y-4" @submit.prevent="saveAutoAccept">
-      <div>
-        <h2 class="font-semibold text-slate-900">Validation des demandes</h2>
-        <p class="mt-1 text-sm text-slate-600">
-          Choisissez ce qui se passe quand un client réserve sur votre page.
-        </p>
-      </div>
-
-      <div class="space-y-2">
-        <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
-          <input v-model="autoAcceptQuotes" type="radio" class="mt-0.5" :value="false" name="auto-accept" />
-          <span class="flex-1">
-            <span class="text-sm font-medium text-slate-800">Je valide chaque demande avant paiement</span>
-            <span class="mt-1 block text-xs text-slate-500">
-              Vous recevez la demande, vous validez (ou ajustez) le devis, puis le client
-              reçoit le lien pour payer. Vous gardez la main sur chaque course.
-            </span>
-          </span>
-        </label>
-
-        <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
-          <input v-model="autoAcceptQuotes" type="radio" class="mt-0.5" :value="true" name="auto-accept" />
-          <span class="flex-1">
-            <span class="text-sm font-medium text-slate-800">Paiement immédiat à la réservation</span>
-            <span class="mt-1 block text-xs text-slate-500">
-              Le devis est envoyé automatiquement et le client paie par carte en ligne dans la
-              foulée : la course est confirmée sans action de votre part (vous êtes notifié).
-              Les moyens de paiement sur place ne sont pas proposés dans ce mode. En cas de
-              conflit d'agenda détecté, la demande repasse en validation manuelle.
-            </span>
-            <span v-if="autoAcceptQuotes && !instantReady" class="mt-1 block text-xs text-amber-600">
-              ⚠️ Nécessite le paiement en ligne : compte SumUp connecté et case « Paiement en
-              ligne » cochée ci-dessus. En attendant, vos demandes restent validées manuellement.
-            </span>
-          </span>
-        </label>
-      </div>
-
-      <div class="flex justify-end">
-        <button type="submit" class="btn-primary" :disabled="saving === 'auto-accept'">
-          {{ saving === 'auto-accept' ? 'Enregistrement…' : 'Enregistrer' }}
+          {{ saving === 'booking-settings' ? 'Enregistrement…' : 'Enregistrer' }}
         </button>
       </div>
     </form>

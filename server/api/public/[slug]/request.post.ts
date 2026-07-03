@@ -1,18 +1,23 @@
-import { loadActiveDriverBySlug, canAcceptBookings } from '~/server/utils/driver'
+import { loadActiveDriverBySlug, driverBookingMode } from '~/server/utils/driver'
 import { rideRequestSchema } from '~/server/utils/validation'
 import { assertLeadTime, computeQuote } from '~/server/utils/quote-service'
 import { bookingSlot, findConflict } from '~/server/utils/calendar'
 import { computeApplicationFee } from '~/lib/pricing'
+import { resolveRequestPayment } from '~/lib/booking-policy'
+import { PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
 import { prisma } from '~/server/utils/prisma'
 import { newRequestMessage } from '~/server/utils/telegram'
 import { notifyDriver } from '~/server/utils/notify-driver'
 import { emailTemplates, sendEmail } from '~/server/utils/email'
 import { sendQuoteToClient } from '~/server/utils/quote-actions'
 import { createQuoteCheckoutUrl } from '~/server/utils/checkout'
+import { confirmQuoteOnSite } from '~/server/utils/booking-onsite'
 
 // Soumission d'une demande de course par le client (sans compte).
-// Crée/retrouve le client, enregistre la demande + un devis BROUILLON, détecte un
-// conflit calendrier, puis notifie le chauffeur par email (Telegram si réactivé).
+// Crée/retrouve le client, enregistre la demande + un devis BROUILLON, puis selon
+// le mode du chauffeur : paiement en ligne immédiat (flux 1), confirmation
+// automatique avec règlement sur place (flux 3), ou validation manuelle (flux 2/4)
+// avec notification du chauffeur. Conflit calendrier → toujours validation manuelle.
 export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, 'slug')!
   const driver = await loadActiveDriverBySlug(slug)
@@ -81,6 +86,18 @@ export default defineEventHandler(async (event) => {
     driver.commissionBps,
   )
 
+  // Mode de réservation du chauffeur + règlement effectif de CETTE demande.
+  // Le choix du client n'est retenu que s'il correspond à un moyen réellement
+  // proposé (un choix invalide — formulaire en cache — est ignoré, pas rejeté).
+  const mode = driverBookingMode(driver)
+  const preferredPaymentMethod =
+    input.paymentMethod &&
+    ((input.paymentMethod === 'STRIPE_PREPAYMENT' && mode.onlineAvailable) ||
+      mode.onSiteMethods.includes(input.paymentMethod as PaymentMethod))
+      ? (input.paymentMethod as PaymentMethod)
+      : null
+  const resolved = resolveRequestPayment(mode, preferredPaymentMethod)
+
   // Demande + devis brouillon (transaction)
   const { quote } = await prisma.$transaction(async (tx) => {
     const rideRequest = await tx.rideRequest.create({
@@ -104,6 +121,7 @@ export default defineEventHandler(async (event) => {
         durationSeconds: computation.durationSeconds,
         durationHours: input.durationHours,
         notes: input.notes,
+        preferredPaymentMethod,
       },
     })
     const quote = await tx.quote.create({
@@ -122,23 +140,17 @@ export default defineEventHandler(async (event) => {
     return { quote }
   })
 
-  // Paiement immédiat : si le chauffeur l'a activé et que le prépaiement en ligne
-  // est opérationnel, le devis part automatiquement (même parcours que la validation
-  // manuelle : SENT + email) et le client est redirigé vers la page de paiement.
-  // En cas de conflit calendrier ou d'échec d'envoi, repli silencieux sur la
-  // validation manuelle (le devis reste en DRAFT).
+  // ── Flux 1 : paiement en ligne immédiat (la confirmation passe par le paiement).
+  // Le devis part automatiquement (SENT + email) et le client est redirigé vers la
+  // page de paiement. En cas de conflit calendrier ou d'échec d'envoi, repli
+  // silencieux sur la validation manuelle (le devis reste en DRAFT).
   let payUrl: string | null = null
-  if (
-    driver.autoAcceptQuotes &&
-    !conflict &&
-    driver.paymentMethods.includes('STRIPE_PREPAYMENT') &&
-    canAcceptBookings(driver)
-  ) {
+  if (mode.autoConfirm && !conflict && resolved.kind === 'ONLINE') {
     try {
       const sent = await sendQuoteToClient(quote.id, driver.id)
-      // Paiement immédiat : on emmène le client directement sur la page de paiement
-      // en ligne (Stripe/SumUp), sans passer par la page devis intermédiaire. Repli
-      // sur la page devis si la création de la session de paiement échoue.
+      // On emmène le client directement sur la page de paiement en ligne
+      // (Stripe/SumUp), sans passer par la page devis intermédiaire. Repli sur la
+      // page devis si la création de la session de paiement échoue.
       try {
         const sentQuote = await prisma.quote.findUnique({
           where: { id: quote.id },
@@ -156,43 +168,81 @@ export default defineEventHandler(async (event) => {
   }
   const autoSent = Boolean(payUrl)
 
-  // Notification chauffeur : email (canal principal) + Telegram si réactivé.
-  await notifyDriver(driver, {
-    email: emailTemplates.newRequestDriver({
-      customerName: input.customer.name,
-      customerPhone: input.customer.phone,
-      type: input.type,
-      scheduledAt,
-      pickupAddress: input.pickupAddress,
-      dropoffAddress: input.dropoffAddress,
-      roundTrip: input.roundTrip,
-      durationHours: input.durationHours,
-      amountCents: computation.price.amountCents,
-      currency: computation.price.currency,
-      hasConflict: Boolean(conflict),
-      notes: input.notes,
-      dashboardUrl: `${config.public.appBaseUrl}/dashboard`,
-      autoSent,
-    }),
-    telegram: newRequestMessage({
-      customerName: input.customer.name,
-      type: input.type,
-      scheduledAt,
-      amountCents: computation.price.amountCents,
-      currency: computation.price.currency,
-      pickupAddress: input.pickupAddress,
-      dropoffAddress: input.dropoffAddress,
-      durationHours: input.durationHours,
-      quoteId: quote.id,
-      hasConflict: Boolean(conflict),
-      autoSent,
-    }),
-  })
+  // ── Flux 3 : confirmation immédiate, règlement sur place le jour de la course.
+  // La course est confirmée sans validation (créneau libre) : le client et le
+  // chauffeur reçoivent directement leurs emails de confirmation. En cas d'échec
+  // (course concurrente confirmée entre-temps…), repli sur la validation manuelle.
+  let manageUrl: string | null = null
+  let confirmed = false
+  if (!autoSent && mode.autoConfirm && !conflict && resolved.kind === 'ONSITE') {
+    try {
+      const draftQuote = await prisma.quote.findUnique({
+        where: { id: quote.id },
+        include: { driver: true, rideRequest: true, booking: true },
+      })
+      if (draftQuote) {
+        const result = await confirmQuoteOnSite(draftQuote, resolved.method, {
+          autoConfirmed: true,
+        })
+        confirmed = true
+        manageUrl = result.manageUrl
+      }
+    } catch {
+      // Le chauffeur validera manuellement.
+    }
+  }
+
+  // ── Validation manuelle (flux 2 & 4, replis compris) : notification chauffeur
+  // + accusé de réception client. En flux 1 (autoSent), le chauffeur est informé
+  // qu'aucune action n'est attendue ; en flux 3 (confirmed), les emails de
+  // confirmation sont déjà partis — rien d'autre à envoyer.
+  const paymentLabel =
+    resolved.kind === 'ONLINE'
+      ? 'En ligne (carte)'
+      : resolved.kind === 'ONSITE'
+        ? `Sur place — ${PAYMENT_METHOD_SHORT_LABELS[resolved.method]}`
+        : undefined
+  if (!confirmed) {
+    await notifyDriver(driver, {
+      email: emailTemplates.newRequestDriver({
+        customerName: input.customer.name,
+        customerPhone: input.customer.phone,
+        type: input.type,
+        scheduledAt,
+        pickupAddress: input.pickupAddress,
+        dropoffAddress: input.dropoffAddress,
+        roundTrip: input.roundTrip,
+        durationHours: input.durationHours,
+        amountCents: computation.price.amountCents,
+        currency: computation.price.currency,
+        hasConflict: Boolean(conflict),
+        notes: input.notes,
+        dashboardUrl: `${config.public.appBaseUrl}/dashboard`,
+        autoSent,
+        directAccept: !autoSent && resolved.kind === 'ONSITE',
+        paymentLabel,
+      }),
+      telegram: newRequestMessage({
+        customerName: input.customer.name,
+        type: input.type,
+        scheduledAt,
+        amountCents: computation.price.amountCents,
+        currency: computation.price.currency,
+        pickupAddress: input.pickupAddress,
+        dropoffAddress: input.dropoffAddress,
+        durationHours: input.durationHours,
+        quoteId: quote.id,
+        hasConflict: Boolean(conflict),
+        autoSent,
+      }),
+    })
+  }
 
   // Accusé de réception au client — uniquement en validation manuelle : en paiement
-  // immédiat, le client est redirigé directement vers le paiement et a déjà reçu le
-  // devis, donc ce message serait hors sujet. L'échec d'envoi ne bloque pas la demande.
-  if (!autoSent) {
+  // immédiat le client est redirigé vers le paiement (devis déjà reçu), en
+  // confirmation immédiate il a déjà son email de confirmation. L'échec d'envoi ne
+  // bloque pas la demande.
+  if (!autoSent && !confirmed) {
     try {
       await sendEmail({
         to: input.customer.email,
@@ -207,6 +257,7 @@ export default defineEventHandler(async (event) => {
           durationHours: input.durationHours,
           amountCents: computation.price.amountCents,
           currency: computation.price.currency,
+          paymentOnSite: resolved.kind === 'ONSITE',
         }),
       })
     } catch {
@@ -220,7 +271,10 @@ export default defineEventHandler(async (event) => {
     hasConflict: Boolean(conflict),
     amountCents: computation.price.amountCents,
     currency: computation.price.currency,
-    // Présent uniquement en paiement immédiat : le front redirige le client dessus.
+    // Présent uniquement en paiement en ligne immédiat : le front redirige dessus.
     payUrl,
+    // Présents uniquement en confirmation immédiate (règlement sur place).
+    confirmed,
+    manageUrl,
   }
 })

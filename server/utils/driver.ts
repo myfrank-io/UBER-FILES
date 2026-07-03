@@ -2,6 +2,8 @@ import { createError } from 'h3'
 import type { Driver } from '@prisma/client'
 import { prisma } from './prisma'
 import type { DriverWithPricing } from './quote-service'
+import { bookingMode, type BookingMode } from '~/lib/booking-policy'
+import type { PaymentMethod } from '~/lib/payment-methods'
 
 /** Charge un chauffeur ACTIF par slug avec sa configuration tarifaire, ou lève une 404. */
 export async function loadActiveDriverBySlug(slug: string): Promise<DriverWithPricing> {
@@ -25,22 +27,22 @@ export function canAcceptBookings(driver: Pick<Driver, 'paymentProvider' | 'sumu
 }
 
 /**
- * Paiement immédiat « carte uniquement » : quand le chauffeur a activé l'envoi
- * automatique des devis ET que le prépaiement en ligne est opérationnel, le client
- * règle par carte pour réserver — les encaissements sur place ne lui sont pas
- * proposés. Si le paiement en ligne n'est pas prêt, le réglage ne s'applique pas
- * (mêmes conditions que l'envoi automatique dans request.post.ts).
+ * Mode de réservation effectif du chauffeur : politique de paiement (en ligne
+ * exigé / au choix / sur place) croisée avec la confirmation (automatique ou
+ * manuelle), en tenant compte de l'état réel du compte de paiement en ligne.
  */
-export function isInstantPaymentOnly(
+export function driverBookingMode(
   driver: Pick<
     Driver,
     'autoAcceptQuotes' | 'paymentMethods' | 'paymentProvider' | 'sumupConnected' | 'stripeChargesEnabled'
   >,
-): boolean {
-  return (
-    driver.autoAcceptQuotes &&
-    (driver.paymentMethods as string[]).includes('STRIPE_PREPAYMENT') &&
-    canAcceptBookings(driver)
+): BookingMode {
+  return bookingMode(
+    {
+      paymentMethods: driver.paymentMethods as PaymentMethod[],
+      autoAcceptQuotes: driver.autoAcceptQuotes,
+    },
+    canAcceptBookings(driver),
   )
 }
 

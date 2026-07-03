@@ -1,6 +1,7 @@
 import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
 import { createQuoteCheckoutUrl } from '~/server/utils/checkout'
+import { bookingSlot, findConflict } from '~/server/utils/calendar'
 
 // Crée la session de paiement pour un devis validé et renvoie l'URL hébergée.
 // Bascule entre Stripe et SumUp selon le prestataire configuré par le chauffeur.
@@ -25,6 +26,22 @@ export default defineEventHandler(async (event) => {
   }
   if (quote.expiresAt.getTime() < Date.now()) {
     throw createError({ statusCode: 410, statusMessage: 'Ce devis a expiré.' })
+  }
+
+  // Le créneau peut avoir été pris entre l'envoi du devis et le paiement (autre
+  // course confirmée, indisponibilité saisie…) : on re-vérifie avant d'encaisser.
+  const req = quote.rideRequest
+  const serviceDurationSeconds =
+    req.type === 'TRANSFER'
+      ? (req.durationSeconds ?? 0) * (req.roundTrip ? 2 : 1)
+      : (req.durationHours ?? 0) * 3600
+  const slot = bookingSlot(quote.driver, req.scheduledAt, serviceDurationSeconds)
+  const conflict = await findConflict(quote.driverId, slot)
+  if (conflict) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Ce créneau n’est plus disponible. Merci de contacter le chauffeur.',
+    })
   }
 
   const url = await createQuoteCheckoutUrl(quote, token)

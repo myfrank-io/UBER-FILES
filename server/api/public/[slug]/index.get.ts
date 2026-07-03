@@ -1,5 +1,5 @@
-import { loadActiveDriverBySlug, canAcceptBookings, isInstantPaymentOnly, publicPhotoUrl } from '~/server/utils/driver'
-import { ONSITE_METHODS, type PaymentMethod } from '~/lib/payment-methods'
+import { loadActiveDriverBySlug, driverBookingMode, publicPhotoUrl } from '~/server/utils/driver'
+import type { PaymentMethod } from '~/lib/payment-methods'
 import { prisma } from '~/server/utils/prisma'
 
 // Profil public d'un chauffeur + résumé tarifaire (pour la page de réservation).
@@ -37,15 +37,11 @@ export default defineEventHandler(async (event) => {
   // ligne n'est retenu que si le prestataire actif (Stripe ou SumUp) est opérationnel ;
   // les encaissements sur place sont toujours utilisables. Le formulaire de réservation
   // reste affiché dans tous les cas (le paiement se règle en aval avec le chauffeur).
-  const methods = driver.paymentMethods as PaymentMethod[]
-  const onlineReady = canAcceptBookings(driver)
-  // En paiement immédiat, seul le paiement carte en ligne est affiché au client.
-  const instantPayment = isInstantPaymentOnly(driver)
-  const acceptedPaymentMethods: PaymentMethod[] = instantPayment
-    ? ['STRIPE_PREPAYMENT']
-    : methods.filter(
-        (m) => (m === 'STRIPE_PREPAYMENT' ? onlineReady : ONSITE_METHODS.includes(m)),
-      )
+  const mode = driverBookingMode(driver)
+  const acceptedPaymentMethods: PaymentMethod[] = [
+    ...(mode.onlineAvailable ? (['STRIPE_PREPAYMENT'] as PaymentMethod[]) : []),
+    ...mode.onSiteMethods,
+  ]
 
   return {
     phone: driver.phone,
@@ -73,8 +69,17 @@ export default defineEventHandler(async (event) => {
     fromKmCents: cheapestKm,
     fromHourCents: cheapestHour,
     bookingEnabled: acceptedPaymentMethods.length > 0,
-    // True si le chauffeur impose le paiement en ligne à la réservation :
-    // le client règle par carte pour réserver (bouton « Réserver et payer »).
-    instantPayment,
+    // Mode de réservation, pour adapter le formulaire et les messages du client :
+    // badge « réservation instantanée », choix du règlement, écrans de succès.
+    bookingMode: {
+      // La demande aboutit sans validation manuelle (paiement en ligne immédiat
+      // et/ou confirmation immédiate avec règlement sur place).
+      instant: mode.instantOnline || mode.instantOnSite,
+      autoConfirm: mode.autoConfirm,
+      onlineAvailable: mode.onlineAvailable,
+      // Le paiement en ligne est exigé pour réserver (aucun règlement sur place).
+      onlineRequired: mode.policy === 'REQUIRED',
+      onSiteMethods: mode.onSiteMethods,
+    },
   }
 })

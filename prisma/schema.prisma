@@ -120,10 +120,11 @@ model Driver {
   // (carte / espèces / chèque) sans passer par le prépaiement s'il le souhaite.
   paymentMethods PaymentMethod[] @default([STRIPE_PREPAYMENT])
 
-  // Paiement immédiat : le devis est envoyé automatiquement au client dès sa
-  // demande (sans validation manuelle) pour qu'il paie dans la foulée. Ne
-  // s'applique que si le paiement en ligne est opérationnel ; en cas de conflit
-  // calendrier détecté, la demande repasse en validation manuelle.
+  // Confirmation automatique des réservations : si le créneau est libre, la course
+  // est confirmée dès la demande, sans validation manuelle — par le paiement en
+  // ligne quand il est exigé/choisi, ou immédiatement quand le règlement se fait
+  // sur place. En cas de conflit calendrier (ou de paiement en ligne inopérant
+  // alors qu'il est exigé), la demande repasse en validation manuelle.
   autoAcceptQuotes Boolean @default(false)
 
   // Paramètres métier (centimes / minutes)
@@ -334,6 +335,10 @@ model RideRequest {
   durationHours Int?
 
   notes String? @db.Text
+
+  // Moyen de règlement choisi par le client dès le formulaire public (null si
+  // non précisé — ancien formulaire en cache, ou choix reporté à la page devis).
+  preferredPaymentMethod PaymentMethod?
 
   quotes Quote[]
 

@@ -30,10 +30,22 @@ export default defineEventHandler(async (event) => {
   const paidOnline = booking.payments.some(
     (p) => p.status === 'PAID' && !isOnSiteMethod(p.method as PaymentMethod),
   )
+  // Situation de règlement affichée au client : payé (en ligne ou sur place) ou
+  // encaissement sur place prévu le jour J (avec le moyen).
+  const paidPayment = booking.payments.find((p) => p.status === 'PAID')
+  const pendingOnSite = booking.payments.find(
+    (p) => p.status === 'PENDING' && isOnSiteMethod(p.method as PaymentMethod),
+  )
 
   return {
     status: booking.status,
     paidOnline,
+    payment: {
+      paid: Boolean(paidPayment),
+      paidOnline,
+      // Moyen du règlement effectué, ou prévu sur place (null si rien à afficher).
+      method: (paidPayment ?? pendingOnSite)?.method ?? null,
+    },
     amountCents: booking.amountCents,
     currency: booking.quote.currency,
     scheduledAt: booking.scheduledAt,

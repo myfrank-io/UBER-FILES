@@ -1,16 +1,14 @@
 import { z } from 'zod'
-import { verifyClientToken, signClientToken } from '~/server/utils/tokens'
+import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
-import { bookingSlot, findConflict } from '~/server/utils/calendar'
-import { sendEmail, emailTemplates } from '~/server/utils/email'
-import { notifyDriver } from '~/server/utils/notify-driver'
-import { ONSITE_METHODS, isOnSiteMethod, type PaymentMethod } from '~/lib/payment-methods'
-import { isInstantPaymentOnly } from '~/server/utils/driver'
+import { confirmQuoteOnSite } from '~/server/utils/booking-onsite'
+import { driverBookingMode } from '~/server/utils/driver'
+import { ONSITE_METHODS, type PaymentMethod } from '~/lib/payment-methods'
 
 // Confirme une course SANS prépaiement en ligne : le client réserve et règle sur
 // place le jour de la course (carte, espèces ou chèque selon ce qu'accepte le
 // chauffeur). Crée Booking (CONFIRMED) + CalendarEvent + Payment (PENDING, encaissé
-// le jour J), passe le devis en ACCEPTED et envoie l'email de confirmation.
+// le jour J), passe le devis en ACCEPTED et envoie les emails de confirmation.
 const schema = z.object({
   method: z.enum(ONSITE_METHODS as [string, ...string[]]).optional(),
 })
@@ -36,24 +34,16 @@ export default defineEventHandler(async (event) => {
   if (quote.booking || quote.status === 'ACCEPTED') {
     throw createError({ statusCode: 409, statusMessage: 'Course déjà confirmée.' })
   }
+  // Le client ne peut confirmer qu'un devis qui lui a été envoyé (un devis en
+  // attente de validation chauffeur ne se confirme pas en contournant l'UI).
   if (quote.status !== 'SENT') {
     throw createError({ statusCode: 409, statusMessage: 'Ce devis ne peut pas être confirmé.' })
   }
-  if (quote.expiresAt.getTime() < Date.now()) {
-    throw createError({ statusCode: 410, statusMessage: 'Ce devis a expiré.' })
-  }
 
-  // Paiement immédiat : la réservation se règle par carte en ligne uniquement,
-  // la confirmation « sur place » n'est pas ouverte (même si l'UI est contournée).
-  if (isInstantPaymentOnly(quote.driver)) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'La réservation se règle par carte en ligne pour ce chauffeur.',
-    })
-  }
-
-  // Le chauffeur accepte-t-il l'encaissement sur place ?
-  const accepted = (quote.driver.paymentMethods as PaymentMethod[]).filter(isOnSiteMethod)
+  // Le chauffeur accepte-t-il l'encaissement sur place ? (vide quand le paiement
+  // en ligne est exigé : la confirmation « sur place » n'est alors pas ouverte,
+  // même si l'UI est contournée.)
+  const accepted = driverBookingMode(quote.driver).onSiteMethods
   if (accepted.length === 0) {
     throw createError({
       statusCode: 409,
@@ -66,98 +56,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'Ce moyen de paiement n’est pas accepté.' })
   }
 
-  const req = quote.rideRequest
-  if (!req.customerId) throw createError({ statusCode: 422, statusMessage: 'Client manquant.' })
-
-  // Re-vérifier l'absence de conflit calendrier au moment de la confirmation.
-  const serviceDurationSeconds =
-    req.type === 'TRANSFER'
-      ? (req.durationSeconds ?? 0) * (req.roundTrip ? 2 : 1)
-      : (req.durationHours ?? 0) * 3600
-  const slot = bookingSlot(quote.driver, req.scheduledAt, serviceDurationSeconds)
-  const conflict = await findConflict(quote.driverId, slot)
-  if (conflict) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'Ce créneau n’est plus disponible. Merci de contacter le chauffeur.',
-    })
-  }
-
-  const booking = await prisma.$transaction(async (tx) => {
-    const booking = await tx.booking.create({
-      data: {
-        driverId: quote.driverId,
-        quoteId: quote.id,
-        customerId: req.customerId!,
-        status: 'CONFIRMED',
-        scheduledAt: req.scheduledAt,
-        amountCents: quote.amountCents,
-        calendarEvent: {
-          create: {
-            driverId: quote.driverId,
-            type: 'BOOKING',
-            source: 'INTERNAL',
-            title: `Course — ${req.customerName}`,
-            startAt: slot.startAt,
-            endAt: slot.endAt,
-          },
-        },
-      },
-    })
-    await tx.quote.update({
-      where: { id: quote.id },
-      data: { status: 'ACCEPTED', acceptedAt: new Date() },
-    })
-    // Paiement en attente : il sera encaissé sur place le jour de la course.
-    await tx.payment.create({
-      data: {
-        driverId: quote.driverId,
-        bookingId: booking.id,
-        amountCents: quote.amountCents,
-        applicationFeeCents: 0,
-        currency: quote.currency,
-        status: 'PENDING',
-        method,
-      },
-    })
-    return booking
-  })
-
-  const manageToken = await signClientToken(
-    { purpose: 'manage', ref: booking.id },
-    config.linkTokenSecret,
-    '90d',
-  )
-  const tpl = emailTemplates.bookingConfirmedOnSite({
-    driverName: quote.driver.displayName,
-    amountCents: quote.amountCents,
-    currency: quote.currency,
-    scheduledAt: req.scheduledAt,
-    method,
-    manageUrl: `${config.public.appBaseUrl}/reservation/${manageToken}`,
-    driverPhone: quote.driver.phone,
-    driverEmail: quote.driver.contactEmail,
-    siren: quote.driver.siren,
-    companyName: quote.driver.companyName,
-    vehicleMake: quote.driver.vehicleMake,
-    vehicleModel: quote.driver.vehicleModel,
-  })
-  await sendEmail({ to: req.customerEmail, ...tpl })
-
-  // Le chauffeur est prévenu par email : course confirmée, encaissement sur place.
-  await notifyDriver(quote.driver, {
-    email: emailTemplates.bookingConfirmedDriver({
-      customerName: req.customerName,
-      customerPhone: req.customerPhone,
-      customerEmail: req.customerEmail,
-      scheduledAt: req.scheduledAt,
-      amountCents: quote.amountCents,
-      currency: quote.currency,
-      paidOnline: false,
-      method,
-      dashboardUrl: `${config.public.appBaseUrl}/dashboard/reservations`,
-    }),
-  })
+  await confirmQuoteOnSite(quote, method)
 
   return { ok: true, method }
 })

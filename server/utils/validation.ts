@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PAYMENT_METHODS } from '~/lib/payment-methods'
 
 // Schémas de validation partagés (toutes les entrées API passent par Zod).
 
@@ -43,6 +44,10 @@ export const rideRequestSchema = estimateSchema.and(
   z.object({
     customer: customerSchema,
     notes: z.string().max(2000).optional(),
+    // Moyen de règlement choisi par le client sur le formulaire (optionnel : les
+    // anciens formulaires en cache n'envoient rien). Vérifié ensuite contre les
+    // moyens réellement proposés par le chauffeur.
+    paymentMethod: z.enum(PAYMENT_METHODS as [string, ...string[]]).optional(),
     cgvAccepted: z.literal(true, {
       errorMap: () => ({ message: 'Vous devez accepter les conditions générales de vente.' }),
     }),

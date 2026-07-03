@@ -1,7 +1,6 @@
 import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
-import { canAcceptBookings, isInstantPaymentOnly } from '~/server/utils/driver'
-import { ONSITE_METHODS, type PaymentMethod } from '~/lib/payment-methods'
+import { driverBookingMode } from '~/server/utils/driver'
 
 // Consultation d'un devis par le client via son jeton signé (sans compte).
 export default defineEventHandler(async (event) => {
@@ -20,14 +19,10 @@ export default defineEventHandler(async (event) => {
 
   const expired = quote.status === 'SENT' && quote.expiresAt.getTime() < Date.now()
 
-  // Options de paiement proposées au client selon le choix du chauffeur.
-  // En paiement immédiat, seul le règlement par carte en ligne est proposé :
-  // les encaissements sur place sont masqués.
-  const methods = quote.driver.paymentMethods as PaymentMethod[]
-  const onlineReady = canAcceptBookings(quote.driver)
-  const onSiteMethods = isInstantPaymentOnly(quote.driver)
-    ? []
-    : methods.filter((m) => ONSITE_METHODS.includes(m))
+  // Options de paiement proposées au client selon les réglages du chauffeur :
+  // prépaiement en ligne si opérationnel, encaissement sur place si accepté
+  // (vide quand le paiement en ligne est exigé).
+  const mode = driverBookingMode(quote.driver)
 
   // Une course annulée ne doit plus apparaître « confirmée » quand le client
   // rouvre son lien devis.
@@ -45,12 +40,14 @@ export default defineEventHandler(async (event) => {
     cancelled: bookingCancelled || quote.status === 'CANCELLED',
     // True si la course est déjà confirmée ET réglée en ligne (sinon : règlement sur place).
     alreadyPaid: Boolean(quote.booking?.payments.some((p) => p.status === 'PAID')),
+    // True si le chauffeur a ajusté le tarif par rapport à l'estimation initiale.
+    adjusted: quote.amountCents !== quote.computedAmountCents,
     payment: {
       // Le prépaiement en ligne n'est proposé que si le chauffeur l'accepte ET que
       // son prestataire de paiement (Stripe ou SumUp) est opérationnel.
-      prepaymentAvailable: methods.includes('STRIPE_PREPAYMENT') && onlineReady,
+      prepaymentAvailable: mode.onlineAvailable,
       // Encaissement sur place : le client réserve et règle le jour de la course.
-      onSiteMethods,
+      onSiteMethods: mode.onSiteMethods,
     },
     driver: { displayName: quote.driver.displayName, slug: quote.driver.slug },
     ride: {

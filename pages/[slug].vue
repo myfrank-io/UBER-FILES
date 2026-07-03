@@ -1,6 +1,10 @@
 <script setup lang="ts">
 // Page publique de réservation d'un chauffeur (marque blanche, mobile-first).
-import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '~/lib/payment-methods'
+import {
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_METHOD_SHORT_LABELS,
+  type PaymentMethod,
+} from '~/lib/payment-methods'
 
 const route = useRoute()
 const slug = route.params.slug as string
@@ -16,6 +20,15 @@ interface PublicVehicle {
   seats: number | null
   color: string | null
   isPrimary: boolean
+}
+
+interface BookingModePublic {
+  // La demande aboutit sans validation manuelle du chauffeur.
+  instant: boolean
+  autoConfirm: boolean
+  onlineAvailable: boolean
+  onlineRequired: boolean
+  onSiteMethods: PaymentMethod[]
 }
 
 interface DriverPublic {
@@ -39,7 +52,7 @@ interface DriverPublic {
   fromKmCents: number | null
   fromHourCents: number | null
   acceptedPaymentMethods: PaymentMethod[]
-  instantPayment: boolean
+  bookingMode: BookingModePublic
 }
 
 const { data: driver, error } = await useFetch<DriverPublic>(`/api/public/${slug}`)
@@ -119,6 +132,47 @@ const estimating = ref(false)
 const submitting = ref(false)
 const errorMsg = ref('')
 const submitted = ref(false)
+// Résultat d'une confirmation immédiate (règlement sur place, créneau libre).
+const confirmedBooking = ref(false)
+const manageUrl = ref<string | null>(null)
+// La demande envoyée attend-elle un règlement sur place ? (adapte le message de succès)
+const submittedOnSite = ref(false)
+
+// ─── Choix du règlement (quand plusieurs options existent) ───
+interface PaymentOption {
+  value: PaymentMethod
+  label: string
+  hint: string
+}
+
+const paymentOptions = computed<PaymentOption[]>(() => {
+  const m = driver.value?.bookingMode
+  if (!m) return []
+  const options: PaymentOption[] = []
+  if (m.onlineAvailable) {
+    options.push({
+      value: 'STRIPE_PREPAYMENT',
+      label: m.autoConfirm ? t('public.payOnlineNow') : t('public.payOnlineLater'),
+      hint: m.autoConfirm ? t('public.payOnlineNowHint') : t('public.payOnlineLaterHint'),
+    })
+  }
+  for (const method of m.onSiteMethods) {
+    options.push({
+      value: method,
+      label: t('public.payOnSiteOption', { method: PAYMENT_METHOD_SHORT_LABELS[method] }),
+      hint: m.autoConfirm ? t('public.payOnSiteInstantHint') : t('public.payOnSiteManualHint'),
+    })
+  }
+  return options
+})
+
+const selectedPayment = ref<PaymentMethod | null>(null)
+watchEffect(() => {
+  if (!selectedPayment.value && paymentOptions.value.length) {
+    selectedPayment.value = paymentOptions.value[0]!.value
+  }
+})
+const selectedIsOnline = computed(() => selectedPayment.value === 'STRIPE_PREPAYMENT')
 
 // Flux en deux étapes : 1) course + estimation, 2) coordonnées du client.
 // Les coordonnées ne sont demandées qu'après avoir estimé et cliqué sur « Réserver ».
@@ -184,16 +238,36 @@ async function submit() {
   submitting.value = true
   try {
     const payload = await buildPayload()
-    const res = await $fetch<{ ok: boolean; payUrl?: string | null }>(`/api/public/${slug}/request`, {
+    const res = await $fetch<{
+      ok: boolean
+      payUrl?: string | null
+      confirmed?: boolean
+      manageUrl?: string | null
+    }>(`/api/public/${slug}/request`, {
       method: 'POST',
-      body: { ...payload, customer, notes: notes.value, cgvAccepted: true },
+      body: {
+        ...payload,
+        customer,
+        notes: notes.value,
+        cgvAccepted: true,
+        paymentMethod: selectedPayment.value ?? undefined,
+      },
     })
-    // Paiement immédiat activé chez le chauffeur : on emmène directement le client
-    // sur la page de paiement du devis (pas d'attente de validation).
+    // Paiement en ligne immédiat : on emmène directement le client sur la page
+    // de paiement du devis (pas d'attente de validation).
     if (res.payUrl) {
       await navigateTo(res.payUrl, { external: true })
       return
     }
+    // Confirmation immédiate (règlement sur place) : la course est déjà réservée.
+    if (res.confirmed) {
+      confirmedBooking.value = true
+      manageUrl.value = res.manageUrl ?? null
+      return
+    }
+    submittedOnSite.value = selectedPayment.value
+      ? !selectedIsOnline.value
+      : !driver.value?.bookingMode.onlineAvailable
     submitted.value = true
   } catch (e) {
     errorMsg.value = errMessage(e)
@@ -216,10 +290,12 @@ const canSubmit = computed(
   () => Boolean(estimate.value) && customer.name.length >= 2 && customer.phone.length >= 6 && customer.email.includes('@'),
 )
 
-// Libellé du bouton de réservation : « Réserver et payer » si le chauffeur impose
-// le paiement en ligne, sinon « Réserver » (le paiement se règle ensuite).
+// Libellé du bouton de réservation : « Réserver et payer » quand l'envoi mène
+// directement au paiement en ligne, sinon « Réserver ».
 const reserveLabel = computed(() =>
-  driver.value?.instantPayment ? t('public.reserveAndPay') : t('public.reserve'),
+  selectedIsOnline.value && driver.value?.bookingMode.autoConfirm
+    ? t('public.reserveAndPay')
+    : t('public.reserve'),
 )
 
 // Passage à l'étape « coordonnées » une fois le prix estimé.
@@ -251,6 +327,15 @@ function goToContact() {
       </div>
       <p v-if="driver.bio" class="mt-4 text-sm text-slate-600">{{ driver.bio }}</p>
       <div class="mt-4 flex flex-wrap gap-2 text-xs">
+        <span
+          v-if="driver.bookingMode.instant"
+          class="rounded-full bg-green-100 px-3 py-1 font-medium text-green-700"
+        >
+          ⚡ {{ $t('public.instantBooking') }}
+        </span>
+        <span v-else class="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+          ✋ {{ $t('public.driverConfirms') }}
+        </span>
         <span v-if="driver.vehicle.class" class="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
           {{ driver.vehicle.class }}<template v-if="driver.vehicle.seats"> · {{ $t('common.places', { count: driver.vehicle.seats }) }}</template>
         </span>
@@ -315,12 +400,28 @@ function goToContact() {
       </div>
     </AppModal>
 
-    <!-- Confirmation -->
-    <div v-if="submitted" class="card mt-5 border-green-200 bg-green-50 text-center">
+    <!-- Course confirmée immédiatement (règlement sur place, créneau libre) -->
+    <div v-if="confirmedBooking" class="card mt-5 border-green-200 bg-green-50 text-center">
+      <p class="text-3xl">✅</p>
+      <h2 class="mt-2 text-lg font-bold text-green-900">{{ $t('public.confirmedTitle') }}</h2>
+      <p class="mt-2 text-sm text-green-800">
+        {{ $t('public.confirmedBody', { name: driver.displayName, email: customer.email }) }}
+      </p>
+      <a v-if="manageUrl" :href="manageUrl" class="btn-primary mt-4 inline-block">
+        {{ $t('public.manageBooking') }}
+      </a>
+    </div>
+
+    <!-- Demande transmise, en attente de validation du chauffeur -->
+    <div v-else-if="submitted" class="card mt-5 border-green-200 bg-green-50 text-center">
       <p class="text-3xl">✅</p>
       <h2 class="mt-2 text-lg font-bold text-green-900">{{ $t('public.submittedTitle') }}</h2>
       <p class="mt-2 text-sm text-green-800">
-        {{ $t('public.submittedBody', { name: driver.displayName, email: customer.email }) }}
+        {{
+          submittedOnSite
+            ? $t('public.submittedBodyOnSite', { name: driver.displayName, email: customer.email })
+            : $t('public.submittedBody', { name: driver.displayName, email: customer.email })
+        }}
       </p>
     </div>
 
@@ -480,6 +581,26 @@ function goToContact() {
           </div>
         </div>
 
+        <!-- Règlement : choix quand plusieurs options, simple rappel sinon -->
+        <div v-if="paymentOptions.length > 1" class="space-y-2">
+          <p class="label">{{ $t('public.paymentQuestion') }}</p>
+          <label
+            v-for="opt in paymentOptions"
+            :key="opt.value"
+            class="flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition"
+            :class="selectedPayment === opt.value ? 'border-brand-600 bg-brand-50' : 'border-slate-200 hover:border-brand-200'"
+          >
+            <input v-model="selectedPayment" type="radio" :value="opt.value" class="mt-0.5" name="payment-choice" />
+            <span class="flex-1">
+              <span class="text-sm font-medium text-slate-800">{{ opt.label }}</span>
+              <span class="mt-0.5 block text-xs text-slate-500">{{ opt.hint }}</span>
+            </span>
+          </label>
+        </div>
+        <p v-else-if="paymentOptions.length === 1" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          {{ paymentOptions[0]!.label }} · {{ paymentOptions[0]!.hint }}
+        </p>
+
         <!-- CGV -->
         <label class="flex items-start gap-2 text-xs text-slate-600">
           <input v-model="cgvAccepted" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" />
@@ -494,7 +615,8 @@ function goToContact() {
       </template>
     </form>
 
-    <p class="mt-6 text-center text-xs text-slate-400">
+    <!-- Mention paiement sécurisé : uniquement si le paiement en ligne est proposé -->
+    <p v-if="driver.bookingMode.onlineAvailable" class="mt-6 text-center text-xs text-slate-400">
       {{ $t('common.securePayment') }}
     </p>
   </div>
