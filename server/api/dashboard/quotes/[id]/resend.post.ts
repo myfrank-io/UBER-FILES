@@ -35,10 +35,12 @@ export default defineEventHandler(async (event) => {
   })
 
   const config = useRuntimeConfig()
+  // Jeton plus long que l'expiration business : le lien reste consultable après
+  // expiration (la page affiche alors « devis expiré » au lieu d'un lien mort).
   const token = await signClientToken(
     { purpose: 'quote', ref: id },
     config.linkTokenSecret,
-    `${quote.driver.quoteExpiryHours}h`,
+    '30d',
   )
   const payUrl = `${config.public.appBaseUrl}/devis/${token}`
 

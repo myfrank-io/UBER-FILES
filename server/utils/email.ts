@@ -232,7 +232,7 @@ export const emailTemplates = {
   }) {
     const refundStr = opts.refundCents > 0
       ? `Remboursement client : ${formatMoney(opts.refundCents, opts.currency)}.`
-      : 'Aucun remboursement (annulation hors délai).'
+      : 'Aucun remboursement automatique effectué.'
     return {
       subject: `Course annulée — ${opts.customerName} (${opts.scheduledAt.toLocaleString('fr-FR')})`,
       html: wrap(
@@ -253,13 +253,30 @@ export const emailTemplates = {
       ),
     }
   },
-  cancelled(opts: { driverName: string; refundCents: number; currency: string }) {
+  cancelled(opts: {
+    driverName: string
+    refundCents: number
+    currency: string
+    // Situation de paiement au moment de l'annulation, pour un message honnête :
+    // REFUNDED (remboursement en ligne parti), NO_REFUND (payé en ligne, retenue
+    // intégrale), PAID_ON_SITE (réglé sur place), NOTHING_PAID (rien d'encaissé).
+    situation?: 'REFUNDED' | 'NO_REFUND' | 'PAID_ON_SITE' | 'NOTHING_PAID'
+  }) {
+    const situation = opts.situation ?? (opts.refundCents > 0 ? 'REFUNDED' : 'NO_REFUND')
+    const detail =
+      situation === 'REFUNDED'
+        ? `<p>Remboursement de <strong>${formatMoney(opts.refundCents, opts.currency)}</strong> en cours.</p>`
+        : situation === 'NO_REFUND'
+          ? '<p>Aucun remboursement applicable selon la politique d\'annulation.</p>'
+          : situation === 'PAID_ON_SITE'
+            ? '<p>Votre règlement ayant été effectué sur place, rapprochez-vous directement du chauffeur pour un éventuel remboursement.</p>'
+            : '<p>Aucun paiement n\'avait été effectué : rien ne vous sera prélevé.</p>'
     return {
       subject: `Course annulée — ${opts.driverName}`,
       html: wrap(
         'Course annulée',
         `<p>Votre course a été annulée.</p>
-         ${opts.refundCents > 0 ? `<p>Remboursement de <strong>${formatMoney(opts.refundCents, opts.currency)}</strong> en cours.</p>` : '<p>Aucun remboursement applicable selon la politique d\'annulation.</p>'}`,
+         ${detail}`,
       ),
     }
   },

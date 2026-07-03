@@ -57,10 +57,13 @@ export async function sendQuoteToClient(
     data: { status: 'SENT', amountCents, sentAt: new Date(), expiresAt },
   })
 
+  // Le jeton du lien vit plus longtemps que le devis : passé l'expiration business
+  // (expiresAt, contrôlée au paiement), le client voit la page « devis expiré »
+  // plutôt qu'un lien mort — et le chauffeur peut renvoyer le devis.
   const token = await signClientToken(
     { purpose: 'quote', ref: updated.id },
     config.linkTokenSecret,
-    `${quote.driver.quoteExpiryHours}h`,
+    '30d',
   )
   const payUrl = `${config.public.appBaseUrl}/devis/${token}`
 

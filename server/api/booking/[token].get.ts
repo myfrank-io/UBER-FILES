@@ -1,6 +1,7 @@
 import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
 import { computeRefund } from '~/lib/cancellation'
+import { isOnSiteMethod, type PaymentMethod } from '~/lib/payment-methods'
 
 // Consultation d'une réservation par le client via son jeton de gestion signé.
 export default defineEventHandler(async (event) => {
@@ -13,16 +14,26 @@ export default defineEventHandler(async (event) => {
 
   const booking = await prisma.booking.findUnique({
     where: { id: payload.ref },
-    include: { driver: { include: { cancellationPolicy: true } }, quote: { include: { rideRequest: true } } },
+    include: {
+      driver: { include: { cancellationPolicy: true } },
+      quote: { include: { rideRequest: true } },
+      payments: true,
+    },
   })
   if (!booking) throw createError({ statusCode: 404, statusMessage: 'Réservation introuvable.' })
 
   const policy = booking.driver.cancellationPolicy ?? { freeUntilHours: 24, retainedPercent: 50 }
   const refund = computeRefund(booking.amountCents, booking.scheduledAt, policy)
   const req = booking.quote.rideRequest
+  // Payé en ligne ? Détermine le message d'annulation (remboursement vs simple
+  // annulation sans prélèvement).
+  const paidOnline = booking.payments.some(
+    (p) => p.status === 'PAID' && !isOnSiteMethod(p.method as PaymentMethod),
+  )
 
   return {
     status: booking.status,
+    paidOnline,
     amountCents: booking.amountCents,
     currency: booking.quote.currency,
     scheduledAt: booking.scheduledAt,

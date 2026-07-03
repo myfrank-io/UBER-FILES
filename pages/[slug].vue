@@ -93,13 +93,26 @@ const customer = reactive({ name: '', phone: '', email: '' })
 const notes = ref('')
 const cgvAccepted = ref(false)
 
-function defaultDateTime(): string {
-  const d = new Date(Date.now() + 3 * 3600_000)
-  d.setMinutes(0, 0, 0)
+function toDatetimeLocal(d: Date): string {
   // format pour <input type="datetime-local"> (heure locale)
   const off = d.getTimezoneOffset() * 60000
   return new Date(d.getTime() - off).toISOString().slice(0, 16)
 }
+
+function defaultDateTime(): string {
+  const leadMs = (driver.value?.minLeadTimeMinutes ?? 180) * 60_000
+  const d = new Date(Date.now() + Math.max(leadMs, 3 * 3600_000))
+  d.setMinutes(0, 0, 0)
+  // L'arrondi à l'heure ne doit pas retomber sous le délai minimum.
+  if (d.getTime() < Date.now() + leadMs) d.setTime(d.getTime() + 3600_000)
+  return toDatetimeLocal(d)
+}
+
+// Borne basse du sélecteur : impossible de choisir une date déjà passée ou sous le
+// délai minimum de réservation (l'erreur n'apparaissait sinon qu'à l'estimation).
+const minScheduledAt = computed(() =>
+  toDatetimeLocal(new Date(Date.now() + (driver.value?.minLeadTimeMinutes ?? 0) * 60_000)),
+)
 
 const estimate = ref<{ amountCents: number; currency: string; breakdown: { label: string; amountCents: number; detail?: string }[] } | null>(null)
 const estimating = ref(false)
@@ -389,7 +402,7 @@ function goToContact() {
 
         <div>
           <label class="label" for="datetime">{{ $t('public.datetimeLabel') }}</label>
-          <input id="datetime" v-model="scheduledAt" type="datetime-local" class="field" />
+          <input id="datetime" v-model="scheduledAt" type="datetime-local" class="field" :min="minScheduledAt" />
           <p class="mt-1 text-xs text-slate-500">
             {{ $t('public.leadTime', { hours: Math.round(driver.minLeadTimeMinutes / 60) }) }}
           </p>

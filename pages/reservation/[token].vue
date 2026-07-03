@@ -66,11 +66,18 @@ async function cancel() {
 
       <template v-if="booking.status === 'CONFIRMED'">
         <div class="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-          <p v-if="booking.cancellation.isFreeNow">
-            ✅ {{ $t('reservation.freeCancel', { amount: formatMoney(booking.cancellation.currentRefundCents, booking.currency) }) }}
-          </p>
+          <!-- Payé en ligne : on parle remboursement. Sinon (règlement sur place),
+               rien n'a été prélevé : on parle simplement d'annulation. -->
+          <template v-if="booking.paidOnline">
+            <p v-if="booking.cancellation.isFreeNow">
+              ✅ {{ $t('reservation.freeCancel', { amount: formatMoney(booking.cancellation.currentRefundCents, booking.currency) }) }}
+            </p>
+            <p v-else>
+              ⚠️ {{ $t('reservation.lateCancel', { hours: booking.cancellation.freeUntilHours, percent: booking.cancellation.retainedPercent, amount: formatMoney(booking.cancellation.currentRefundCents, booking.currency) }) }}
+            </p>
+          </template>
           <p v-else>
-            ⚠️ {{ $t('reservation.lateCancel', { hours: booking.cancellation.freeUntilHours, percent: booking.cancellation.retainedPercent, amount: formatMoney(booking.cancellation.currentRefundCents, booking.currency) }) }}
+            {{ $t('reservation.cancelNoPayment') }}
           </p>
         </div>
 
