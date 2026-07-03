@@ -1,6 +1,6 @@
 import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
-import { canAcceptBookings } from '~/server/utils/driver'
+import { canAcceptBookings, isInstantPaymentOnly } from '~/server/utils/driver'
 import { ONSITE_METHODS, type PaymentMethod } from '~/lib/payment-methods'
 
 // Consultation d'un devis par le client via son jeton signé (sans compte).
@@ -21,9 +21,13 @@ export default defineEventHandler(async (event) => {
   const expired = quote.status === 'SENT' && quote.expiresAt.getTime() < Date.now()
 
   // Options de paiement proposées au client selon le choix du chauffeur.
+  // En paiement immédiat, seul le règlement par carte en ligne est proposé :
+  // les encaissements sur place sont masqués.
   const methods = quote.driver.paymentMethods as PaymentMethod[]
   const onlineReady = canAcceptBookings(quote.driver)
-  const onSiteMethods = methods.filter((m) => ONSITE_METHODS.includes(m))
+  const onSiteMethods = isInstantPaymentOnly(quote.driver)
+    ? []
+    : methods.filter((m) => ONSITE_METHODS.includes(m))
 
   return {
     id: quote.id,

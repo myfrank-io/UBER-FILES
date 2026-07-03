@@ -25,6 +25,26 @@ export function canAcceptBookings(driver: Pick<Driver, 'paymentProvider' | 'sumu
 }
 
 /**
+ * Paiement immédiat « carte uniquement » : quand le chauffeur a activé l'envoi
+ * automatique des devis ET que le prépaiement en ligne est opérationnel, le client
+ * règle par carte pour réserver — les encaissements sur place ne lui sont pas
+ * proposés. Si le paiement en ligne n'est pas prêt, le réglage ne s'applique pas
+ * (mêmes conditions que l'envoi automatique dans request.post.ts).
+ */
+export function isInstantPaymentOnly(
+  driver: Pick<
+    Driver,
+    'autoAcceptQuotes' | 'paymentMethods' | 'paymentProvider' | 'sumupConnected' | 'stripeChargesEnabled'
+  >,
+): boolean {
+  return (
+    driver.autoAcceptQuotes &&
+    (driver.paymentMethods as string[]).includes('STRIPE_PREPAYMENT') &&
+    canAcceptBookings(driver)
+  )
+}
+
+/**
  * URL légère de la photo de profil pour les réponses JSON. Les photos importées
  * sont stockées en data URL (base64) : on ne les embarque jamais telles quelles
  * dans une réponse (poids), on renvoie l'endpoint image versionné à la place.

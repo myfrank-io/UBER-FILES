@@ -1,4 +1,4 @@
-import { loadActiveDriverBySlug, canAcceptBookings, publicPhotoUrl } from '~/server/utils/driver'
+import { loadActiveDriverBySlug, canAcceptBookings, isInstantPaymentOnly, publicPhotoUrl } from '~/server/utils/driver'
 import { ONSITE_METHODS, type PaymentMethod } from '~/lib/payment-methods'
 import { prisma } from '~/server/utils/prisma'
 
@@ -39,9 +39,12 @@ export default defineEventHandler(async (event) => {
   // reste affiché dans tous les cas (le paiement se règle en aval avec le chauffeur).
   const methods = driver.paymentMethods as PaymentMethod[]
   const onlineReady = canAcceptBookings(driver)
-  const acceptedPaymentMethods = methods.filter(
-    (m) => (m === 'STRIPE_PREPAYMENT' ? onlineReady : ONSITE_METHODS.includes(m)),
-  )
+  // En paiement immédiat, seul le paiement carte en ligne est affiché au client.
+  const acceptedPaymentMethods: PaymentMethod[] = isInstantPaymentOnly(driver)
+    ? ['STRIPE_PREPAYMENT']
+    : methods.filter(
+        (m) => (m === 'STRIPE_PREPAYMENT' ? onlineReady : ONSITE_METHODS.includes(m)),
+      )
 
   return {
     phone: driver.phone,

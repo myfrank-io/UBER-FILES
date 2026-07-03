@@ -596,9 +596,10 @@ async function deleteSurcharge(id: string) {
           <span class="flex-1">
             <span class="text-sm font-medium text-slate-800">Paiement immédiat à la réservation</span>
             <span class="mt-1 block text-xs text-slate-500">
-              Le devis est envoyé automatiquement et le client paie dans la foulée : la course
-              est confirmée sans action de votre part (vous êtes notifié). En cas de conflit
-              d'agenda détecté, la demande repasse en validation manuelle.
+              Le devis est envoyé automatiquement et le client paie par carte en ligne dans la
+              foulée : la course est confirmée sans action de votre part (vous êtes notifié).
+              Les moyens de paiement sur place ne sont pas proposés dans ce mode. En cas de
+              conflit d'agenda détecté, la demande repasse en validation manuelle.
             </span>
             <span v-if="autoAcceptQuotes && !instantReady" class="mt-1 block text-xs text-amber-600">
               ⚠️ Nécessite le paiement en ligne : compte SumUp connecté et case « Paiement en
