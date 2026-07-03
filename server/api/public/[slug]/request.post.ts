@@ -6,7 +6,7 @@ import { computeApplicationFee } from '~/lib/pricing'
 import { prisma } from '~/server/utils/prisma'
 import { newRequestMessage } from '~/server/utils/telegram'
 import { notifyDriver } from '~/server/utils/notify-driver'
-import { emailTemplates } from '~/server/utils/email'
+import { emailTemplates, sendEmail } from '~/server/utils/email'
 import { sendQuoteToClient } from '~/server/utils/quote-actions'
 import { createQuoteCheckoutUrl } from '~/server/utils/checkout'
 
@@ -188,6 +188,31 @@ export default defineEventHandler(async (event) => {
       autoSent,
     }),
   })
+
+  // Accusé de réception au client — uniquement en validation manuelle : en paiement
+  // immédiat, le client est redirigé directement vers le paiement et a déjà reçu le
+  // devis, donc ce message serait hors sujet. L'échec d'envoi ne bloque pas la demande.
+  if (!autoSent) {
+    try {
+      await sendEmail({
+        to: input.customer.email,
+        ...emailTemplates.orderReceived({
+          customerName: input.customer.name,
+          driverName: driver.displayName,
+          type: input.type,
+          scheduledAt,
+          pickupAddress: input.pickupAddress,
+          dropoffAddress: input.dropoffAddress,
+          roundTrip: input.roundTrip,
+          durationHours: input.durationHours,
+          amountCents: computation.price.amountCents,
+          currency: computation.price.currency,
+        }),
+      })
+    } catch {
+      // Ne pas empêcher la prise en compte de la demande si l'accusé échoue.
+    }
+  }
 
   return {
     ok: true,

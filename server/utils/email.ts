@@ -51,6 +51,44 @@ const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
 export const emailTemplates = {
+  // Accusé de réception envoyé au client juste après sa demande, tant que le
+  // chauffeur n'a pas encore validé le devis (flux à validation manuelle).
+  orderReceived(opts: {
+    customerName: string
+    driverName: string
+    type: 'TRANSFER' | 'HOURLY'
+    scheduledAt: Date
+    pickupAddress?: string | null
+    dropoffAddress?: string | null
+    roundTrip?: boolean
+    durationHours?: number | null
+    amountCents: number
+    currency: string
+  }) {
+    const trajet =
+      opts.type === 'TRANSFER'
+        ? `${esc(opts.pickupAddress ?? '?')} → ${esc(opts.dropoffAddress ?? '?')}${opts.roundTrip ? ' (aller-retour)' : ''}`
+        : `Mise à disposition ${opts.durationHours ?? '?'} h${opts.pickupAddress ? ` — départ : ${esc(opts.pickupAddress)}` : ''}`
+    return {
+      subject: `Demande de réservation bien reçue — ${opts.driverName}`,
+      html: wrap(
+        'Votre demande est bien reçue ✅',
+        `<p>Bonjour ${esc(opts.customerName)},</p>
+         <p>Nous avons bien reçu votre demande de réservation : elle vient d'être
+            <strong>transmise à ${esc(opts.driverName)}</strong>.</p>
+         <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0">
+           📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
+           📍 ${trajet}<br />
+           💶 Montant estimé : <strong>${formatMoney(opts.amountCents, opts.currency)}</strong>
+         </div>
+         <p><strong>Prochaine étape :</strong> dès que le chauffeur aura validé votre course,
+            vous recevrez un <strong>nouvel email</strong> avec le lien pour confirmer et régler
+            votre réservation.</p>
+         <p style="font-size:13px;color:#6b7280">Le montant ci-dessus est une estimation, susceptible
+            d'être ajustée par le chauffeur lors de la validation. Aucune somme ne vous est débitée à ce stade.</p>`,
+      ),
+    }
+  },
   quoteSent(opts: {
     driverName: string
     amountCents: number
