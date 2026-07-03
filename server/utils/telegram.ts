@@ -1,6 +1,17 @@
 // Bot Telegram : notifications chauffeur temps réel + validation/ajustement du devis
 // via boutons inline. Sans token, on journalise simplement (dev/test).
+import { randomBytes } from 'node:crypto'
 import { formatMoney } from '~/lib/money'
+
+/** Code d'appairage à usage unique (lien /start du bot). */
+export function randomLinkCode(): string {
+  return randomBytes(6).toString('hex')
+}
+
+/** Lien profond ouvrant la conversation du bot avec le code pré-rempli. */
+export function telegramDeepLink(botUsername: string, code: string): string {
+  return `https://t.me/${botUsername.replace(/^@/, '')}?start=${code}`
+}
 
 const API = (token: string, method: string) => `https://api.telegram.org/bot${token}/${method}`
 

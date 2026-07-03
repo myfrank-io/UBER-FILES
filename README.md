@@ -74,9 +74,10 @@ npm run dev                 # http://localhost:3000
   paiement Stripe ; sur place : confirmé à la réservation, encaissement marqué reçu par le chauffeur.
 - **Calendrier interne** + indisponibilités + détection de conflit avant validation.
 - **Modification / annulation** client (liens signés) + remboursement selon politique paramétrable.
-- **Notifications** : tout passe par email — client (devis, confirmation, rappel J-1, annulation)
-  et chauffeur (nouvelle demande, course confirmée, annulation). Les notifications Telegram sont
-  coupées par défaut (réactivables via `TELEGRAM_NOTIFICATIONS_ENABLED=1`).
+- **Notifications** : email pour tous — client (devis, confirmation, rappel J-1, annulation)
+  et chauffeur (nouvelle demande, course confirmée, annulation). Chaque chauffeur peut en plus
+  **lier Telegram** depuis ses réglages pour recevoir ses notifications et valider/refuser ses
+  courses en un tap ; l'email reste envoyé dans tous les cas.
 - **Back-office chauffeur** : grilles, demandes, courses, calendrier, base clients (export CSV).
 - **Back-office admin** : onboarding/suspension chauffeurs, dashboard, facturation des forfaits.
 
@@ -139,7 +140,7 @@ curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://votre-domaine/api/c
 | Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET` | Webhooks : `/api/webhooks/stripe` (checkout) et `/api/webhooks/stripe-connect` (account.updated) |
 | Google Maps | `GOOGLE_MAPS_API_KEY` | Restreindre la clé (Places + Routes). Sans clé : repli haversine + Base Adresse Nationale (data.gouv.fr) |
 | Resend | `RESEND_API_KEY`, `EMAIL_FROM` | Vérifier SPF/DKIM du domaine |
-| Telegram | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_NOTIFICATIONS_ENABLED` | Webhook : `/api/webhooks/telegram`. Notifications coupées par défaut (mettre `1` pour réactiver) |
+| Telegram | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_BOT_USERNAME` | Webhook : `/api/webhooks/telegram`. Chaque chauffeur lie son compte depuis ses réglages (opt-in) |
 | INSEE | `INSEE_API_KEY` | Vérification SIREN à l'onboarding |
 
 > Sans clés, l'application fonctionne en mode dégradé (emails/Telegram journalisés, itinéraires
