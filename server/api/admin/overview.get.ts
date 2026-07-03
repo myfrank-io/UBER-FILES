@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
       },
     }),
     prisma.booking.count({ where: { status: 'CONFIRMED' } }),
-    prisma.payment.aggregate({ where: { status: 'PAID' }, _sum: { amountCents: true, applicationFeeCents: true } }),
+    prisma.payment.aggregate({ where: { status: 'PAID' }, _sum: { amountCents: true } }),
     prisma.subscription.aggregate({ where: { status: 'ACTIVE' }, _sum: { monthlyFeeCents: true } }),
   ])
 
@@ -23,8 +23,9 @@ export default defineEventHandler(async (event) => {
       driversTotal: drivers.length,
       driversActive: drivers.filter((d) => d.status === 'ACTIVE').length,
       bookingsConfirmed: bookingCount,
+      // Volume encaissé par les chauffeurs (ils sont merchant of record via SumUp).
       gmvCents: revenue._sum.amountCents ?? 0,
-      commissionCents: revenue._sum.applicationFeeCents ?? 0,
+      // Notre revenu = forfaits mensuels (pas de commission sur les courses).
       mrrCents: subscriptions._sum.monthlyFeeCents ?? 0,
     },
     drivers: drivers.map((d) => ({
@@ -33,7 +34,8 @@ export default defineEventHandler(async (event) => {
       displayName: d.displayName,
       status: d.status,
       sirenVerified: d.sirenVerified,
-      stripeReady: d.stripeChargesEnabled,
+      // Encaissement en ligne : on n'utilise que SumUp (chauffeur = merchant of record).
+      sumupConnected: d.sumupConnected,
       bookings: d._count.bookings,
       monthlyFeeCents: d.subscription?.monthlyFeeCents ?? 0,
       createdAt: d.createdAt,

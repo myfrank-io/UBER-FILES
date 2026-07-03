@@ -74,12 +74,11 @@ const filteredDrivers = computed(() => {
     </div>
 
     <!-- Stats -->
-    <div v-if="data" class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+    <div v-if="data" class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       <StatCard title="Chauffeurs" :value="data.stats.driversTotal" />
       <StatCard title="Actifs" :value="data.stats.driversActive" />
       <StatCard title="Courses" :value="data.stats.bookingsConfirmed" />
-      <StatCard title="GMV" :value="formatMoney(data.stats.gmvCents)" />
-      <StatCard title="Commission" :value="formatMoney(data.stats.commissionCents)" />
+      <StatCard title="Volume encaissé" :value="formatMoney(data.stats.gmvCents)" />
       <StatCard title="MRR forfaits" :value="formatMoney(data.stats.mrrCents)" />
     </div>
 
@@ -120,7 +119,7 @@ const filteredDrivers = computed(() => {
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
-            <th class="py-2">Chauffeur</th><th>Statut</th><th>SIREN</th><th>Stripe</th><th>Courses</th><th>Forfait</th><th></th>
+            <th class="py-2">Chauffeur</th><th>Statut</th><th>SIREN</th><th>SumUp</th><th>Courses</th><th>Forfait</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -132,7 +131,7 @@ const filteredDrivers = computed(() => {
             </td>
             <td><span class="rounded-full px-2 py-0.5 text-xs font-semibold" :class="statusColors[d.status]">{{ d.status }}</span></td>
             <td>{{ d.sirenVerified ? '✅' : '—' }}</td>
-            <td>{{ d.stripeReady ? '✅' : '⏳' }}</td>
+            <td>{{ d.sumupConnected ? '✅' : '⏳' }}</td>
             <td>{{ d.bookings }}</td>
             <td>{{ formatMoney(d.monthlyFeeCents) }}</td>
             <td class="text-right">

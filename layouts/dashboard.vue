@@ -1,6 +1,16 @@
 <script setup lang="ts">
 // Layout du back-office chauffeur : navigation latérale (desktop) / barre basse (mobile).
-const { user, clear } = useUserSession()
+const { user, session, clear } = useUserSession()
+
+// Usurpation admin : quand un admin visite l'espace d'un chauffeur, la session
+// mémorise son identité. On affiche alors un bandeau pour revenir à l'admin.
+const impersonator = computed(
+  () => (session.value as { impersonator?: { email: string } } | null)?.impersonator ?? null,
+)
+async function stopImpersonation() {
+  await $fetch('/api/admin/stop-impersonation', { method: 'POST' })
+  await navigateTo('/admin')
+}
 
 // État de validation du profil (bannière d'attente / suspension).
 // Pas de `key` explicite : les pages qui appellent aussi /api/dashboard/me
@@ -50,6 +60,23 @@ async function logout() {
 
     <!-- Contenu -->
     <main class="flex-1 px-5 py-6 sm:px-8 sm:py-8">
+      <!-- Bandeau d'usurpation : l'admin visite l'espace d'un chauffeur -->
+      <div
+        v-if="impersonator"
+        class="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-3 text-sm text-indigo-900"
+      >
+        <p>
+          👁️ Vous consultez cet espace en tant qu'administrateur
+          (<strong>{{ impersonator.email }}</strong>). Vos modifications s'appliquent au chauffeur.
+        </p>
+        <button
+          class="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 font-medium text-indigo-700 hover:bg-indigo-100"
+          @click="stopImpersonation"
+        >
+          ← Revenir à l'administration
+        </button>
+      </div>
+
       <!-- Bannière de statut : profil en attente de validation ou suspendu -->
       <div
         v-if="status === 'PENDING'"

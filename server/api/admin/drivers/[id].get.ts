@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
   const [revenue, upcoming] = await Promise.all([
     prisma.payment.aggregate({
       where: { driverId: id, status: 'PAID' },
-      _sum: { amountCents: true, applicationFeeCents: true },
+      _sum: { amountCents: true },
       _count: true,
     }),
     prisma.booking.count({
@@ -37,14 +37,13 @@ export default defineEventHandler(async (event) => {
     siren: driver.siren,
     sirenVerified: driver.sirenVerified,
     companyName: driver.companyName,
-    commissionBps: driver.commissionBps,
     currency: driver.currency,
     telegramLinked: Boolean(driver.telegramChatId),
     telegramLinkCode: driver.telegramLinkCode,
-    stripe: {
-      connected: Boolean(driver.stripeAccountId),
-      chargesEnabled: driver.stripeChargesEnabled,
-      payoutsEnabled: driver.stripePayoutsEnabled,
+    // Encaissement en ligne : uniquement SumUp (le chauffeur encaisse en direct).
+    sumup: {
+      connected: driver.sumupConnected,
+      merchantCode: driver.sumupMerchantCode,
     },
     subscription: driver.subscription,
     user: driver.user,
@@ -54,7 +53,6 @@ export default defineEventHandler(async (event) => {
       rideRequests: driver._count.rideRequests,
       upcomingBookings: upcoming,
       revenueCents: revenue._sum.amountCents ?? 0,
-      commissionCents: revenue._sum.applicationFeeCents ?? 0,
       payments: revenue._count,
     },
     createdAt: driver.createdAt,
