@@ -141,7 +141,7 @@ async function markPaid(id: string) {
             <p class="mt-1 text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
             <p class="mt-0.5 truncate text-xs text-slate-500">
               <template v-if="b.ride.type === 'TRANSFER'">
-                {{ b.ride.pickupAddress }} → {{ b.ride.dropoffAddress }}
+                <NavAddress :address="b.ride.pickupAddress ?? ''" /> → <NavAddress :address="b.ride.dropoffAddress ?? ''" />
                 <span v-if="b.ride.roundTrip" class="text-slate-400">(A/R)</span>
               </template>
               <template v-else>Mise à disposition — {{ b.ride.durationHours }}h</template>
@@ -218,10 +218,12 @@ async function markPaid(id: string) {
             <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Trajet</p>
             <template v-if="(detail.ride as Record<string, unknown>).type === 'TRANSFER'">
               <p class="mt-2 text-sm text-slate-700">
-                <span class="font-medium">Départ :</span> {{ (detail.ride as Record<string, string>).pickupAddress }}
+                <span class="font-medium">Départ :</span>
+                <NavAddress :address="(detail.ride as Record<string, string>).pickupAddress ?? ''" />
               </p>
               <p class="text-sm text-slate-700">
-                <span class="font-medium">Arrivée :</span> {{ (detail.ride as Record<string, string>).dropoffAddress }}
+                <span class="font-medium">Arrivée :</span>
+                <NavAddress :address="(detail.ride as Record<string, string>).dropoffAddress ?? ''" />
               </p>
               <p v-if="(detail.ride as Record<string, unknown>).roundTrip" class="mt-1 text-xs text-slate-500">Aller-retour</p>
               <p v-if="(detail.ride as Record<string, unknown>).distanceMeters" class="mt-1 text-xs text-slate-500">
@@ -230,6 +232,10 @@ async function markPaid(id: string) {
             </template>
             <template v-else>
               <p class="mt-2 text-sm text-slate-700">Mise à disposition — {{ (detail.ride as Record<string, number>).durationHours }}h</p>
+              <p v-if="(detail.ride as Record<string, string>).pickupAddress" class="text-sm text-slate-700">
+                <span class="font-medium">Prise en charge :</span>
+                <NavAddress :address="(detail.ride as Record<string, string>).pickupAddress" />
+              </p>
             </template>
             <p v-if="(detail.ride as Record<string, string>).notes" class="mt-2 text-xs italic text-slate-400">
               « {{ (detail.ride as Record<string, string>).notes }} »

@@ -543,7 +543,7 @@ function eventTimeLabel(e: CalEvent): string {
         <div class="mt-3 space-y-2 text-sm text-slate-600">
           <p>🕐 {{ eventTimeLabel(openedBooking) }} <span class="text-xs text-slate-400">(approche incluse)</span></p>
           <p v-if="openedBooking.booking?.pickupAddress">
-            📍 {{ openedBooking.booking.pickupAddress }} → {{ openedBooking.booking.dropoffAddress }}
+            📍 <NavAddress :address="openedBooking.booking.pickupAddress" /><template v-if="openedBooking.booking.dropoffAddress"> → <NavAddress :address="openedBooking.booking.dropoffAddress" /></template>
           </p>
           <p v-if="openedBooking.booking?.type === 'HOURLY'">
             ⏱️ {{ openedBooking.booking.durationHours }} h de mise à disposition
@@ -565,8 +565,19 @@ function eventTimeLabel(e: CalEvent): string {
           </p>
         </div>
 
-        <div class="mt-4 grid grid-cols-2 gap-2">
-          <a :href="`tel:${openedBooking.booking?.customerPhone}`" class="btn-primary !py-2.5 text-sm">
+        <!-- Navigation directe vers le lieu de prise en charge -->
+        <a
+          v-if="openedBooking.booking?.pickupAddress"
+          :href="`https://waze.com/ul?q=${encodeURIComponent(openedBooking.booking.pickupAddress)}&navigate=yes`"
+          target="_blank"
+          rel="noopener"
+          class="btn-primary mt-4 block w-full !py-2.5 text-center text-sm"
+        >
+          🧭 Y aller (Waze)
+        </a>
+
+        <div class="mt-2 grid grid-cols-2 gap-2">
+          <a :href="`tel:${openedBooking.booking?.customerPhone}`" class="btn-ghost !py-2.5 text-center text-sm">
             📞 Appeler
           </a>
           <NuxtLink
