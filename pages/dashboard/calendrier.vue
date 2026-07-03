@@ -511,12 +511,12 @@ function eventTimeLabel(e: CalEvent): string {
               >
                 ⏳ En attente de paiement
               </span>
-              <span
+              <RideRoute
                 v-if="isRide(e) && e.booking?.pickupAddress"
-                class="block truncate text-xs text-slate-500"
-              >
-                {{ e.booking.pickupAddress }} → {{ e.booking.dropoffAddress }}
-              </span>
+                class="mt-0.5 text-xs text-slate-500"
+                :pickup="e.booking.pickupAddress"
+                :dropoff="e.booking.dropoffAddress"
+              />
             </span>
             <span v-if="isRide(e)" class="shrink-0 text-sm font-bold text-slate-900">
               {{ formatMoney(e.booking?.amountCents ?? 0) }}
@@ -567,9 +567,13 @@ function eventTimeLabel(e: CalEvent): string {
 
         <div class="mt-3 space-y-2 text-sm text-slate-600">
           <p>🕐 {{ eventTimeLabel(openedBooking) }} <span class="text-xs text-slate-400">(approche incluse)</span></p>
-          <p v-if="openedBooking.booking?.pickupAddress">
-            📍 <NavAddress :address="openedBooking.booking.pickupAddress" /><template v-if="openedBooking.booking.dropoffAddress"> → <NavAddress :address="openedBooking.booking.dropoffAddress" /></template>
-          </p>
+          <RideRoute
+            v-if="openedBooking.booking?.pickupAddress"
+            nav
+            wrap
+            :pickup="openedBooking.booking.pickupAddress"
+            :dropoff="openedBooking.booking.dropoffAddress"
+          />
           <p v-if="openedBooking.booking?.type === 'HOURLY'">
             ⏱️ {{ openedBooking.booking.durationHours }} h de mise à disposition
           </p>

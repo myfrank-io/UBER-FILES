@@ -151,12 +151,12 @@ async function markPaid(id: string) {
               <StatusBadge :status="b.status" />
             </div>
             <p class="mt-1 text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
-            <p class="mt-0.5 truncate text-xs text-slate-500">
-              <template v-if="b.ride.type === 'TRANSFER'">
-                <NavAddress :address="b.ride.pickupAddress ?? ''" /> → <NavAddress :address="b.ride.dropoffAddress ?? ''" />
-                <span v-if="b.ride.roundTrip" class="text-slate-400">(A/R)</span>
-              </template>
-              <template v-else>Mise à disposition — {{ b.ride.durationHours }}h</template>
+            <div v-if="b.ride.type === 'TRANSFER'" class="mt-0.5 text-xs text-slate-500">
+              <RideRoute nav :pickup="b.ride.pickupAddress" :dropoff="b.ride.dropoffAddress" />
+              <span v-if="b.ride.roundTrip" class="text-slate-400">Aller-retour</span>
+            </div>
+            <p v-else class="mt-0.5 truncate text-xs text-slate-500">
+              Mise à disposition — {{ b.ride.durationHours }}h
             </p>
             <!-- Règlement de la course, en un coup d'œil (payé en ligne / sur place / à encaisser) -->
             <PaymentBadge
@@ -243,14 +243,13 @@ async function markPaid(id: string) {
           <div class="card !p-4">
             <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Trajet</p>
             <template v-if="(detail.ride as Record<string, unknown>).type === 'TRANSFER'">
-              <p class="mt-2 text-sm text-slate-700">
-                <span class="font-medium">Départ :</span>
-                <NavAddress :address="(detail.ride as Record<string, string>).pickupAddress ?? ''" />
-              </p>
-              <p class="text-sm text-slate-700">
-                <span class="font-medium">Arrivée :</span>
-                <NavAddress :address="(detail.ride as Record<string, string>).dropoffAddress ?? ''" />
-              </p>
+              <RideRoute
+                nav
+                wrap
+                class="mt-2 text-sm text-slate-700"
+                :pickup="(detail.ride as Record<string, string>).pickupAddress"
+                :dropoff="(detail.ride as Record<string, string>).dropoffAddress"
+              />
               <p v-if="(detail.ride as Record<string, unknown>).roundTrip" class="mt-1 text-xs text-slate-500">Aller-retour</p>
               <p v-if="(detail.ride as Record<string, unknown>).distanceMeters" class="mt-1 text-xs text-slate-500">
                 {{ Math.round(((detail.ride as Record<string, number>).distanceMeters) / 1000) }} km
