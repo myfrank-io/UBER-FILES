@@ -46,7 +46,10 @@ export async function confirmQuoteOnSite(
   if (quote.status !== 'DRAFT' && quote.status !== 'SENT') {
     throw createError({ statusCode: 409, statusMessage: 'Ce devis ne peut pas être confirmé.' })
   }
-  if (quote.expiresAt.getTime() < Date.now()) {
+  // L'expiration ne concerne que le lien client (devis SENT) : le chauffeur reste
+  // libre d'accepter une demande DRAFT ancienne — le conflit calendrier est
+  // re-vérifié juste en dessous de toute façon.
+  if (quote.status === 'SENT' && quote.expiresAt.getTime() < Date.now()) {
     throw createError({ statusCode: 410, statusMessage: 'Ce devis a expiré.' })
   }
 
@@ -73,6 +76,15 @@ export async function confirmQuoteOnSite(
   }
 
   const booking = await prisma.$transaction(async (tx) => {
+    // Transition conditionnelle : si le devis a été traité entre-temps (refusé
+    // dans un autre onglet, confirmé par le client…), on n'écrase rien.
+    const transitioned = await tx.quote.updateMany({
+      where: { id: quote.id, status: { in: ['DRAFT', 'SENT'] } },
+      data: { status: 'ACCEPTED', acceptedAt: new Date() },
+    })
+    if (transitioned.count === 0) {
+      throw createError({ statusCode: 409, statusMessage: 'Ce devis a déjà été traité.' })
+    }
     const booking = await tx.booking.create({
       data: {
         driverId: quote.driverId,
@@ -93,10 +105,6 @@ export async function confirmQuoteOnSite(
         },
       },
     })
-    await tx.quote.update({
-      where: { id: quote.id },
-      data: { status: 'ACCEPTED', acceptedAt: new Date() },
-    })
     // Paiement en attente : il sera encaissé sur place le jour de la course.
     await tx.payment.create({
       data: {
@@ -114,7 +122,7 @@ export async function confirmQuoteOnSite(
 
   const manageToken = await signClientToken(
     { purpose: 'manage', ref: booking.id },
-    config.linkTokenSecret,
+    config.linkTokenSecret as string,
     '90d',
   )
   const manageUrl = `${config.public.appBaseUrl}/reservation/${manageToken}`
@@ -156,6 +164,7 @@ export async function confirmQuoteOnSite(
         paidOnline: false,
         method,
         autoConfirmed: opts.autoConfirmed,
+        acceptedByDriver: opts.acceptedByDriver,
         dashboardUrl: `${config.public.appBaseUrl}/dashboard/reservations`,
       }),
     })

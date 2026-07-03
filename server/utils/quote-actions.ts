@@ -55,16 +55,21 @@ export async function sendQuoteToClient(
   const amountCents = adjustedAmountCents ?? quote.amountCents
   const expiresAt = new Date(Date.now() + quote.driver.quoteExpiryHours * 3_600_000)
 
-  const updated = await prisma.quote.update({
-    where: { id: quote.id },
+  // Transition conditionnelle : refuse la validation si le devis a été traité
+  // entre-temps (double clic, deuxième onglet, bot Telegram…).
+  const transitioned = await prisma.quote.updateMany({
+    where: { id: quote.id, status: 'DRAFT' },
     data: { status: 'SENT', amountCents, sentAt: new Date(), expiresAt },
   })
+  if (transitioned.count === 0) {
+    throw createError({ statusCode: 409, statusMessage: 'Ce devis a déjà été traité.' })
+  }
 
   // Le jeton du lien vit plus longtemps que le devis : passé l'expiration business
   // (expiresAt, contrôlée au paiement), le client voit la page « devis expiré »
   // plutôt qu'un lien mort — et le chauffeur peut renvoyer le devis.
   const token = await signClientToken(
-    { purpose: 'quote', ref: updated.id },
+    { purpose: 'quote', ref: quote.id },
     config.linkTokenSecret,
     '30d',
   )
@@ -93,7 +98,14 @@ export async function sendQuoteToClient(
     // Estimation initiale : sert à détecter et afficher un éventuel ajustement du tarif.
     originalAmountCents: quote.computedAmountCents,
   })
-  await sendEmail({ to: quote.rideRequest.customerEmail, ...tpl })
+  // Un échec d'email ne doit pas bloquer le devis en état « déjà traité » sans
+  // recours : le devis est SENT, le chauffeur dispose de « Relancer le client »
+  // (et en paiement immédiat, le client est de toute façon redirigé vers le paiement).
+  try {
+    await sendEmail({ to: quote.rideRequest.customerEmail, ...tpl })
+  } catch (err) {
+    console.error('[quote-actions] échec email devis', err)
+  }
 
   return { ok: true, payUrl, amountCents, token }
 }
@@ -152,7 +164,14 @@ export async function rejectQuote(quoteId: string, driverId: string): Promise<vo
   if (quote.status !== 'DRAFT') {
     throw createError({ statusCode: 409, statusMessage: 'Ce devis a déjà été traité.' })
   }
-  await prisma.quote.update({ where: { id: quote.id }, data: { status: 'REJECTED' } })
+  // Transition conditionnelle : ne refuse pas un devis accepté/envoyé entre-temps.
+  const rejected = await prisma.quote.updateMany({
+    where: { id: quote.id, status: 'DRAFT' },
+    data: { status: 'REJECTED' },
+  })
+  if (rejected.count === 0) {
+    throw createError({ statusCode: 409, statusMessage: 'Ce devis a déjà été traité.' })
+  }
   await prisma.rideRequest.update({
     where: { id: quote.rideRequestId },
     data: { status: 'CANCELLED' },

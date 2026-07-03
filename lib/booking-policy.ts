@@ -78,16 +78,24 @@ export type ResolvedPayment =
  * Résout le règlement d'une demande : le choix explicite du client s'il est
  * toujours proposé par le chauffeur, sinon le comportement par défaut du mode
  * (en ligne dès que possible, sinon premier moyen sur place accepté).
+ *
+ * Un choix EXPLICITE « en ligne » ne bascule jamais silencieusement sur un
+ * règlement sur place (le client n'y a pas consenti) : si le paiement en ligne
+ * devient indisponible, la demande repasse en UNDECIDED — validation manuelle,
+ * le client garde la main via la page devis.
  */
 export function resolveRequestPayment(
   mode: Pick<BookingMode, 'onlineAvailable' | 'onSiteMethods'>,
   preferred: PaymentMethod | null | undefined,
 ): ResolvedPayment {
-  if (preferred === 'STRIPE_PREPAYMENT' && mode.onlineAvailable) return { kind: 'ONLINE' }
-  if (preferred && preferred !== 'STRIPE_PREPAYMENT' && mode.onSiteMethods.includes(preferred)) {
+  if (preferred === 'STRIPE_PREPAYMENT') {
+    return mode.onlineAvailable ? { kind: 'ONLINE' } : { kind: 'UNDECIDED' }
+  }
+  if (preferred && mode.onSiteMethods.includes(preferred)) {
     return { kind: 'ONSITE', method: preferred }
   }
-  // Pas de choix (ancien formulaire) ou choix devenu invalide : défaut du mode.
+  // Pas de choix (ancien formulaire) ou choix sur place devenu invalide :
+  // comportement par défaut du mode.
   if (mode.onlineAvailable) return { kind: 'ONLINE' }
   if (mode.onSiteMethods.length > 0) return { kind: 'ONSITE', method: mode.onSiteMethods[0]! }
   return { kind: 'UNDECIDED' }

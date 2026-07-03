@@ -265,9 +265,13 @@ async function submit() {
       manageUrl.value = res.manageUrl ?? null
       return
     }
+    // « Règlement sur place » seulement si c'est réellement le cas : choix
+    // explicite d'un moyen sur place, ou chauffeur sans paiement en ligne
+    // opérationnel MAIS avec des moyens sur place déclarés.
+    const m = driver.value?.bookingMode
     submittedOnSite.value = selectedPayment.value
       ? !selectedIsOnline.value
-      : !driver.value?.bookingMode.onlineAvailable
+      : Boolean(m && !m.onlineAvailable && m.onSiteMethods.length > 0)
     submitted.value = true
   } catch (e) {
     errorMsg.value = errMessage(e)

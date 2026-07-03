@@ -312,6 +312,12 @@ export const emailTemplates = {
     // True quand la course a été confirmée automatiquement (créneau libre, sans
     // action du chauffeur) — l'email est alors sa seule notification.
     autoConfirmed?: boolean
+    // True quand c'est le chauffeur lui-même qui vient d'accepter la demande
+    // (l'email sert de trace : « vous avez accepté », pas « le client a confirmé »).
+    acceptedByDriver?: boolean
+    // True si la course confirmée chevauche un autre événement du calendrier
+    // (paiement déjà encaissé : on confirme mais on alerte le chauffeur).
+    conflictWarning?: boolean
   }) {
     const contact = [
       opts.customerPhone ? `📞 ${esc(opts.customerPhone)}` : '',
@@ -324,13 +330,17 @@ export const emailTemplates = {
       ? `<p><strong>${esc(opts.customerName)}</strong> vient de réserver : la course du
          <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong> a été <strong>confirmée
          automatiquement</strong> (créneau libre).</p>`
-      : `<p><strong>${esc(opts.customerName)}</strong> a confirmé sa course du <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>`
+      : opts.acceptedByDriver
+        ? `<p>Vous avez accepté la réservation de <strong>${esc(opts.customerName)}</strong> :
+           la course du <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong> est confirmée.</p>`
+        : `<p><strong>${esc(opts.customerName)}</strong> a confirmé sa course du <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>`
     return {
       subject: `Course confirmée — ${opts.customerName} (${opts.scheduledAt.toLocaleString('fr-FR')})`,
       html: wrap(
         'Course confirmée ✅',
         `${intro}
          <p>${paiement}</p>
+         ${opts.conflictWarning ? '<p style="color:#b45309"><strong>⚠️ Attention :</strong> cette course chevauche un autre événement de votre calendrier. Vérifiez votre planning et contactez le client si besoin.</p>' : ''}
          ${contact ? `<p style="font-size:13px;color:#374151">Contact client : ${contact}</p>` : ''}
          <p style="font-size:13px;color:#6b7280">Le créneau est bloqué dans votre calendrier.</p>
          ${button(opts.dashboardUrl, 'Voir mes réservations')}`,

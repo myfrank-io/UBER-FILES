@@ -273,6 +273,41 @@ describe('emailTemplates chauffeur', () => {
     expect(tpl.html).toContain('à encaisser sur place')
   })
 
+  it('bookingConfirmedDriver : « vous avez accepté » quand le chauffeur est à l\'origine', () => {
+    const tpl = emailTemplates.bookingConfirmedDriver({
+      ...base,
+      amountCents: 8000,
+      currency: 'EUR',
+      paidOnline: false,
+      method: 'ONSITE_CASH',
+      acceptedByDriver: true,
+      dashboardUrl: 'https://app.test/dashboard/reservations',
+    })
+    expect(tpl.html).toContain('Vous avez accepté')
+    expect(tpl.html).not.toContain('a confirmé sa course')
+  })
+
+  it('bookingConfirmedDriver : alerte de chevauchement quand le paiement a confirmé malgré un conflit', () => {
+    const tpl = emailTemplates.bookingConfirmedDriver({
+      ...base,
+      amountCents: 8000,
+      currency: 'EUR',
+      paidOnline: true,
+      conflictWarning: true,
+      dashboardUrl: 'https://app.test/dashboard/reservations',
+    })
+    expect(tpl.html).toContain('chevauche')
+
+    const noWarn = emailTemplates.bookingConfirmedDriver({
+      ...base,
+      amountCents: 8000,
+      currency: 'EUR',
+      paidOnline: true,
+      dashboardUrl: 'https://app.test/dashboard/reservations',
+    })
+    expect(noWarn.html).not.toContain('chevauche')
+  })
+
   it('bookingCancelledDriver : avec et sans remboursement', () => {
     const withRefund = emailTemplates.bookingCancelledDriver({
       ...base,

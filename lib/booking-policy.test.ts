@@ -116,12 +116,21 @@ describe('resolveRequestPayment', () => {
     expect(resolveRequestPayment(optional, undefined)).toEqual({ kind: 'ONLINE' })
   })
 
-  it('choix en ligne mais compte HS : bascule sur le premier moyen sur place', () => {
+  it('choix EXPLICITE en ligne mais compte HS : jamais de bascule silencieuse sur le sur-place', () => {
     const mode = bookingMode(
       { paymentMethods: [ONLINE, 'ONSITE_CARD'], autoAcceptQuotes: false },
       false,
     )
-    expect(resolveRequestPayment(mode, ONLINE)).toEqual({ kind: 'ONSITE', method: 'ONSITE_CARD' })
+    // Le client n'a pas consenti à un règlement sur place : validation manuelle.
+    expect(resolveRequestPayment(mode, ONLINE)).toEqual({ kind: 'UNDECIDED' })
+  })
+
+  it('sans choix explicite et compte HS : le sur-place par défaut reste possible', () => {
+    const mode = bookingMode(
+      { paymentMethods: [ONLINE, 'ONSITE_CARD'], autoAcceptQuotes: false },
+      false,
+    )
+    expect(resolveRequestPayment(mode, null)).toEqual({ kind: 'ONSITE', method: 'ONSITE_CARD' })
   })
 
   it('sur place uniquement, sans choix : premier moyen accepté', () => {
