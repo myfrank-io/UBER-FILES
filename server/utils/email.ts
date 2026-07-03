@@ -59,6 +59,32 @@ const button = (url: string, label: string) =>
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
+// Pastille de contact cliquable (tel:/sms:/mailto:), style charte.
+const contactPill = (href: string, label: string) =>
+  `<a href="${href}" style="display:inline-block;margin:0 8px 8px 0;padding:9px 14px;background:#ffffff;border:1.5px solid #E4DCCC;border-radius:999px;color:#16283D;text-decoration:none;font-size:13px;font-weight:600">${label}</a>`
+
+/**
+ * Bloc contact propre : nom + boutons Appeler / SMS / Email en un geste.
+ * `title` : « Votre chauffeur » côté client, « Votre client » côté chauffeur.
+ */
+const contactBlock = (
+  title: string,
+  contact: { name?: string | null; phone?: string | null; email?: string | null },
+): string => {
+  if (!contact.phone && !contact.email) return ''
+  const tel = (contact.phone ?? '').replace(/[^+\d]/g, '')
+  const pills = [
+    contact.phone ? contactPill(`tel:${tel}`, `📞 ${esc(contact.phone)}`) : '',
+    contact.phone ? contactPill(`sms:${tel}`, '💬 SMS') : '',
+    contact.email ? contactPill(`mailto:${contact.email}`, '✉️ Email') : '',
+  ].filter(Boolean).join('')
+  return `
+  <div style="margin:18px 0;padding:14px 16px 8px;background:#FBF7F0;border:1px solid #EFE7D8;border-radius:12px">
+    <p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9A8B72">${title}${contact.name ? ` &nbsp;·&nbsp; <span style="color:#16283D;text-transform:none;letter-spacing:0;font-size:13px">${esc(contact.name)}</span>` : ''}</p>
+    ${pills}
+  </div>`
+}
+
 export const emailTemplates = {
   // Accusé de réception envoyé au client juste après sa demande, tant que le
   // chauffeur n'a pas encore validé (flux à validation manuelle). La « prochaine
@@ -184,11 +210,6 @@ export const emailTemplates = {
     vehicleMake?: string | null
     vehicleModel?: string | null
   }) {
-    const contact = [
-      opts.driverPhone ? `📞 ${opts.driverPhone}` : '',
-      opts.driverEmail ? `✉️ ${opts.driverEmail}` : '',
-    ].filter(Boolean).join('&nbsp;&nbsp;|&nbsp;&nbsp;')
-
     const legalLines = [
       opts.companyName ? `Prestataire : ${opts.companyName}` : `Prestataire : ${opts.driverName}`,
       opts.siren ? `SIREN : ${opts.siren}` : '',
@@ -201,7 +222,7 @@ export const emailTemplates = {
         'Votre réservation est confirmée ✅',
         `<p>Le paiement de <strong>${formatMoney(opts.amountCents, opts.currency)}</strong> a bien été reçu.</p>
          <p>Prise en charge le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
-         ${contact ? `<p style="font-size:13px;color:#3C4A5A">Contact chauffeur : ${contact}</p>` : ''}
+         ${contactBlock('Votre chauffeur', { name: opts.driverName, phone: opts.driverPhone, email: opts.driverEmail })}
          ${button(opts.manageUrl, 'Gérer ma réservation')}
          <hr style="border:none;border-top:1px solid #EFE7D8;margin:16px 0" />
          <p style="font-size:11px;color:#9A8B72">${legalLines}</p>
@@ -226,11 +247,6 @@ export const emailTemplates = {
     // (flux à validation) — l'intro le dit explicitement au client.
     acceptedByDriver?: boolean
   }) {
-    const contact = [
-      opts.driverPhone ? `📞 ${opts.driverPhone}` : '',
-      opts.driverEmail ? `✉️ ${opts.driverEmail}` : '',
-    ].filter(Boolean).join('&nbsp;&nbsp;|&nbsp;&nbsp;')
-
     const legalLines = [
       opts.companyName ? `Prestataire : ${opts.companyName}` : `Prestataire : ${opts.driverName}`,
       opts.siren ? `SIREN : ${opts.siren}` : '',
@@ -250,7 +266,7 @@ export const emailTemplates = {
         `${intro}
          <p style="font-size:13px;color:#3C4A5A">Moyen de paiement prévu : <strong>${PAYMENT_METHOD_LABELS[opts.method]}</strong>.</p>
          <p>Prise en charge le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
-         ${contact ? `<p style="font-size:13px;color:#3C4A5A">Contact chauffeur : ${contact}</p>` : ''}
+         ${contactBlock('Votre chauffeur', { name: opts.driverName, phone: opts.driverPhone, email: opts.driverEmail })}
          ${button(opts.manageUrl, 'Gérer ma réservation')}
          <hr style="border:none;border-top:1px solid #EFE7D8;margin:16px 0" />
          <p style="font-size:11px;color:#9A8B72">${legalLines}</p>
@@ -328,10 +344,6 @@ export const emailTemplates = {
     // (paiement déjà encaissé : on confirme mais on alerte le chauffeur).
     conflictWarning?: boolean
   }) {
-    const contact = [
-      opts.customerPhone ? `📞 ${esc(opts.customerPhone)}` : '',
-      opts.customerEmail ? `✉️ ${esc(opts.customerEmail)}` : '',
-    ].filter(Boolean).join('&nbsp;&nbsp;|&nbsp;&nbsp;')
     const paiement = opts.paidOnline
       ? `<strong>${formatMoney(opts.amountCents, opts.currency)}</strong> payés en ligne.`
       : `<strong>${formatMoney(opts.amountCents, opts.currency)}</strong> à encaisser sur place${opts.method ? ` (${PAYMENT_METHOD_LABELS[opts.method]})` : ''}.`
@@ -350,7 +362,7 @@ export const emailTemplates = {
         `${intro}
          <p>${paiement}</p>
          ${opts.conflictWarning ? '<p style="color:#96691E"><strong>⚠️ Attention :</strong> cette course chevauche un autre événement de votre calendrier. Vérifiez votre planning et contactez le client si besoin.</p>' : ''}
-         ${contact ? `<p style="font-size:13px;color:#3C4A5A">Contact client : ${contact}</p>` : ''}
+         ${contactBlock('Votre client', { name: opts.customerName, phone: opts.customerPhone, email: opts.customerEmail })}
          <p style="font-size:13px;color:#6C7889">Le créneau est bloqué dans votre calendrier.</p>
          ${button(opts.dashboardUrl, 'Voir mes réservations')}`,
       ),
@@ -379,6 +391,9 @@ export const emailTemplates = {
     driverName: string
     scheduledAt: Date
     manageUrl: string
+    // Coordonnées du chauffeur : le client peut l'appeler ou lui écrire en un geste.
+    driverPhone?: string | null
+    driverEmail?: string | null
     // Renseignés quand un encaissement sur place est encore attendu : le rappel
     // précise le montant et le moyen prévus pour le jour J.
     amountCents?: number
@@ -396,6 +411,7 @@ export const emailTemplates = {
         'Rappel de course',
         `<p>Votre course avec ${opts.driverName} est prévue le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
          ${paymentLine}
+         ${contactBlock('Votre chauffeur', { name: opts.driverName, phone: opts.driverPhone, email: opts.driverEmail })}
          ${button(opts.manageUrl, 'Voir ma réservation')}`,
       ),
     }
