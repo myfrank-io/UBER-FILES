@@ -49,6 +49,15 @@ async function submit() {
   if (!canSubmit.value || busy.value) return
   busy.value = true
   errorMsg.value = ''
+
+  // WhatsApp s'ouvre dans un nouvel onglet : on l'ouvre MAINTENANT (dans le geste
+  // de clic) — sinon le navigateur bloque la popup car elle surviendrait après
+  // l'appel réseau (perte de l'« activation utilisateur »). On le redirige ensuite.
+  let waWindow: Window | null = null
+  if (form.channel === 'WHATSAPP') {
+    waWindow = window.open('', '_blank')
+  }
+
   try {
     const res = await $fetch<{ message: string; publicUrl: string; sent: boolean }>(
       '/api/dashboard/share-page',
@@ -67,7 +76,9 @@ async function submit() {
       done.value = true
     } else if (form.channel === 'WHATSAPP') {
       const digits = normalizePhone(form.phone)
-      window.open(`https://wa.me/${digits}?text=${encodeURIComponent(res.message)}`, '_blank')
+      const url = `https://wa.me/${digits}?text=${encodeURIComponent(res.message)}`
+      if (waWindow) waWindow.location.href = url
+      else window.location.href = url // repli si l'onglet n'a pas pu s'ouvrir
       done.value = true
     } else {
       // SMS : lien natif tel/sms avec corps pré-rempli.
@@ -76,6 +87,7 @@ async function submit() {
       done.value = true
     }
   } catch (e) {
+    if (waWindow) waWindow.close()
     errorMsg.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.'
   } finally {
     busy.value = false
