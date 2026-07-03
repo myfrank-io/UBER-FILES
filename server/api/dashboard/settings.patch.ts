@@ -12,6 +12,7 @@ const schema = z.object({
     .array(z.enum(PAYMENT_METHODS as [string, ...string[]]))
     .min(1, 'Sélectionnez au moins un moyen de paiement.')
     .optional(),
+  autoAcceptQuotes: z.boolean().optional(),
 })
 
 export default defineEventHandler(async (event) => {

@@ -1,4 +1,4 @@
-import { loadActiveDriverBySlug } from '~/server/utils/driver'
+import { loadActiveDriverBySlug, canAcceptBookings } from '~/server/utils/driver'
 import { rideRequestSchema } from '~/server/utils/validation'
 import { assertLeadTime, computeQuote } from '~/server/utils/quote-service'
 import { bookingSlot, findConflict } from '~/server/utils/calendar'
@@ -7,6 +7,7 @@ import { prisma } from '~/server/utils/prisma'
 import { newRequestMessage } from '~/server/utils/telegram'
 import { notifyDriver } from '~/server/utils/notify-driver'
 import { emailTemplates } from '~/server/utils/email'
+import { sendQuoteToClient } from '~/server/utils/quote-actions'
 
 // Soumission d'une demande de course par le client (sans compte).
 // Crée/retrouve le client, enregistre la demande + un devis BROUILLON, détecte un
@@ -120,6 +121,27 @@ export default defineEventHandler(async (event) => {
     return { quote }
   })
 
+  // Paiement immédiat : si le chauffeur l'a activé et que le prépaiement en ligne
+  // est opérationnel, le devis part automatiquement (même parcours que la validation
+  // manuelle : SENT + email) et le client est redirigé vers la page de paiement.
+  // En cas de conflit calendrier ou d'échec d'envoi, repli silencieux sur la
+  // validation manuelle (le devis reste en DRAFT).
+  let payUrl: string | null = null
+  if (
+    driver.autoAcceptQuotes &&
+    !conflict &&
+    driver.paymentMethods.includes('STRIPE_PREPAYMENT') &&
+    canAcceptBookings(driver)
+  ) {
+    try {
+      const sent = await sendQuoteToClient(quote.id, driver.id)
+      payUrl = sent.payUrl
+    } catch {
+      // Le chauffeur validera manuellement.
+    }
+  }
+  const autoSent = Boolean(payUrl)
+
   // Notification chauffeur : email (canal principal) + Telegram si réactivé.
   await notifyDriver(driver, {
     email: emailTemplates.newRequestDriver({
@@ -136,6 +158,7 @@ export default defineEventHandler(async (event) => {
       hasConflict: Boolean(conflict),
       notes: input.notes,
       dashboardUrl: `${config.public.appBaseUrl}/dashboard`,
+      autoSent,
     }),
     telegram: newRequestMessage({
       customerName: input.customer.name,
@@ -148,6 +171,7 @@ export default defineEventHandler(async (event) => {
       durationHours: input.durationHours,
       quoteId: quote.id,
       hasConflict: Boolean(conflict),
+      autoSent,
     }),
   })
 
@@ -157,5 +181,7 @@ export default defineEventHandler(async (event) => {
     hasConflict: Boolean(conflict),
     amountCents: computation.price.amountCents,
     currency: computation.price.currency,
+    // Présent uniquement en paiement immédiat : le front redirige le client dessus.
+    payUrl,
   }
 })

@@ -140,10 +140,16 @@ async function submit() {
   submitting.value = true
   try {
     const payload = await buildPayload()
-    await $fetch(`/api/public/${slug}/request`, {
+    const res = await $fetch<{ ok: boolean; payUrl?: string | null }>(`/api/public/${slug}/request`, {
       method: 'POST',
       body: { ...payload, customer, notes: notes.value, cgvAccepted: true },
     })
+    // Paiement immédiat activé chez le chauffeur : on emmène directement le client
+    // sur la page de paiement du devis (pas d'attente de validation).
+    if (res.payUrl) {
+      await navigateTo(res.payUrl, { external: true })
+      return
+    }
     submitted.value = true
   } catch (e) {
     errorMsg.value = errMessage(e)

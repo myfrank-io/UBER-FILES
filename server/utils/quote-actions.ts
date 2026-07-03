@@ -2,6 +2,7 @@ import { prisma } from './prisma'
 import { signClientToken } from './tokens'
 import { sendEmail, emailTemplates } from './email'
 import { bookingSlot, findConflict } from './calendar'
+import { canAcceptBookings } from './driver'
 
 // Actions métier sur les devis, partagées entre le back-office et le bot Telegram.
 
@@ -63,9 +64,7 @@ export async function sendQuoteToClient(
 
   // Le chauffeur propose-t-il le prépaiement en ligne ? (adapte le libellé du bouton)
   const prepayment =
-    quote.driver.paymentMethods.includes('STRIPE_PREPAYMENT') &&
-    Boolean(quote.driver.stripeAccountId) &&
-    quote.driver.stripeChargesEnabled
+    quote.driver.paymentMethods.includes('STRIPE_PREPAYMENT') && canAcceptBookings(quote.driver)
   const tpl = emailTemplates.quoteSent({
     driverName: quote.driver.displayName,
     amountCents,

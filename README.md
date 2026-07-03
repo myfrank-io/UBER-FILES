@@ -64,7 +64,9 @@ npm run dev                 # http://localhost:3000
 - **Page publique chauffeur** (`/{slug}`) : présentation, formulaire de demande, devis instantané.
 - **Deux prestations** : transfert A→B (€/km à taux variable jour/nuit/pointe, option A/R) et
   mise à disposition (tarif horaire dégressif).
-- **Devis validé par le chauffeur** (back-office ou Telegram) avant envoi du lien de paiement.
+- **Devis validé par le chauffeur** (back-office ou Telegram) avant envoi du lien de paiement,
+  ou **paiement immédiat à la réservation** si le chauffeur l'active dans ses réglages
+  (repli automatique en validation manuelle si conflit d'agenda ou paiement en ligne indisponible).
 - **Moyens de paiement paramétrables par le chauffeur** : prépaiement en ligne (Stripe) et/ou
   encaissement sur place le jour de la course (carte, espèces, chèque). Le chauffeur choisit
   librement ceux qu'il accepte dans ses réglages — il n'est pas obligé de passer par Stripe.
