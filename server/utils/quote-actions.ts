@@ -10,6 +10,8 @@ export interface SendQuoteResult {
   ok: boolean
   payUrl: string
   amountCents: number
+  // Jeton signé du devis (permet de construire l'URL de paiement en ligne directe).
+  token: string
 }
 
 /**
@@ -75,7 +77,7 @@ export async function sendQuoteToClient(
   })
   await sendEmail({ to: quote.rideRequest.customerEmail, ...tpl })
 
-  return { ok: true, payUrl, amountCents }
+  return { ok: true, payUrl, amountCents, token }
 }
 
 /** Refuse un devis (DRAFT → REJECTED). */
