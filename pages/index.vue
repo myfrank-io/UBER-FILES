@@ -3,6 +3,8 @@
 // Applique la charte graphique « Signature » : Nuit/Ardoise/Cuivre/Or/Crème,
 // DM Serif Display (titres), DM Sans (interface), Space Grotesk (labels).
 // Les styles sont scopés à cette page : le reste de l'app garde son habillage.
+const appBase = useRuntimeConfig().public.appBaseUrl
+
 useHead({
   title: 'Ridewiz — Votre clientèle, sans intermédiaire',
   meta: [
@@ -11,6 +13,25 @@ useHead({
       content:
         'Ridewiz donne aux chauffeurs VTC leur propre page de réservation : devis automatiques à vos tarifs, paiement direct, zéro commission sur vos courses.',
     },
+    // Aperçu de partage (WhatsApp, iMessage, réseaux sociaux)
+    { property: 'og:title', content: 'Ridewiz — Votre clientèle, sans intermédiaire' },
+    {
+      property: 'og:description',
+      content:
+        'Votre page de réservation à votre nom : devis automatiques à vos tarifs, paiement direct, zéro commission sur vos courses.',
+    },
+    { property: 'og:image', content: `${appBase}/og-default.jpg` },
+    { property: 'og:url', content: appBase },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:site_name', content: 'Ridewiz' },
+    { name: 'twitter:card', content: 'summary_large_image' },
+    { name: 'twitter:title', content: 'Ridewiz — Votre clientèle, sans intermédiaire' },
+    {
+      name: 'twitter:description',
+      content:
+        'Votre page de réservation à votre nom : devis automatiques, paiement direct, zéro commission.',
+    },
+    { name: 'twitter:image', content: `${appBase}/og-default.jpg` },
   ],
   link: [
     { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
