@@ -172,7 +172,7 @@ export const emailTemplates = {
     const trajet =
       opts.type === 'TRANSFER'
         ? `${esc(opts.pickupAddress ?? '?')} → ${esc(opts.dropoffAddress ?? '?')}${opts.roundTrip ? ' (aller-retour)' : ''}`
-        : `Mise à disposition ${opts.durationHours ?? '?'} h`
+        : `Mise à disposition ${opts.durationHours ?? '?'} h${opts.pickupAddress ? ` — départ : ${esc(opts.pickupAddress)}` : ''}`
     return {
       subject: `Nouvelle demande de course — ${opts.customerName}`,
       html: wrap(

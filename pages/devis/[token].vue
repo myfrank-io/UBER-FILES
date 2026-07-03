@@ -101,7 +101,9 @@ async function devConfirm() {
             <strong>{{ $t('quote.transfer') }}</strong>{{ quote.ride.roundTrip ? $t('common.roundTripSuffix') : '' }}<br />
             {{ quote.ride.pickupAddress }} → {{ quote.ride.dropoffAddress }}
           </p>
-          <p v-else><strong>{{ $t('quote.hourly') }}</strong> — {{ $t('quote.hourlyDuration', { hours: quote.ride.durationHours }) }}</p>
+          <p v-else>
+            <strong>{{ $t('quote.hourly') }}</strong> — {{ $t('quote.hourlyDuration', { hours: quote.ride.durationHours }) }}<template v-if="quote.ride.pickupAddress"><br />{{ quote.ride.pickupAddress }}</template>
+          </p>
           <p>{{ $t('quote.on', { date: formatDateTime(quote.ride.scheduledAt) }) }}</p>
         </div>
 
