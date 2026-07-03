@@ -148,15 +148,15 @@ async function markPaid(id: string) {
             </p>
             <p v-if="b.payment" class="mt-1 text-xs">
               <span v-if="b.payment.status === 'PAID'" class="text-green-700">● Réglé</span>
-              <span v-else-if="b.payment.status === 'PENDING'" class="text-amber-600">● À encaisser sur place — {{ methodLabel(b.payment.method) }}</span>
+              <span v-else-if="b.payment.status === 'PENDING' && b.status !== 'CANCELLED'" class="text-amber-600">● À encaisser sur place — {{ methodLabel(b.payment.method) }}</span>
             </p>
           </div>
           <p class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</p>
         </div>
 
-        <!-- Encaissement sur place : action rapide -->
+        <!-- Encaissement sur place : action rapide (jamais sur une course annulée) -->
         <div
-          v-if="b.payment && b.payment.status === 'PENDING'"
+          v-if="b.payment && b.payment.status === 'PENDING' && b.status !== 'CANCELLED'"
           class="mt-3 border-t border-slate-100 pt-3"
           @click.stop
         >
@@ -251,7 +251,7 @@ async function markPaid(id: string) {
             </p>
 
             <button
-              v-if="(detail.payments as Record<string, unknown>[]).some((p) => p.status === 'PENDING')"
+              v-if="detail.status !== 'CANCELLED' && (detail.payments as Record<string, unknown>[]).some((p) => p.status === 'PENDING')"
               class="mt-3 rounded-lg border border-green-600 bg-white px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-50 disabled:opacity-50"
               :disabled="markingPaid === (detail.id as string)"
               @click="markPaid(detail.id as string)"

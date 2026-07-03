@@ -20,17 +20,25 @@ interface BookingInfo {
   roundTrip: boolean
   durationHours: number | null
   notes: string | null
+  paid: boolean
 }
 
 interface CalEvent {
   id: string
-  type: 'BOOKING' | 'UNAVAILABILITY' | 'WORKING_BLOCK'
+  // PENDING_QUOTE : devis envoyé, en attente de paiement du client (événement
+  // virtuel informatif, ne bloque pas le créneau).
+  type: 'BOOKING' | 'PENDING_QUOTE' | 'UNAVAILABILITY' | 'WORKING_BLOCK'
   source: string
   title: string | null
   startAt: string
   endAt: string
   bookingId: string | null
   booking: BookingInfo | null
+}
+
+/** Course (confirmée ou en attente de paiement), par opposition aux blocages. */
+function isRide(e: CalEvent): boolean {
+  return e.type === 'BOOKING' || e.type === 'PENDING_QUOTE'
 }
 
 // ─── Date helpers (local, sans dépendance) ──────────────────────────────────
@@ -144,6 +152,7 @@ const dayEvents = computed(() => eventsByDay.value[selectedKey.value] ?? [])
 const monthStats = computed(() => {
   const seen = new Set<string>()
   let bookings = 0
+  let pending = 0
   let blocks = 0
   for (const day of gridDays.value) {
     if (!day.inMonth) continue
@@ -151,10 +160,11 @@ const monthStats = computed(() => {
       if (seen.has(e.id)) continue
       seen.add(e.id)
       if (e.type === 'BOOKING') bookings++
+      else if (e.type === 'PENDING_QUOTE') pending++
       else if (e.type === 'UNAVAILABILITY') blocks++
     }
   }
-  return { bookings, blocks }
+  return { bookings, pending, blocks }
 })
 
 // ─── Détail d'une course (fiche) ─────────────────────────────────────────────
@@ -231,16 +241,21 @@ async function saveBlock() {
     blockError.value = 'La fin doit être après le début.'
     return
   }
-  // Avertir si le blocage chevauche une course confirmée.
+  // Avertir si le blocage chevauche une course confirmée ou un devis en attente
+  // de paiement (le client pourrait payer et confirmer ce créneau).
   const conflict = events.value.find(
     (e) =>
-      e.type === 'BOOKING' &&
+      isRide(e) &&
       new Date(e.startAt) < dates.endAt &&
       new Date(e.endAt) > dates.startAt,
   )
   if (conflict) {
     const name = conflict.booking?.customerName ?? 'une course'
-    if (!confirm(`⚠️ Ce créneau chevauche la course de ${name}. Bloquer quand même ?`)) return
+    const msg =
+      conflict.type === 'PENDING_QUOTE'
+        ? `⚠️ Ce créneau chevauche le devis en attente de ${name} (le client peut encore payer). Bloquer quand même ?`
+        : `⚠️ Ce créneau chevauche la course de ${name}. Bloquer quand même ?`
+    if (!confirm(msg)) return
   }
 
   blockBusy.value = true
@@ -362,7 +377,9 @@ function eventTimeLabel(e: CalEvent): string {
                 :class="[
                   e.type === 'BOOKING'
                     ? day.key === selectedKey ? 'bg-white' : 'bg-brand-600'
-                    : day.key === selectedKey ? 'bg-amber-200' : 'bg-amber-400',
+                    : e.type === 'PENDING_QUOTE'
+                      ? day.key === selectedKey ? 'bg-white/60 ring-1 ring-white' : 'bg-white ring-1 ring-brand-400'
+                      : day.key === selectedKey ? 'bg-amber-200' : 'bg-amber-400',
                 ]"
               />
             </span>
@@ -376,10 +393,14 @@ function eventTimeLabel(e: CalEvent): string {
                 :class="[
                   e.type === 'BOOKING'
                     ? day.key === selectedKey ? 'bg-white/20 text-white' : 'bg-brand-50 text-brand-700'
-                    : day.key === selectedKey ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-700',
+                    : e.type === 'PENDING_QUOTE'
+                      ? day.key === selectedKey ? 'bg-white/10 text-white ring-1 ring-white/40' : 'bg-white text-brand-600 ring-1 ring-brand-200'
+                      : day.key === selectedKey ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-700',
                 ]"
               >
-                {{ e.type === 'BOOKING' ? (e.booking?.customerName ?? 'Course') : (e.title ?? 'Indispo') }}
+                <template v-if="e.type === 'BOOKING'">{{ e.booking?.customerName ?? 'Course' }}</template>
+                <template v-else-if="e.type === 'PENDING_QUOTE'">⏳ {{ e.booking?.customerName ?? 'Devis' }}</template>
+                <template v-else>{{ e.title ?? 'Indispo' }}</template>
               </span>
               <span
                 v-if="(eventsByDay[day.key] ?? []).length > 2"
@@ -399,11 +420,14 @@ function eventTimeLabel(e: CalEvent): string {
               <span class="h-2.5 w-2.5 rounded-full bg-brand-600" /> Course
             </span>
             <span class="flex items-center gap-1.5">
+              <span class="h-2.5 w-2.5 rounded-full bg-white ring-1 ring-brand-400" /> Attente paiement
+            </span>
+            <span class="flex items-center gap-1.5">
               <span class="h-2.5 w-2.5 rounded-full bg-amber-400" /> Indisponible
             </span>
           </span>
           <span>
-            {{ monthStats.bookings }} course(s) · {{ monthStats.blocks }} blocage(s)
+            {{ monthStats.bookings }} course(s)<template v-if="monthStats.pending"> · {{ monthStats.pending }} en attente</template> · {{ monthStats.blocks }} blocage(s)
             <span v-if="pending" class="ml-1 text-slate-300">⟳</span>
           </span>
         </div>
@@ -422,25 +446,33 @@ function eventTimeLabel(e: CalEvent): string {
 
         <div class="mt-3 space-y-2">
           <component
-            :is="e.type === 'BOOKING' ? 'button' : 'div'"
+            :is="isRide(e) ? 'button' : 'div'"
             v-for="e in dayEvents"
             :key="e.id"
             class="flex w-full items-start gap-3 rounded-xl border p-3 text-left"
             :class="
               e.type === 'BOOKING'
                 ? 'border-brand-100 bg-brand-50/60 transition hover:border-brand-300'
-                : 'border-amber-100 bg-amber-50/60'
+                : e.type === 'PENDING_QUOTE'
+                  ? 'border-dashed border-brand-300 bg-white transition hover:border-brand-400'
+                  : 'border-amber-100 bg-amber-50/60'
             "
-            @click="e.type === 'BOOKING' ? (openedBooking = e) : undefined"
+            @click="isRide(e) ? (openedBooking = e) : undefined"
           >
             <span
               class="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full"
-              :class="e.type === 'BOOKING' ? 'bg-brand-600' : 'bg-amber-400'"
+              :class="
+                e.type === 'BOOKING'
+                  ? 'bg-brand-600'
+                  : e.type === 'PENDING_QUOTE'
+                    ? 'bg-white ring-1 ring-brand-400'
+                    : 'bg-amber-400'
+              "
             />
             <span class="min-w-0 flex-1">
               <span class="block text-xs font-semibold text-slate-500">{{ eventTimeLabel(e) }}</span>
               <span class="block truncate text-sm font-semibold text-slate-900">
-                <template v-if="e.type === 'BOOKING'">
+                <template v-if="isRide(e)">
                   {{ e.booking?.customerName ?? 'Course' }}
                   <span class="font-normal text-slate-500">
                     · {{ e.booking?.type === 'TRANSFER' ? 'Transfert' : 'Mise à dispo' }}
@@ -449,13 +481,19 @@ function eventTimeLabel(e: CalEvent): string {
                 <template v-else>{{ e.title ?? 'Indisponible' }}</template>
               </span>
               <span
-                v-if="e.type === 'BOOKING' && e.booking?.pickupAddress"
+                v-if="e.type === 'PENDING_QUOTE'"
+                class="mt-0.5 inline-block rounded-full bg-amber-100 px-2 py-px text-[11px] font-semibold text-amber-800"
+              >
+                ⏳ En attente de paiement
+              </span>
+              <span
+                v-if="isRide(e) && e.booking?.pickupAddress"
                 class="block truncate text-xs text-slate-500"
               >
                 {{ e.booking.pickupAddress }} → {{ e.booking.dropoffAddress }}
               </span>
             </span>
-            <span v-if="e.type === 'BOOKING'" class="shrink-0 text-sm font-bold text-slate-900">
+            <span v-if="isRide(e)" class="shrink-0 text-sm font-bold text-slate-900">
               {{ formatMoney(e.booking?.amountCents ?? 0) }}
             </span>
             <button
@@ -487,6 +525,12 @@ function eventTimeLabel(e: CalEvent): string {
             <h3 class="mt-1 text-lg font-bold text-slate-900">
               {{ openedBooking.booking?.customerName }}
             </h3>
+            <span
+              v-if="openedBooking.type === 'PENDING_QUOTE'"
+              class="mt-1 inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800"
+            >
+              ⏳ Devis en attente de paiement
+            </span>
           </div>
           <button
             class="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
@@ -509,7 +553,15 @@ function eventTimeLabel(e: CalEvent): string {
           </p>
           <p class="text-base font-bold text-slate-900">
             {{ formatMoney(openedBooking.booking?.amountCents ?? 0) }}
-            <span class="text-xs font-normal text-green-600">payé ✓</span>
+            <span v-if="openedBooking.type === 'PENDING_QUOTE'" class="text-xs font-normal text-amber-600">
+              en attente de paiement du client
+            </span>
+            <span v-else-if="openedBooking.booking?.paid" class="text-xs font-normal text-green-600">payé ✓</span>
+            <span v-else class="text-xs font-normal text-amber-600">à encaisser sur place</span>
+          </p>
+          <p v-if="openedBooking.type === 'PENDING_QUOTE'" class="text-xs text-slate-500">
+            Le lien de paiement a été envoyé au client. La course sera confirmée dès son
+            règlement (ou sa réservation) — retrouvez ce devis sur l'accueil pour le relancer.
           </p>
         </div>
 
@@ -517,8 +569,21 @@ function eventTimeLabel(e: CalEvent): string {
           <a :href="`tel:${openedBooking.booking?.customerPhone}`" class="btn-primary !py-2.5 text-sm">
             📞 Appeler
           </a>
-          <NuxtLink to="/dashboard/reservations" class="btn-ghost !py-2.5 text-sm" @click="openedBooking = null">
+          <NuxtLink
+            v-if="openedBooking.type === 'BOOKING'"
+            to="/dashboard/reservations"
+            class="btn-ghost !py-2.5 text-sm"
+            @click="openedBooking = null"
+          >
             Voir la réservation
+          </NuxtLink>
+          <NuxtLink
+            v-else
+            to="/dashboard"
+            class="btn-ghost !py-2.5 text-sm"
+            @click="openedBooking = null"
+          >
+            Voir le devis
           </NuxtLink>
         </div>
       </div>

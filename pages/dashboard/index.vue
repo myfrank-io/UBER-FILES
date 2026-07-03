@@ -27,7 +27,7 @@ function selectTab(key: TabKey) {
 
 // lazy : la navigation s'affiche immédiatement, les données arrivent ensuite.
 const { data, refresh, pending } = await useFetch('/api/dashboard/overview', { lazy: true })
-const { error: toastError } = useToast()
+const { error: toastError, success: toastSuccess } = useToast()
 
 const busyId = ref<string | null>(null)
 const adjustValue = reactive<Record<string, number>>({})
@@ -64,6 +64,7 @@ async function resend(quoteId: string) {
   busyId.value = quoteId
   try {
     await $fetch(`/api/dashboard/quotes/${quoteId}/resend`, { method: 'POST' })
+    toastSuccess('Email envoyé au client.')
     await refresh()
   } catch (e) {
     toastError((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.')
@@ -175,6 +176,48 @@ async function resend(quoteId: string) {
           />
           <button class="btn-ghost !py-2 text-sm" :disabled="busyId === q.id || !adjustValue[q.id]" @click="validate(q.id, true)">
             Ajuster
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Devis envoyés : en attente de paiement/confirmation du client -->
+    <section v-if="data?.sentQuotes.length" class="mt-8">
+      <h2 class="text-lg font-semibold text-slate-900">
+        En attente du client
+        <span class="ml-1 rounded-full bg-amber-500 px-2 py-0.5 text-xs text-white">
+          {{ data.sentQuotes.length }}
+        </span>
+      </h2>
+      <p class="mt-1 text-xs text-slate-500">
+        Devis envoyés — la course sera confirmée dès le paiement (ou la réservation) du client.
+      </p>
+
+      <div v-for="q in data.sentQuotes" :key="q.id" class="card mt-3">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="font-semibold text-slate-900">{{ q.ride.customerName }}</p>
+            <p class="text-xs text-slate-500">{{ q.ride.customerPhone }} · {{ q.ride.customerEmail }}</p>
+          </div>
+          <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+            ⏳ Attente paiement
+          </span>
+        </div>
+        <div class="mt-2 space-y-1 text-sm text-slate-600">
+          <p>📅 {{ formatDateTime(q.ride.scheduledAt) }}</p>
+          <p v-if="q.ride.type === 'TRANSFER'">
+            📍 {{ q.ride.pickupAddress }} → {{ q.ride.dropoffAddress }}
+            <span v-if="q.ride.roundTrip" class="text-xs text-slate-400">(A/R)</span>
+          </p>
+          <p v-else>⏱️ {{ q.ride.durationHours }} h</p>
+        </div>
+        <div class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+          <div>
+            <span class="font-bold text-slate-900">{{ formatMoney(q.amountCents, q.currency) }}</span>
+            <p class="text-xs text-slate-400">Valable jusqu'au {{ formatDateTime(q.expiresAt) }}</p>
+          </div>
+          <button class="btn-ghost text-sm" :disabled="busyId === q.id" @click="resend(q.id)">
+            {{ busyId === q.id ? '…' : '↩ Relancer le client' }}
           </button>
         </div>
       </div>
