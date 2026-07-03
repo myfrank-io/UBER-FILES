@@ -36,6 +36,10 @@ const adjustValue = reactive<Record<string, number>>({})
 // tableau de bord, mais toujours accessibles d'un clic.
 const showExpired = ref(false)
 
+// Les devis en attente de paiement restent discrets : section repliée par
+// défaut (le compteur reste visible), dépliable d'un clic.
+const showSent = ref(false)
+
 async function validate(quoteId: string, custom = false) {
   busyId.value = quoteId
   try {
@@ -181,15 +185,23 @@ async function resend(quoteId: string) {
       </div>
     </section>
 
-    <!-- Devis envoyés : en attente de paiement/confirmation du client -->
+    <!-- Devis envoyés : en attente de paiement/confirmation du client.
+         Repliés par défaut pour rester discrets (compteur toujours visible). -->
     <section v-if="data?.sentQuotes.length" class="mt-8">
-      <h2 class="text-lg font-semibold text-slate-900">
-        En attente du client
-        <span class="ml-1 rounded-full bg-amber-500 px-2 py-0.5 text-xs text-white">
-          {{ data.sentQuotes.length }}
+      <button
+        class="flex w-full items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700"
+        :aria-expanded="showSent"
+        @click="showSent = !showSent"
+      >
+        <span class="transition-transform" :class="showSent ? 'rotate-90' : ''">›</span>
+        <span>En attente du client</span>
+        <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+          ⏳ {{ data.sentQuotes.length }}
         </span>
-      </h2>
-      <p class="mt-1 text-xs text-slate-500">
+      </button>
+
+      <div v-show="showSent" class="mt-3">
+      <p class="text-xs text-slate-500">
         Devis envoyés — la course sera confirmée dès le paiement (ou la réservation) du client.
       </p>
 
@@ -220,6 +232,7 @@ async function resend(quoteId: string) {
             {{ busyId === q.id ? '…' : '↩ Relancer le client' }}
           </button>
         </div>
+      </div>
       </div>
     </section>
 
