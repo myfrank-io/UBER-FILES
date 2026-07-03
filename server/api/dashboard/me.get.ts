@@ -26,6 +26,7 @@ export default defineEventHandler(async (event) => {
     contactEmail: driver.contactEmail,
     status: driver.status,
     currency: driver.currency,
+    timezone: driver.timezone,
     paymentMethods: driver.paymentMethods,
     autoAcceptQuotes: driver.autoAcceptQuotes,
     minimumFareCents: driver.minimumFareCents,
