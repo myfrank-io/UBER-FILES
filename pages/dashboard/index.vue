@@ -260,7 +260,33 @@ async function resend(quoteId: string) {
       </div>
     </section>
 
-    <!-- Demandes expirées (archivées) : repliées par défaut, discrètes mais accessibles -->
+    <!-- Courses à venir -->
+    <section class="mt-8">
+      <h2 class="text-lg font-semibold text-slate-900">Courses à venir</h2>
+      <p v-if="data && !data.upcomingBookings.length" class="mt-3 text-sm text-slate-500">
+        Aucune course planifiée.
+      </p>
+      <div v-for="b in data?.upcomingBookings" :key="b.id" class="card mt-3 flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <p class="font-semibold text-slate-900">{{ b.customerName }}</p>
+          <p class="text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
+          <p class="text-xs text-slate-500">
+            <template v-if="b.type === 'TRANSFER'"><NavAddress :address="b.pickupAddress ?? ''" /> → <NavAddress :address="b.dropoffAddress ?? ''" /></template>
+            <template v-else>Mise à disposition — {{ b.durationHours }} h<template v-if="b.pickupAddress"> · <NavAddress :address="b.pickupAddress" /></template></template>
+          </p>
+          <!-- Règlement de la course, en un coup d'œil -->
+          <PaymentBadge
+            v-if="b.payment"
+            class="mt-1.5"
+            :method="b.payment.method"
+            :status="b.payment.status"
+          />
+        </div>
+        <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</span>
+      </div>
+    </section>
+
+    <!-- Demandes expirées (archivées) : repliées par défaut, discrètes, en fin de page -->
     <section v-if="data?.expiredQuotes.length" class="mt-8">
       <button
         class="flex w-full items-center gap-2 text-sm font-medium text-slate-400 hover:text-slate-600"
@@ -298,32 +324,6 @@ async function resend(quoteId: string) {
           </button>
         </div>
       </div>
-      </div>
-    </section>
-
-    <!-- Courses à venir -->
-    <section class="mt-8">
-      <h2 class="text-lg font-semibold text-slate-900">Courses à venir</h2>
-      <p v-if="data && !data.upcomingBookings.length" class="mt-3 text-sm text-slate-500">
-        Aucune course planifiée.
-      </p>
-      <div v-for="b in data?.upcomingBookings" :key="b.id" class="card mt-3 flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <p class="font-semibold text-slate-900">{{ b.customerName }}</p>
-          <p class="text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
-          <p class="text-xs text-slate-500">
-            <template v-if="b.type === 'TRANSFER'"><NavAddress :address="b.pickupAddress ?? ''" /> → <NavAddress :address="b.dropoffAddress ?? ''" /></template>
-            <template v-else>Mise à disposition — {{ b.durationHours }} h<template v-if="b.pickupAddress"> · <NavAddress :address="b.pickupAddress" /></template></template>
-          </p>
-          <!-- Règlement de la course, en un coup d'œil -->
-          <PaymentBadge
-            v-if="b.payment"
-            class="mt-1.5"
-            :method="b.payment.method"
-            :status="b.payment.status"
-          />
-        </div>
-        <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</span>
       </div>
     </section>
 
