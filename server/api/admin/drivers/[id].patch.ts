@@ -7,7 +7,6 @@ const schema = z.object({
   slug: z.string().min(2).max(60).regex(/^[a-z0-9-]+$/, 'Slug : minuscules, chiffres et tirets.').optional(),
   phone: z.string().max(30).optional().nullable(),
   contactEmail: z.string().email().optional().nullable(),
-  commissionBps: z.number().int().min(0).max(5000).optional(),
   monthlyFeeCents: z.number().int().min(0).optional(),
 })
 
