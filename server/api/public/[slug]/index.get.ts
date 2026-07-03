@@ -40,7 +40,8 @@ export default defineEventHandler(async (event) => {
   const methods = driver.paymentMethods as PaymentMethod[]
   const onlineReady = canAcceptBookings(driver)
   // En paiement immédiat, seul le paiement carte en ligne est affiché au client.
-  const acceptedPaymentMethods: PaymentMethod[] = isInstantPaymentOnly(driver)
+  const instantPayment = isInstantPaymentOnly(driver)
+  const acceptedPaymentMethods: PaymentMethod[] = instantPayment
     ? ['STRIPE_PREPAYMENT']
     : methods.filter(
         (m) => (m === 'STRIPE_PREPAYMENT' ? onlineReady : ONSITE_METHODS.includes(m)),
@@ -72,5 +73,8 @@ export default defineEventHandler(async (event) => {
     fromKmCents: cheapestKm,
     fromHourCents: cheapestHour,
     bookingEnabled: acceptedPaymentMethods.length > 0,
+    // True si le chauffeur impose le paiement en ligne à la réservation :
+    // le client règle par carte pour réserver (bouton « Réserver et payer »).
+    instantPayment,
   }
 })
