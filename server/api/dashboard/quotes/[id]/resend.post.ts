@@ -21,9 +21,10 @@ export default defineEventHandler(async (event) => {
   })
   if (!quote) throw createError({ statusCode: 404, statusMessage: 'Devis introuvable.' })
 
-  const isExpired = quote.status === 'SENT' && quote.expiresAt.getTime() < Date.now()
-  if (!isExpired) {
-    throw createError({ statusCode: 409, statusMessage: 'Ce devis n\'est pas expiré.' })
+  // Renvoi possible pour tout devis envoyé : relance d'un client qui n'a pas
+  // encore payé, ou remise en vie d'un devis expiré (l'expiration est prolongée).
+  if (quote.status !== 'SENT') {
+    throw createError({ statusCode: 409, statusMessage: 'Ce devis ne peut pas être renvoyé.' })
   }
 
   const amountCents = body.data.amountCents ?? quote.amountCents
