@@ -8,6 +8,7 @@ import { newRequestMessage } from '~/server/utils/telegram'
 import { notifyDriver } from '~/server/utils/notify-driver'
 import { emailTemplates } from '~/server/utils/email'
 import { sendQuoteToClient } from '~/server/utils/quote-actions'
+import { createQuoteCheckoutUrl } from '~/server/utils/checkout'
 
 // Soumission d'une demande de course par le client (sans compte).
 // Crée/retrouve le client, enregistre la demande + un devis BROUILLON, détecte un
@@ -135,7 +136,20 @@ export default defineEventHandler(async (event) => {
   ) {
     try {
       const sent = await sendQuoteToClient(quote.id, driver.id)
-      payUrl = sent.payUrl
+      // Paiement immédiat : on emmène le client directement sur la page de paiement
+      // en ligne (Stripe/SumUp), sans passer par la page devis intermédiaire. Repli
+      // sur la page devis si la création de la session de paiement échoue.
+      try {
+        const sentQuote = await prisma.quote.findUnique({
+          where: { id: quote.id },
+          include: { driver: true, rideRequest: true },
+        })
+        payUrl = sentQuote
+          ? await createQuoteCheckoutUrl(sentQuote, sent.token)
+          : sent.payUrl
+      } catch {
+        payUrl = sent.payUrl
+      }
     } catch {
       // Le chauffeur validera manuellement.
     }
