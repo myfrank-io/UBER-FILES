@@ -52,6 +52,13 @@ export default defineEventHandler(async (event) => {
       currency: quote.currency,
       payUrl,
       expiresAt,
+      type: quote.rideRequest.type,
+      scheduledAt: quote.rideRequest.scheduledAt,
+      pickupAddress: quote.rideRequest.pickupAddress,
+      dropoffAddress: quote.rideRequest.dropoffAddress,
+      roundTrip: quote.rideRequest.roundTrip,
+      durationHours: quote.rideRequest.durationHours,
+      originalAmountCents: quote.computedAmountCents,
     }),
   })
 

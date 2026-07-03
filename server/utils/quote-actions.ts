@@ -77,6 +77,14 @@ export async function sendQuoteToClient(
     payUrl,
     expiresAt,
     prepayment,
+    type: quote.rideRequest.type,
+    scheduledAt: quote.rideRequest.scheduledAt,
+    pickupAddress: quote.rideRequest.pickupAddress,
+    dropoffAddress: quote.rideRequest.dropoffAddress,
+    roundTrip: quote.rideRequest.roundTrip,
+    durationHours: quote.rideRequest.durationHours,
+    // Estimation initiale : sert à détecter et afficher un éventuel ajustement du tarif.
+    originalAmountCents: quote.computedAmountCents,
   })
   await sendEmail({ to: quote.rideRequest.customerEmail, ...tpl })
 
