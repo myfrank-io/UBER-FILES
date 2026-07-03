@@ -544,6 +544,44 @@ export const emailTemplates = {
       ),
     }
   },
+  // Envoyé à l'inscription : accueille le chauffeur ET lui demande de confirmer
+  // son adresse email (le lien porte un jeton de vérification). Rappelle aussi que
+  // le profil est en attente de validation — un seul email à l'inscription.
+  verifyEmail(opts: { displayName: string; verifyUrl: string; dashboardUrl: string }) {
+    return {
+      subject: 'Confirmez votre adresse email — Ridewiz',
+      html: wrap(
+        `Bienvenue ${esc(opts.displayName)} 👋`,
+        `<p>Merci pour votre inscription. Avant tout, <strong>confirmez votre adresse
+          email</strong> pour sécuriser votre compte et recevoir vos notifications de
+          course :</p>
+         ${button(opts.verifyUrl, 'Confirmer mon adresse email')}
+         <p style="font-size:13px;color:#6C7889">Ce lien est valable 7 jours. Si le bouton
+          ne fonctionne pas, copiez ce lien dans votre navigateur :<br />
+          <a href="${opts.verifyUrl}" style="color:#B5793F;word-break:break-all">${opts.verifyUrl}</a></p>
+         <hr style="border:none;border-top:1px solid #EFE7D8;margin:20px 0" />
+         <p style="font-size:13px;color:#6C7889">En parallèle, votre profil est
+          <strong>en cours de vérification</strong> par notre équipe. Vous pouvez dès
+          maintenant <a href="${opts.dashboardUrl}" style="color:#B5793F">accéder à votre
+          espace</a> pour le compléter (présentation, véhicule, tarifs, zone…). Dès qu'il
+          sera approuvé, votre page publique sera mise en ligne.</p>`,
+      ),
+    }
+  },
+  // Renvoi du lien de confirmation (depuis la bannière de l'espace chauffeur).
+  verifyEmailResend(opts: { verifyUrl: string }) {
+    return {
+      subject: 'Confirmez votre adresse email — Ridewiz',
+      html: wrap(
+        'Confirmez votre adresse email',
+        `<p>Voici votre nouveau lien pour confirmer votre adresse email :</p>
+         ${button(opts.verifyUrl, 'Confirmer mon adresse email')}
+         <p style="font-size:13px;color:#6C7889">Ce lien est valable 7 jours. Si le bouton
+          ne fonctionne pas, copiez ce lien dans votre navigateur :<br />
+          <a href="${opts.verifyUrl}" style="color:#B5793F;word-break:break-all">${opts.verifyUrl}</a></p>`,
+      ),
+    }
+  },
   driverApproved(opts: { displayName: string; publicUrl: string; dashboardUrl: string }) {
     return {
       subject: 'Votre profil chauffeur est validé ✅',
@@ -567,6 +605,24 @@ export const emailTemplates = {
         `<p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
          ${button(opts.resetUrl, 'Choisir un nouveau mot de passe')}
          <p style="font-size:13px;color:#6C7889">Ce lien est valable 1 heure. Si vous n'avez pas fait cette demande, ignorez cet email.</p>`,
+      ),
+    }
+  },
+  // Confirmation envoyée après un changement de mot de passe réussi (sécurité :
+  // alerte l'utilisateur si ce n'était pas lui).
+  passwordChanged(opts: { loginUrl: string; supportEmail?: string | null }) {
+    const support = opts.supportEmail
+      ? `<a href="mailto:${opts.supportEmail}" style="color:#B5793F">${opts.supportEmail}</a>`
+      : 'notre équipe'
+    return {
+      subject: 'Votre mot de passe a été modifié',
+      html: wrap(
+        'Mot de passe modifié ✅',
+        `<p>Votre mot de passe vient d'être modifié avec succès. Vous pouvez désormais
+          vous connecter avec votre nouveau mot de passe.</p>
+         ${button(opts.loginUrl, 'Se connecter')}
+         <p style="font-size:13px;color:#96691E"><strong>Ce n'était pas vous ?</strong>
+          Réinitialisez immédiatement votre mot de passe et contactez ${support}.</p>`,
       ),
     }
   },

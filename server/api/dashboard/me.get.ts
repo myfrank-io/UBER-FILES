@@ -1,17 +1,30 @@
-import { requireDriverId } from '~/server/utils/auth'
+import { requireUser } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import { publicPhotoUrl } from '~/server/utils/driver'
 
 // Profil + état de configuration du chauffeur connecté.
 export default defineEventHandler(async (event) => {
-  const driverId = await requireDriverId(event)
-  const driver = await prisma.driver.findUniqueOrThrow({
-    where: { id: driverId },
-    include: { transferBands: true, hourlyTiers: true, cancellationPolicy: true, surcharges: true },
-  })
+  const sessionUser = await requireUser(event)
+  if (sessionUser.role !== 'DRIVER' || !sessionUser.driverId) {
+    throw createError({ statusCode: 403, statusMessage: 'Accès réservé aux chauffeurs.' })
+  }
+  const driverId = sessionUser.driverId
+  const [driver, account] = await Promise.all([
+    prisma.driver.findUniqueOrThrow({
+      where: { id: driverId },
+      include: { transferBands: true, hourlyTiers: true, cancellationPolicy: true, surcharges: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: sessionUser.id },
+      select: { email: true, emailVerified: true },
+    }),
+  ])
   return {
     id: driver.id,
     slug: driver.slug,
+    // État de vérification de l'adresse email du compte (bannière de rappel).
+    accountEmail: account?.email ?? null,
+    emailVerified: account?.emailVerified ?? true,
     displayName: driver.displayName,
     tagline: driver.tagline,
     bio: driver.bio,

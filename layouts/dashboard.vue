@@ -22,6 +22,25 @@ const { data: me } = await useFetch('/api/dashboard/me')
 const status = computed(() => (me.value as { status?: string } | null)?.status ?? null)
 const publicSlug = computed(() => (me.value as { slug?: string } | null)?.slug ?? '')
 
+// Bannière de confirmation d'email (tant que l'adresse n'est pas vérifiée).
+const emailVerified = computed(() => (me.value as { emailVerified?: boolean } | null)?.emailVerified ?? true)
+const { success: toastSuccess, error: toastError } = useToast()
+const resendingVerification = ref(false)
+const verificationSent = ref(false)
+
+async function resendVerification() {
+  resendingVerification.value = true
+  try {
+    await $fetch('/api/auth/resend-verification', { method: 'POST' })
+    verificationSent.value = true
+    toastSuccess('Email de confirmation envoyé. Vérifiez votre boîte de réception.')
+  } catch (e) {
+    toastError((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur, réessayez.')
+  } finally {
+    resendingVerification.value = false
+  }
+}
+
 // « Gains » et « Clients » ont été intégrés à l'accueil (sous-onglets) pour
 // épurer la navigation.
 const nav = [
@@ -84,6 +103,27 @@ async function logout() {
           @click="stopImpersonation"
         >
           ← Revenir à l'administration
+        </button>
+      </div>
+
+      <!-- Bannière : adresse email à confirmer -->
+      <div
+        v-if="!emailVerified"
+        class="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm text-blue-900"
+      >
+        <p>
+          ✉️ <strong>Confirmez votre adresse email.</strong>
+          <span v-if="!verificationSent">
+            Un lien de confirmation vous a été envoyé à votre inscription — pensez à vérifier vos spams.
+          </span>
+          <span v-else>Nouvel email envoyé : cliquez sur le lien reçu pour confirmer.</span>
+        </p>
+        <button
+          class="rounded-lg border border-blue-300 bg-white px-3 py-1.5 font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+          :disabled="resendingVerification"
+          @click="resendVerification"
+        >
+          {{ resendingVerification ? 'Envoi…' : 'Renvoyer le lien' }}
         </button>
       </div>
 

@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const driver = await prisma.driver.findUnique({
     where: { id },
     include: {
-      user: { select: { id: true, email: true } },
+      user: { select: { id: true, email: true, emailVerified: true } },
       _count: { select: { bookings: true, customers: true, rideRequests: true } },
     },
   })

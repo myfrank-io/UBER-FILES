@@ -325,3 +325,46 @@ describe('emailTemplates chauffeur', () => {
     expect(noRefund.html).toContain('Aucun remboursement')
   })
 })
+
+describe('emailTemplates compte & sécurité', () => {
+  it('verifyEmail : accueille, contient le lien de confirmation et échappe le nom', () => {
+    const tpl = emailTemplates.verifyEmail({
+      displayName: 'Karim <b>VTC</b>',
+      verifyUrl: 'https://app.test/auth/verify-email?token=abc',
+      dashboardUrl: 'https://app.test/dashboard',
+    })
+    expect(tpl.subject).toContain('Confirmez votre adresse email')
+    expect(tpl.html).toContain('Confirmer mon adresse email')
+    expect(tpl.html).toContain('https://app.test/auth/verify-email?token=abc')
+    expect(tpl.html).toContain('7 jours')
+    expect(tpl.html).toContain('en cours de vérification')
+    expect(tpl.html).not.toContain('<b>VTC</b>')
+    expect(tpl.html).toContain('Karim &lt;b&gt;VTC&lt;/b&gt;')
+  })
+
+  it('verifyEmailResend : renvoie un lien de confirmation', () => {
+    const tpl = emailTemplates.verifyEmailResend({
+      verifyUrl: 'https://app.test/auth/verify-email?token=xyz',
+    })
+    expect(tpl.subject).toContain('Confirmez votre adresse email')
+    expect(tpl.html).toContain('https://app.test/auth/verify-email?token=xyz')
+    expect(tpl.html).toContain('Confirmer mon adresse email')
+  })
+
+  it('passwordChanged : confirme et alerte « ce n\'était pas vous »', () => {
+    const tpl = emailTemplates.passwordChanged({
+      loginUrl: 'https://app.test/dashboard/login',
+      supportEmail: 'support@ridewiz.fr',
+    })
+    expect(tpl.subject).toContain('mot de passe a été modifié')
+    expect(tpl.html).toContain('modifié avec succès')
+    expect(tpl.html).toContain('Ce n\'était pas vous')
+    expect(tpl.html).toContain('support@ridewiz.fr')
+    expect(tpl.html).toContain('https://app.test/dashboard/login')
+  })
+
+  it('passwordChanged : repli sans email de support', () => {
+    const tpl = emailTemplates.passwordChanged({ loginUrl: 'https://app.test/dashboard/login' })
+    expect(tpl.html).toContain('notre équipe')
+  })
+})
