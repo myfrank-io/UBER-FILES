@@ -57,7 +57,6 @@ async function login() {
           Mot de passe oublié ?
         </NuxtLink>
       </p>
-      <p class="text-center text-xs text-slate-400">Démo : karim@example.com / password123</p>
     </form>
     <p class="mt-5 text-center text-sm text-slate-500">
       Pas encore de compte ?
