@@ -5,6 +5,7 @@ import { bookingSlot, findConflict } from '~/server/utils/calendar'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { notifyDriver } from '~/server/utils/notify-driver'
 import { ONSITE_METHODS, isOnSiteMethod, type PaymentMethod } from '~/lib/payment-methods'
+import { isInstantPaymentOnly } from '~/server/utils/driver'
 
 // Confirme une course SANS prépaiement en ligne : le client réserve et règle sur
 // place le jour de la course (carte, espèces ou chèque selon ce qu'accepte le
@@ -40,6 +41,15 @@ export default defineEventHandler(async (event) => {
   }
   if (quote.expiresAt.getTime() < Date.now()) {
     throw createError({ statusCode: 410, statusMessage: 'Ce devis a expiré.' })
+  }
+
+  // Paiement immédiat : la réservation se règle par carte en ligne uniquement,
+  // la confirmation « sur place » n'est pas ouverte (même si l'UI est contournée).
+  if (isInstantPaymentOnly(quote.driver)) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'La réservation se règle par carte en ligne pour ce chauffeur.',
+    })
   }
 
   // Le chauffeur accepte-t-il l'encaissement sur place ?
