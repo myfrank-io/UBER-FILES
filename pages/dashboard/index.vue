@@ -32,6 +32,10 @@ const { error: toastError } = useToast()
 const busyId = ref<string | null>(null)
 const adjustValue = reactive<Record<string, number>>({})
 
+// Les demandes expirées sont « archivées » : repliées par défaut pour épurer le
+// tableau de bord, mais toujours accessibles d'un clic.
+const showExpired = ref(false)
+
 async function validate(quoteId: string, custom = false) {
   busyId.value = quoteId
   try {
@@ -176,10 +180,22 @@ async function resend(quoteId: string) {
       </div>
     </section>
 
-    <!-- Devis expirés -->
+    <!-- Demandes expirées (archivées) : repliées par défaut, discrètes mais accessibles -->
     <section v-if="data?.expiredQuotes.length" class="mt-8">
-      <h2 class="text-lg font-semibold text-slate-900">Devis expirés sans paiement</h2>
-      <div v-for="q in data.expiredQuotes" :key="q.id" class="card mt-3">
+      <button
+        class="flex w-full items-center gap-2 text-sm font-medium text-slate-400 hover:text-slate-600"
+        :aria-expanded="showExpired"
+        @click="showExpired = !showExpired"
+      >
+        <span class="transition-transform" :class="showExpired ? 'rotate-90' : ''">›</span>
+        <span>Demandes expirées</span>
+        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+          {{ data.expiredQuotes.length }}
+        </span>
+      </button>
+
+      <div v-show="showExpired" class="mt-3 space-y-3">
+      <div v-for="q in data.expiredQuotes" :key="q.id" class="card opacity-75 hover:opacity-100">
         <div class="flex items-start justify-between gap-3">
           <div>
             <p class="font-semibold text-slate-900">{{ q.ride.customerName }}</p>
@@ -201,6 +217,7 @@ async function resend(quoteId: string) {
             {{ busyId === q.id ? '…' : '↩ Renvoyer le lien' }}
           </button>
         </div>
+      </div>
       </div>
     </section>
 
