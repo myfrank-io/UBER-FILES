@@ -5,7 +5,6 @@ import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '~/lib/payment-methods
 const route = useRoute()
 const token = route.params.token as string
 const { formatMoney, formatDateTime } = useFormat()
-const config = useRuntimeConfig()
 const { t } = useI18n()
 
 const { data: quote, error } = await useFetch(`/api/quote/${token}`)
@@ -82,19 +81,6 @@ async function confirmOnSite() {
   } catch (e) {
     const err = e as { data?: { statusMessage?: string } }
     errorMsg.value = err?.data?.statusMessage || 'Réservation indisponible.'
-    paying.value = false
-  }
-}
-
-async function devConfirm() {
-  paying.value = true
-  errorMsg.value = ''
-  try {
-    await $fetch('/api/dev/confirm-booking', { method: 'POST', body: { quoteId: quote.value!.id } })
-    await navigateTo(route.path + '?paid=1')
-  } catch (e) {
-    const err = e as { data?: { statusMessage?: string } }
-    errorMsg.value = err?.data?.statusMessage || t('common.genericError')
     paying.value = false
   }
 }
@@ -234,15 +220,6 @@ async function devConfirm() {
             Le chauffeur n'a pas encore finalisé sa configuration de paiement. Merci de le contacter.
           </div>
 
-          <!-- Bouton de test dev — visible uniquement si devTools actif -->
-          <button
-            v-if="config.public.devTools"
-            class="mt-2 w-full rounded-xl border-2 border-dashed border-amber-400 bg-amber-50 py-3 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
-            :disabled="paying"
-            @click="devConfirm"
-          >
-            🧪 Confirmer sans payer (test dev)
-          </button>
         </template>
         <div v-else class="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
           {{ $t('quote.unavailable') }}

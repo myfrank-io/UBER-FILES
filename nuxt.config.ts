@@ -85,10 +85,6 @@ export default defineNuxtConfig({
       // Clé client du CDN d'images de véhicules (imagin.studio). Par défaut : clé démo
       // gratuite. Remplacer par votre propre clé pour la production (sans changer le code).
       imaginCustomer: process.env.IMAGIN_CUSTOMER || 'hrjavascript-mastery',
-      // Outils de développement (commutateur admin/chauffeur/public).
-      // Actifs automatiquement en local ; en ligne uniquement si DEV_TOOLS=1.
-      // À RETIRER avant la mise en production finale.
-      devTools: process.env.NODE_ENV === 'development' || process.env.DEV_TOOLS === '1',
     },
   },
 
