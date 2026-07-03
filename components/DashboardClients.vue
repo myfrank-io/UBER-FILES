@@ -48,7 +48,7 @@ function exportCsv() {
       <div v-for="c in customers" :key="c.id" class="card flex items-center justify-between">
         <div>
           <p class="font-semibold text-slate-900">{{ c.name }}</p>
-          <p class="text-sm text-slate-500">{{ c.phone }} · {{ c.email }}</p>
+          <ContactActions class="mt-1" :phone="c.phone" :email="c.email" />
           <p v-if="c.lastRideAt" class="mt-1 text-xs text-slate-400">
             Dernière course : {{ formatDateTime(c.lastRideAt) }}
           </p>

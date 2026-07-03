@@ -576,25 +576,34 @@ function eventTimeLabel(e: CalEvent): string {
           🧭 Y aller (Waze)
         </a>
 
-        <div class="mt-2 grid grid-cols-2 gap-2">
-          <a :href="`tel:${openedBooking.booking?.customerPhone}`" class="btn-ghost !py-2.5 text-center text-sm">
+        <div class="mt-2 grid grid-cols-3 gap-2">
+          <a
+            :href="`tel:${(openedBooking.booking?.customerPhone ?? '').replace(/[^+\d]/g, '')}`"
+            class="btn-ghost !px-2 !py-2.5 text-center text-sm"
+          >
             📞 Appeler
+          </a>
+          <a
+            :href="`sms:${(openedBooking.booking?.customerPhone ?? '').replace(/[^+\d]/g, '')}`"
+            class="btn-ghost !px-2 !py-2.5 text-center text-sm"
+          >
+            💬 SMS
           </a>
           <NuxtLink
             v-if="openedBooking.type === 'BOOKING'"
             to="/dashboard/reservations"
-            class="btn-ghost !py-2.5 text-sm"
+            class="btn-ghost !px-2 !py-2.5 text-sm"
             @click="openedBooking = null"
           >
-            Voir la réservation
+            Voir plus
           </NuxtLink>
           <NuxtLink
             v-else
             to="/dashboard"
-            class="btn-ghost !py-2.5 text-sm"
+            class="btn-ghost !px-2 !py-2.5 text-sm"
             @click="openedBooking = null"
           >
-            Voir le devis
+            Voir plus
           </NuxtLink>
         </div>
       </div>
