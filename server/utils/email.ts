@@ -46,6 +46,10 @@ const wrap = (title: string, body: string) => `
 const button = (url: string, label: string) =>
   `<p style="margin:24px 0"><a href="${url}" style="background:#4f46e5;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">${label}</a></p>`
 
+// Échappe les valeurs saisies par le client (nom, note, adresse…) injectées dans le HTML.
+const esc = (s: string) =>
+  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
+
 export const emailTemplates = {
   quoteSent(opts: {
     driverName: string
@@ -144,6 +148,91 @@ export const emailTemplates = {
          <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
          <p style="font-size:11px;color:#9ca3af">${legalLines}</p>
          <p style="font-size:11px;color:#9ca3af">Conformément à l'art. L221-28 du Code de la consommation, le droit de rétractation de 14 jours ne s'applique pas à ce service de transport daté.</p>`,
+      ),
+    }
+  },
+  // ── Emails chauffeur (canal principal depuis la coupure des notifications Telegram) ──
+  newRequestDriver(opts: {
+    customerName: string
+    customerPhone?: string | null
+    type: 'TRANSFER' | 'HOURLY'
+    scheduledAt: Date
+    pickupAddress?: string | null
+    dropoffAddress?: string | null
+    roundTrip?: boolean
+    durationHours?: number | null
+    amountCents: number
+    currency: string
+    hasConflict: boolean
+    notes?: string | null
+    dashboardUrl: string
+  }) {
+    const trajet =
+      opts.type === 'TRANSFER'
+        ? `${esc(opts.pickupAddress ?? '?')} → ${esc(opts.dropoffAddress ?? '?')}${opts.roundTrip ? ' (aller-retour)' : ''}`
+        : `Mise à disposition ${opts.durationHours ?? '?'} h`
+    return {
+      subject: `Nouvelle demande de course — ${opts.customerName}`,
+      html: wrap(
+        'Nouvelle demande de course 🚗',
+        `<p><strong>${esc(opts.customerName)}</strong>${opts.customerPhone ? ` (${esc(opts.customerPhone)})` : ''} souhaite réserver :</p>
+         <p>📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
+            📍 ${trajet}</p>
+         <p>Prix calculé : <strong style="font-size:20px">${formatMoney(opts.amountCents, opts.currency)}</strong></p>
+         ${opts.notes ? `<p style="font-size:13px;color:#6b7280">Note du client : ${esc(opts.notes)}</p>` : ''}
+         ${opts.hasConflict ? '<p style="color:#b45309"><strong>⚠️ Conflit calendrier détecté</strong> — vérifiez votre planning avant de valider.</p>' : ''}
+         ${button(opts.dashboardUrl, 'Valider ou refuser le devis')}
+         <p style="font-size:13px;color:#6b7280">Le client recevra le lien de réservation dès que vous aurez validé le devis.</p>`,
+      ),
+    }
+  },
+  bookingConfirmedDriver(opts: {
+    customerName: string
+    customerPhone?: string | null
+    customerEmail?: string | null
+    scheduledAt: Date
+    amountCents: number
+    currency: string
+    // true : payé en ligne ; false : à encaisser sur place (method précise le moyen)
+    paidOnline: boolean
+    method?: PaymentMethod
+    dashboardUrl: string
+  }) {
+    const contact = [
+      opts.customerPhone ? `📞 ${esc(opts.customerPhone)}` : '',
+      opts.customerEmail ? `✉️ ${esc(opts.customerEmail)}` : '',
+    ].filter(Boolean).join('&nbsp;&nbsp;|&nbsp;&nbsp;')
+    const paiement = opts.paidOnline
+      ? `<strong>${formatMoney(opts.amountCents, opts.currency)}</strong> payés en ligne.`
+      : `<strong>${formatMoney(opts.amountCents, opts.currency)}</strong> à encaisser sur place${opts.method ? ` (${PAYMENT_METHOD_LABELS[opts.method]})` : ''}.`
+    return {
+      subject: `Course confirmée — ${opts.customerName} (${opts.scheduledAt.toLocaleString('fr-FR')})`,
+      html: wrap(
+        'Course confirmée ✅',
+        `<p><strong>${esc(opts.customerName)}</strong> a confirmé sa course du <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
+         <p>${paiement}</p>
+         ${contact ? `<p style="font-size:13px;color:#374151">Contact client : ${contact}</p>` : ''}
+         <p style="font-size:13px;color:#6b7280">Le créneau est bloqué dans votre calendrier.</p>
+         ${button(opts.dashboardUrl, 'Voir mes réservations')}`,
+      ),
+    }
+  },
+  bookingCancelledDriver(opts: {
+    customerName: string
+    scheduledAt: Date
+    refundCents: number
+    currency: string
+  }) {
+    const refundStr = opts.refundCents > 0
+      ? `Remboursement client : ${formatMoney(opts.refundCents, opts.currency)}.`
+      : 'Aucun remboursement (annulation hors délai).'
+    return {
+      subject: `Course annulée — ${opts.customerName} (${opts.scheduledAt.toLocaleString('fr-FR')})`,
+      html: wrap(
+        'Annulation client ❌',
+        `<p><strong>${esc(opts.customerName)}</strong> a annulé sa réservation prévue le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
+         <p>${refundStr}</p>
+         <p>Le créneau est libéré dans votre calendrier.</p>`,
       ),
     }
   },

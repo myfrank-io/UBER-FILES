@@ -4,7 +4,7 @@ import { formatMoney } from '~/lib/money'
 
 const API = (token: string, method: string) => `https://api.telegram.org/bot${token}/${method}`
 
-interface InlineButton {
+export interface InlineButton {
   text: string
   callback_data: string
 }

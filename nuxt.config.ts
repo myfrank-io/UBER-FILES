@@ -66,6 +66,12 @@ export default defineNuxtConfig({
     // Telegram
     telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
     telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || '',
+    // Notifications sortantes Telegram coupées par défaut : tout passe par email.
+    // Remettre TELEGRAM_NOTIFICATIONS_ENABLED=1 pour les réactiver (le webhook
+    // et la liaison de compte restent actifs dans tous les cas).
+    telegramNotificationsEnabled: ['1', 'true'].includes(
+      process.env.TELEGRAM_NOTIFICATIONS_ENABLED || '',
+    ),
     // INSEE Sirene
     inseeApiKey: process.env.INSEE_API_KEY || '',
     // Secret du déclencheur de tâches planifiées (rappels J-1)

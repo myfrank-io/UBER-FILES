@@ -2,6 +2,7 @@ import type { Prisma, PaymentProvider } from '@prisma/client'
 import { prisma } from '~/server/utils/prisma'
 import { bookingSlot } from '~/server/utils/calendar'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
+import { notifyDriver } from '~/server/utils/notify-driver'
 import { signClientToken } from '~/server/utils/tokens'
 
 type QuoteWithRelations = Prisma.QuoteGetPayload<{
@@ -91,6 +92,20 @@ export async function confirmBookingFromQuote(quote: QuoteWithRelations, payment
       companyName: quote.driver.companyName,
       vehicleMake: quote.driver.vehicleMake,
       vehicleModel: quote.driver.vehicleModel,
+    }),
+  })
+
+  // Le chauffeur est prévenu par email qu'une course payée vient d'être confirmée.
+  await notifyDriver(quote.driver, {
+    email: emailTemplates.bookingConfirmedDriver({
+      customerName: req.customerName,
+      customerPhone: req.customerPhone,
+      customerEmail: req.customerEmail,
+      scheduledAt: req.scheduledAt,
+      amountCents: quote.amountCents,
+      currency: quote.currency,
+      paidOnline: true,
+      dashboardUrl: `${config.public.appBaseUrl}/dashboard/reservations`,
     }),
   })
 

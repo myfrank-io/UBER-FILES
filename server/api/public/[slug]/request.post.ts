@@ -4,11 +4,13 @@ import { assertLeadTime, computeQuote } from '~/server/utils/quote-service'
 import { bookingSlot, findConflict } from '~/server/utils/calendar'
 import { computeApplicationFee } from '~/lib/pricing'
 import { prisma } from '~/server/utils/prisma'
-import { newRequestMessage, sendTelegramMessage } from '~/server/utils/telegram'
+import { newRequestMessage } from '~/server/utils/telegram'
+import { notifyDriver } from '~/server/utils/notify-driver'
+import { emailTemplates } from '~/server/utils/email'
 
 // Soumission d'une demande de course par le client (sans compte).
 // Crée/retrouve le client, enregistre la demande + un devis BROUILLON, détecte un
-// conflit calendrier, puis notifie le chauffeur (Telegram + email de secours).
+// conflit calendrier, puis notifie le chauffeur par email (Telegram si réactivé).
 export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, 'slug')!
   const driver = await loadActiveDriverBySlug(slug)
@@ -118,9 +120,24 @@ export default defineEventHandler(async (event) => {
     return { quote }
   })
 
-  // Notification chauffeur (Telegram + email de secours)
-  if (driver.telegramChatId) {
-    const msg = newRequestMessage({
+  // Notification chauffeur : email (canal principal) + Telegram si réactivé.
+  await notifyDriver(driver, {
+    email: emailTemplates.newRequestDriver({
+      customerName: input.customer.name,
+      customerPhone: input.customer.phone,
+      type: input.type,
+      scheduledAt,
+      pickupAddress: input.pickupAddress,
+      dropoffAddress: input.dropoffAddress,
+      roundTrip: input.roundTrip,
+      durationHours: input.durationHours,
+      amountCents: computation.price.amountCents,
+      currency: computation.price.currency,
+      hasConflict: Boolean(conflict),
+      notes: input.notes,
+      dashboardUrl: `${config.public.appBaseUrl}/dashboard`,
+    }),
+    telegram: newRequestMessage({
       customerName: input.customer.name,
       type: input.type,
       scheduledAt,
@@ -131,19 +148,8 @@ export default defineEventHandler(async (event) => {
       durationHours: input.durationHours,
       quoteId: quote.id,
       hasConflict: Boolean(conflict),
-    })
-    await sendTelegramMessage(driver.telegramChatId, msg.text, msg.buttons)
-  }
-  if (driver.contactEmail) {
-    const { sendEmail } = await import('~/server/utils/email')
-    await sendEmail({
-      to: driver.contactEmail,
-      subject: `Nouvelle demande de course — ${input.customer.name}`,
-      html: `<p>Nouvelle demande pour le ${scheduledAt.toLocaleString('fr-FR')}.</p>
-             <p>Connectez-vous à votre back-office pour valider le devis.</p>
-             ${conflict ? '<p><strong>⚠️ Conflit calendrier détecté.</strong></p>' : ''}`,
-    })
-  }
+    }),
+  })
 
   return {
     ok: true,
