@@ -2,10 +2,9 @@ import { prisma } from './prisma'
 import { sendEmail } from './email'
 import { sendTelegramMessage, type InlineButton } from './telegram'
 
-// Canal de notification chauffeur. L'email est le canal principal : Telegram est
-// coupé par défaut et ne repart que si TELEGRAM_NOTIFICATIONS_ENABLED=1.
-// Le webhook Telegram et la liaison de compte restent actifs pour permettre une
-// réactivation sans reconfiguration.
+// Canal de notification chauffeur. L'email est le canal principal (fiable, avec
+// trace). Telegram s'ajoute par chauffeur : dès qu'un chauffeur a lié son compte
+// (telegramChatId présent), il reçoit aussi ses notifications sur Telegram.
 
 interface DriverContact {
   id: string
@@ -32,10 +31,10 @@ export async function notifyDriver(
     telegram?: { text: string; buttons?: InlineButton[][] }
   },
 ): Promise<void> {
-  const config = useRuntimeConfig()
   const to = await driverNotifyEmail(driver)
   if (to) await sendEmail({ to, ...message.email })
-  if (config.telegramNotificationsEnabled && message.telegram && driver.telegramChatId) {
+  // Canal Telegram : uniquement pour les chauffeurs ayant lié leur compte.
+  if (message.telegram && driver.telegramChatId) {
     await sendTelegramMessage(driver.telegramChatId, message.telegram.text, message.telegram.buttons)
   }
 }

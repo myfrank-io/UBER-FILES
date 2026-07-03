@@ -103,6 +103,72 @@ onMounted(() => {
   }
 })
 
+// ─── Telegram ──────────────────────────────────────────────────────────────
+
+const telegramLinked = computed(() => Boolean((me.value as Record<string, unknown>)?.telegramLinked))
+const telegramConnecting = ref(false)
+const telegramDeepLink = ref('')
+let telegramPoll: ReturnType<typeof setInterval> | null = null
+
+function stopTelegramPoll() {
+  if (telegramPoll) {
+    clearInterval(telegramPoll)
+    telegramPoll = null
+  }
+}
+
+// Option A : après ouverture de Telegram, on interroge le serveur en boucle et la
+// page bascule seule en « connecté » dès que le chauffeur a appuyé sur DÉMARRER.
+function startTelegramPoll() {
+  stopTelegramPoll()
+  let elapsed = 0
+  telegramPoll = setInterval(async () => {
+    elapsed += 3
+    try {
+      const res = await $fetch<{ linked: boolean }>('/api/dashboard/telegram/status')
+      if (res.linked) {
+        stopTelegramPoll()
+        telegramDeepLink.value = ''
+        successMsg.value = 'Compte Telegram connecté ✅'
+        await refresh()
+      }
+    } catch {
+      // On retente au prochain tick.
+    }
+    if (elapsed >= 180) stopTelegramPoll() // abandon silencieux après 3 min
+  }, 3000)
+}
+
+async function connectTelegram() {
+  telegramConnecting.value = true
+  errorMsg.value = ''
+  successMsg.value = ''
+  try {
+    const res = await $fetch<{ deepLink: string; botUsername: string }>(
+      '/api/dashboard/telegram/connect',
+      { method: 'POST' },
+    )
+    telegramDeepLink.value = res.deepLink
+    window.open(res.deepLink, '_blank') // ouvre l'app / le web Telegram
+    startTelegramPoll()
+  } catch (e) {
+    errorMsg.value =
+      (e as { data?: { statusMessage?: string } })?.data?.statusMessage
+      ?? 'Connexion Telegram indisponible pour le moment.'
+  } finally {
+    telegramConnecting.value = false
+  }
+}
+
+async function disconnectTelegram() {
+  if (!confirm('Déconnecter Telegram ? Vous ne recevrez plus vos notifications sur Telegram.')) return
+  stopTelegramPoll()
+  telegramDeepLink.value = ''
+  await call('telegram-disconnect', () => $fetch('/api/dashboard/telegram/disconnect', { method: 'POST' }))
+}
+
+onBeforeUnmount(stopTelegramPoll)
+
 // ─── Réservations & paiement ───────────────────────────────────────────────
 
 type PayChoice = 'ONLINE_REQUIRED' | 'CLIENT_CHOICE' | 'ONSITE_ONLY'
@@ -1089,6 +1155,61 @@ async function call(key: string, fn: () => Promise<unknown>) {
             Déconnecter
           </button>
         </div>
+      </div>
+
+      <!-- Notifications Telegram -->
+      <div class="card">
+        <h2 class="font-semibold text-slate-900">Notifications Telegram</h2>
+        <p class="mt-1 text-sm text-slate-600">
+          Recevez vos nouvelles demandes, paiements et rappels directement sur Telegram,
+          et validez vos courses en un tap. L'email reste envoyé dans tous les cas.
+        </p>
+
+        <div class="mt-3">
+          <p v-if="telegramLinked" class="inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm text-green-800">
+            ✅ Compte Telegram connecté — notifications actives
+          </p>
+          <p v-else class="text-sm text-slate-500">Aucun compte Telegram connecté.</p>
+        </div>
+
+        <!-- Appairage en attente : lien de secours si l'ouverture auto a échoué -->
+        <p v-if="telegramDeepLink && !telegramLinked" class="mt-3 rounded-lg bg-sky-50 px-4 py-3 text-sm text-sky-800">
+          Dans Telegram, appuyez sur <strong>DÉMARRER</strong> dans la conversation du bot —
+          cette page se mettra à jour automatiquement.<br />
+          <a :href="telegramDeepLink" target="_blank" rel="noopener" class="font-medium underline">
+            Ouvrir Telegram
+          </a>
+          si l'application ne s'est pas ouverte.
+        </p>
+
+        <div class="mt-4 flex gap-2">
+          <button
+            v-if="!telegramLinked"
+            class="btn-primary"
+            :disabled="telegramConnecting"
+            @click="connectTelegram"
+          >
+            {{ telegramConnecting ? '…' : telegramDeepLink ? 'En attente de connexion…' : 'Connecter Telegram' }}
+          </button>
+          <button
+            v-if="telegramLinked"
+            class="btn-ghost"
+            :disabled="saving === 'telegram-disconnect'"
+            @click="disconnectTelegram"
+          >
+            Déconnecter
+          </button>
+        </div>
+
+        <details v-if="!telegramLinked" class="mt-4 text-sm text-slate-600">
+          <summary class="cursor-pointer font-medium text-slate-700">Comment ça marche ?</summary>
+          <ol class="mt-2 list-decimal space-y-1 pl-5">
+            <li>Installez <strong>Telegram</strong> sur votre téléphone (si ce n'est pas déjà fait).</li>
+            <li>Cliquez sur <strong>Connecter Telegram</strong> : la conversation avec notre bot s'ouvre.</li>
+            <li>Appuyez sur <strong>DÉMARRER</strong> dans Telegram.</li>
+            <li>C'est lié : cette page passe en « connecté » toute seule.</li>
+          </ol>
+        </details>
       </div>
 
       <!-- Stripe (alternative — affiché si déjà utilisé) -->
