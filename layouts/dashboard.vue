@@ -9,12 +9,12 @@ const { data: me } = await useFetch('/api/dashboard/me')
 const status = computed(() => (me.value as { status?: string } | null)?.status ?? null)
 const publicSlug = computed(() => (me.value as { slug?: string } | null)?.slug ?? '')
 
+// « Gains » et « Clients » ont été intégrés à l'accueil (sous-onglets) pour
+// épurer la navigation.
 const nav = [
   { to: '/dashboard', label: 'Accueil', icon: '🏠' },
   { to: '/dashboard/reservations', label: 'Réservations', icon: '🗂️' },
-  { to: '/dashboard/gains', label: 'Gains', icon: '💶' },
   { to: '/dashboard/calendrier', label: 'Calendrier', icon: '📅' },
-  { to: '/dashboard/clients', label: 'Clients', icon: '👥' },
   { to: '/dashboard/profil', label: 'Profil', icon: '👤' },
   { to: '/dashboard/parametres', label: 'Réglages', icon: '⚙️' },
 ]

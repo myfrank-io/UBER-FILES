@@ -1,8 +1,29 @@
 <script setup lang="ts">
 // Tableau de bord chauffeur : devis à valider + courses à venir + statistiques.
+// Les anciens onglets « Gains » et « Clients » sont désormais intégrés ici en
+// sous-onglets pour épurer la navigation principale.
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Tableau de bord' })
 const { formatMoney, formatDateTime } = useFormat()
+
+// Onglets internes, synchronisés avec l'URL (?tab=) pour être partageables et
+// résister au rafraîchissement.
+const tabs = [
+  { key: 'overview', label: 'Vue d’ensemble' },
+  { key: 'gains', label: 'Gains' },
+  { key: 'clients', label: 'Clients' },
+] as const
+type TabKey = (typeof tabs)[number]['key']
+
+const route = useRoute()
+const router = useRouter()
+const tab = computed<TabKey>(() => {
+  const q = route.query.tab
+  return tabs.some((t) => t.key === q) ? (q as TabKey) : 'overview'
+})
+function selectTab(key: TabKey) {
+  router.replace({ query: key === 'overview' ? {} : { tab: key } })
+}
 
 // lazy : la navigation s'affiche immédiatement, les données arrivent ensuite.
 const { data, refresh, pending } = await useFetch('/api/dashboard/overview', { lazy: true })
@@ -51,6 +72,30 @@ async function resend(quoteId: string) {
 <template>
   <div>
     <h1 class="text-2xl font-bold text-slate-900">Tableau de bord</h1>
+
+    <!-- Onglets internes -->
+    <div class="mt-4 flex gap-1 border-b border-slate-200">
+      <button
+        v-for="t in tabs"
+        :key="t.key"
+        class="-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors"
+        :class="tab === t.key
+          ? 'border-brand-600 text-brand-700'
+          : 'border-transparent text-slate-500 hover:text-slate-700'"
+        @click="selectTab(t.key)"
+      >
+        {{ t.label }}
+      </button>
+    </div>
+
+    <!-- Onglet Gains -->
+    <DashboardGains v-if="tab === 'gains'" class="mt-6" />
+
+    <!-- Onglet Clients -->
+    <DashboardClients v-else-if="tab === 'clients'" class="mt-6" />
+
+    <!-- Onglet Vue d'ensemble -->
+    <div v-else class="mt-6">
     <p v-if="pending && !data" class="mt-4 text-sm text-slate-400">Chargement…</p>
 
     <!-- Stats -->
@@ -179,5 +224,6 @@ async function resend(quoteId: string) {
     </section>
 
     <p v-if="pending" class="mt-4 text-sm text-slate-400">Chargement…</p>
+    </div>
   </div>
 </template>
