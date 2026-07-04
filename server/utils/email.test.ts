@@ -180,9 +180,34 @@ describe('emailTemplates client — variantes des flux', () => {
 })
 
 describe('emailTemplates chauffeur', () => {
+  it('preRideDriver : alerte H-2 avec trajet, contact client et liens de navigation', () => {
+    const tpl = emailTemplates.preRideDriver({
+      driverFirstName: 'Karim',
+      customerName: 'Paul <b>!</b>',
+      customerPhone: '+33788764719',
+      scheduledAt: new Date('2026-08-15T14:30:00Z'),
+      type: 'TRANSFER',
+      pickupAddress: '11 rue du Muguet, Brest',
+      dropoffAddress: 'Place de Brest, Le Mans',
+      mapsUrl: 'https://www.google.com/maps/dir/?api=1&destination=48.39,-4.486',
+      wazeUrl: 'https://waze.com/ul?ll=48.39,-4.486&navigate=yes',
+      paymentNote: 'Course déjà réglée en ligne — rien à encaisser.',
+    })
+    expect(tpl.subject).toContain('Course dans ~2 h')
+    expect(tpl.html).toContain('Hello Karim 👋')
+    expect(tpl.html).toContain('11 rue du Muguet, Brest')
+    expect(tpl.html).toContain('Place de Brest, Le Mans')
+    expect(tpl.html).toContain('Paul &lt;b&gt;!&lt;/b&gt;')
+    expect(tpl.html).toContain('tel:+33788764719')
+    expect(tpl.html).toContain('https://www.google.com/maps/dir/?api=1&destination=48.39,-4.486')
+    expect(tpl.html).toContain('https://waze.com/ul?ll=48.39,-4.486&navigate=yes')
+    expect(tpl.html).toContain('rien à encaisser')
+  })
+
   it('newRequestDriver : rend les détails et échappe les saisies client', () => {
     const tpl = emailTemplates.newRequestDriver({
       ...base,
+      driverFirstName: 'Karim',
       customerPhone: '+33612345678',
       type: 'TRANSFER',
       pickupAddress: 'Gare de Lyon <b>Paris</b>',
@@ -195,6 +220,7 @@ describe('emailTemplates chauffeur', () => {
       dashboardUrl: 'https://app.test/dashboard',
     })
     expect(tpl.subject).toContain('Nouvelle demande')
+    expect(tpl.html).toContain('Hello Karim 👋')
     expect(tpl.html).not.toContain('<script>')
     expect(tpl.html).toContain('&lt;script&gt;')
     expect(tpl.html).toContain('Gare de Lyon &lt;b&gt;Paris&lt;/b&gt; → Orly (aller-retour)')

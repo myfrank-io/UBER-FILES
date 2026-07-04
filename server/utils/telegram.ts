@@ -15,10 +15,23 @@ export function telegramDeepLink(botUsername: string, code: string): string {
 
 const API = (token: string, method: string) => `https://api.telegram.org/bot${token}/${method}`
 
+// Bouton inline : action (callback_data) ou lien externe (url), au choix.
 export interface InlineButton {
   text: string
-  callback_data: string
+  callback_data?: string
+  url?: string
 }
+
+/** Prénom du chauffeur pour saluer : premier mot du nom d'affichage. */
+export function driverFirstName(displayName: string): string {
+  return displayName.trim().split(/\s+/)[0]?.replace(/[—–,]+$/, '') || displayName
+}
+
+// Chaque message chauffeur commence par « Hello (prénom) 👋 ».
+const hello = (displayName: string) => `Hello ${escHtml(driverFirstName(displayName))} 👋`
+
+// Échappement HTML minimal pour parse_mode HTML (les saisies client y passent).
+const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 export async function sendTelegramMessage(
   chatId: string,
@@ -59,6 +72,7 @@ export async function answerCallbackQuery(callbackQueryId: string, text: string)
  * sans boutons — la course se confirmera d'elle-même au paiement du client.
  */
 export function newRequestMessage(opts: {
+  driverDisplayName: string
   customerName: string
   type: 'TRANSFER' | 'HOURLY'
   scheduledAt: Date
@@ -72,8 +86,9 @@ export function newRequestMessage(opts: {
   autoSent?: boolean
 }): { text: string; buttons: InlineButton[][] } {
   const lines = [
+    hello(opts.driverDisplayName),
     `🚗 <b>Nouvelle demande</b>`,
-    `Client : ${opts.customerName}`,
+    `Client : ${escHtml(opts.customerName)}`,
     `Quand : ${opts.scheduledAt.toLocaleString('fr-FR')}`,
   ]
   if (opts.type === 'TRANSFER') {
@@ -97,4 +112,85 @@ export function newRequestMessage(opts: {
           ],
         ],
   }
+}
+
+/**
+ * Notifie le chauffeur qu'une course vient d'être confirmée (paiement en ligne
+ * reçu, ou réservation avec règlement sur place) — y compris dans les flux sans
+ * validation manuelle (paiement immédiat, confirmation automatique).
+ */
+export function bookingConfirmedMessage(opts: {
+  driverDisplayName: string
+  customerName: string
+  customerPhone?: string | null
+  scheduledAt: Date
+  type?: 'TRANSFER' | 'HOURLY'
+  durationHours?: number | null
+  pickupAddress?: string | null
+  dropoffAddress?: string | null
+  amountCents: number
+  currency: string
+  // true : payée en ligne ; false : à encaisser sur place (methodLabel précise le moyen)
+  paidOnline: boolean
+  methodLabel?: string
+  conflictWarning?: boolean
+}): { text: string } {
+  const paiement = opts.paidOnline
+    ? `💳 <b>${formatMoney(opts.amountCents, opts.currency)}</b> payés en ligne`
+    : `💶 <b>${formatMoney(opts.amountCents, opts.currency)}</b> à encaisser sur place${opts.methodLabel ? ` (${opts.methodLabel})` : ''}`
+  const lines = [
+    hello(opts.driverDisplayName),
+    `✅ <b>Course confirmée</b>`,
+    `Client : ${escHtml(opts.customerName)}${opts.customerPhone ? ` — 📞 ${escHtml(opts.customerPhone)}` : ''}`,
+    `Quand : ${opts.scheduledAt.toLocaleString('fr-FR')}`,
+  ]
+  if (opts.type === 'TRANSFER') {
+    lines.push(`Trajet : ${escHtml(opts.pickupAddress ?? '?')} → ${escHtml(opts.dropoffAddress ?? '?')}`)
+  } else if (opts.type === 'HOURLY') {
+    lines.push(`Mise à disposition : ${opts.durationHours ?? '?'} h`)
+    if (opts.pickupAddress) lines.push(`Départ : ${escHtml(opts.pickupAddress)}`)
+  }
+  lines.push(paiement)
+  if (opts.conflictWarning) lines.push(`⚠️ <b>Chevauchement calendrier détecté</b> — vérifiez votre planning.`)
+  lines.push(`Le créneau est bloqué dans votre calendrier.`)
+  return { text: lines.join('\n') }
+}
+
+/**
+ * Alerte pré-course (~2 h avant la prise en charge) : récap de la course +
+ * boutons ouvrant directement la navigation (Google Maps / Waze) vers le départ.
+ */
+export function preRideAlertMessage(opts: {
+  driverDisplayName: string
+  customerName: string
+  customerPhone?: string | null
+  scheduledAt: Date
+  type: 'TRANSFER' | 'HOURLY'
+  durationHours?: number | null
+  pickupAddress?: string | null
+  dropoffAddress?: string | null
+  mapsUrl?: string | null
+  wazeUrl?: string | null
+  // Note de règlement : « déjà payée en ligne » ou « X € à encaisser (espèces) »
+  paymentNote?: string
+}): { text: string; buttons: InlineButton[][] } {
+  const lines = [
+    hello(opts.driverDisplayName),
+    `⏰ <b>Course dans ~2 h</b> — ${opts.scheduledAt.toLocaleString('fr-FR')}`,
+    `Client : ${escHtml(opts.customerName)}${opts.customerPhone ? ` — 📞 ${escHtml(opts.customerPhone)}` : ''}`,
+  ]
+  if (opts.type === 'TRANSFER') {
+    lines.push(`📍 Départ : ${escHtml(opts.pickupAddress ?? '?')}`)
+    lines.push(`🏁 Arrivée : ${escHtml(opts.dropoffAddress ?? '?')}`)
+  } else {
+    lines.push(`🕐 Mise à disposition ${opts.durationHours ?? '?'} h`)
+    if (opts.pickupAddress) lines.push(`📍 Départ : ${escHtml(opts.pickupAddress)}`)
+  }
+  if (opts.paymentNote) lines.push(opts.paymentNote)
+
+  const navButtons: InlineButton[] = []
+  if (opts.mapsUrl) navButtons.push({ text: '🧭 Google Maps', url: opts.mapsUrl })
+  if (opts.wazeUrl) navButtons.push({ text: '🚗 Waze', url: opts.wazeUrl })
+
+  return { text: lines.join('\n'), buttons: navButtons.length ? [navButtons] : [] }
 }
