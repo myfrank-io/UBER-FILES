@@ -126,10 +126,10 @@ async function remove(v: Vehicle) {
 
 <template>
   <div class="card space-y-4">
-    <div class="flex items-center justify-between gap-4">
-      <div>
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0">
         <h2 class="font-semibold text-slate-900">Véhicules</h2>
-        <p class="mt-1 text-sm text-slate-500">Un ou plusieurs véhicules, affichés avec la photo du modèle.</p>
+        <p class="mt-1 text-sm text-slate-500">Affichés avec la photo du modèle.</p>
       </div>
       <button type="button" class="btn-ghost shrink-0 text-sm" @click="openCreate">+ Ajouter</button>
     </div>
@@ -138,8 +138,10 @@ async function remove(v: Vehicle) {
 
     <!-- Liste compacte -->
     <ul v-else class="divide-y divide-slate-100">
-      <li v-for="v in vehicles" :key="v.id" class="flex items-center gap-3 py-2.5">
-        <div class="flex h-12 w-20 shrink-0 items-center justify-center rounded-lg bg-slate-50">
+      <!-- Sur mobile, les actions passent sous le nom (rangée dédiée) : le nom du
+           modèle et le badge « En avant » restent lisibles en entier. -->
+      <li v-for="v in vehicles" :key="v.id" class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
+        <div class="flex h-12 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50">
           <VehicleImage
             :make="v.make"
             :model-family="v.modelFamily"
@@ -150,9 +152,9 @@ async function remove(v: Vehicle) {
           />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="flex items-center gap-2 truncate text-sm font-medium text-slate-900">
-            {{ v.modelLabel }}
-            <span v-if="v.isPrimary" class="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+          <p class="flex items-center gap-2 text-sm font-medium text-slate-900">
+            <span class="min-w-0 truncate">{{ v.modelLabel }}</span>
+            <span v-if="v.isPrimary" class="shrink-0 rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
               En avant
             </span>
           </p>
@@ -162,12 +164,21 @@ async function remove(v: Vehicle) {
             <span v-if="v.color"> · {{ v.color }}</span>
           </p>
         </div>
-        <div class="flex shrink-0 items-center gap-2 text-xs">
-          <button v-if="!v.isPrimary" type="button" class="text-brand-700 hover:underline" @click="setPrimary(v)">
-            En avant
+        <div class="flex w-full shrink-0 items-center justify-end gap-1 text-xs sm:w-auto">
+          <button
+            v-if="!v.isPrimary"
+            type="button"
+            class="whitespace-nowrap rounded-lg px-2.5 py-2.5 font-semibold text-brand-700 hover:bg-brand-50"
+            @click="setPrimary(v)"
+          >
+            Mettre en avant
           </button>
-          <button type="button" class="text-slate-500 hover:underline" @click="openEdit(v)">Modifier</button>
-          <button type="button" class="text-red-600 hover:underline" @click="remove(v)">Suppr.</button>
+          <button type="button" class="whitespace-nowrap rounded-lg px-2.5 py-2.5 font-semibold text-slate-600 hover:bg-slate-100" @click="openEdit(v)">
+            Modifier
+          </button>
+          <button type="button" class="whitespace-nowrap rounded-lg px-2.5 py-2.5 font-semibold text-red-600 hover:bg-red-50" @click="remove(v)">
+            Supprimer
+          </button>
         </div>
       </li>
     </ul>
@@ -232,8 +243,8 @@ async function remove(v: Vehicle) {
           <label class="label" for="vColor">Couleur (optionnel)</label>
           <input id="vColor" v-model="form.color" type="text" class="field" maxlength="40" placeholder="Noir, Gris…" />
         </div>
-        <label class="flex items-center gap-2 text-sm text-slate-700">
-          <input v-model="form.isPrimary" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+        <label class="flex items-center gap-2.5 py-1 text-sm text-slate-700">
+          <input v-model="form.isPrimary" type="checkbox" class="h-5 w-5 shrink-0 rounded border-slate-300" />
           Mettre ce véhicule en avant
         </label>
 

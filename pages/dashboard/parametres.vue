@@ -43,6 +43,16 @@ function selectTab(key: TabKey) {
   router.replace({ query: key === 'tarifs' ? {} : { tab: key } })
 }
 
+// La barre d'onglets scrolle horizontalement sur mobile : sans cela, l'onglet
+// actif (ex. « Général » via ?tab=general) peut rester entièrement hors écran.
+const tabsBar = ref<HTMLElement | null>(null)
+const activeTabEl = ref<HTMLElement | null>(null)
+function revealActiveTab() {
+  activeTabEl.value?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' })
+}
+onMounted(() => nextTick(revealActiveTab))
+watch(tab, () => nextTick(revealActiveTab))
+
 // ─── Stripe ────────────────────────────────────────────────────────────────
 
 async function connectStripe() {
@@ -660,12 +670,13 @@ async function call(key: string, fn: () => Promise<unknown>) {
   <div class="max-w-2xl">
     <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Réglages</h1>
 
-    <!-- Onglets -->
-    <div class="mt-4 flex gap-1 overflow-x-auto border-b border-slate-200">
+    <!-- Onglets : l'onglet actif est toujours ramené dans le viewport (barre scrollable). -->
+    <div ref="tabsBar" class="mt-4 flex gap-1 overflow-x-auto border-b border-slate-200">
       <button
         v-for="t in tabs"
         :key="t.key"
-        class="-mb-px whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors"
+        :ref="(el) => { if (tab === t.key) activeTabEl = el as HTMLElement }"
+        class="-mb-px min-h-[44px] whitespace-nowrap border-b-2 px-3.5 py-2 text-sm font-medium transition-colors"
         :class="tab === t.key
           ? 'border-brand-600 text-brand-700'
           : 'border-transparent text-slate-500 hover:text-slate-700'"
@@ -711,17 +722,19 @@ async function call(key: string, fn: () => Promise<unknown>) {
           </button>
         </div>
 
+        <!-- Le champ date+heure prend toute la largeur sur mobile : en demi-colonne,
+             l'heure du départ (déterminante pour le tarif) était coupée. -->
         <div v-if="sim.type === 'TRANSFER'" class="mt-3 grid grid-cols-2 gap-3">
           <div>
             <label class="label" for="sim-km">Distance (km)</label>
             <input id="sim-km" v-model.number="sim.km" type="number" min="1" step="1" class="field !bg-white" />
           </div>
-          <div>
+          <div class="col-span-2 sm:col-span-1">
             <label class="label" for="sim-when">Départ le</label>
             <input id="sim-when" v-model="sim.when" type="datetime-local" class="field !bg-white" />
           </div>
-          <label class="col-span-2 flex items-center gap-2 text-sm text-slate-700">
-            <input v-model="sim.roundTrip" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+          <label class="col-span-2 flex items-center gap-2.5 py-1 text-sm text-slate-700">
+            <input v-model="sim.roundTrip" type="checkbox" class="h-5 w-5 shrink-0 rounded border-slate-300" />
             Aller-retour
           </label>
         </div>
@@ -776,11 +789,12 @@ async function call(key: string, fn: () => Promise<unknown>) {
               </div>
               <div>
                 <label class="label">De</label>
-                <input v-model="editBandForm.startTime" type="time" class="field" />
+                <input v-model="editBandForm.startTime" type="time" class="field !px-2.5" />
               </div>
               <div>
-                <label class="label">À <span class="font-normal text-slate-400">(avant = lendemain)</span></label>
-                <input v-model="editBandForm.endTime" type="time" class="field" />
+                <label class="label">À</label>
+                <input v-model="editBandForm.endTime" type="time" class="field !px-2.5" />
+                <p class="mt-1 text-xs text-slate-400">Avant « De » = le lendemain.</p>
               </div>
             </div>
             <div>
@@ -790,7 +804,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
                   v-for="d in DAY_ORDER"
                   :key="d"
                   type="button"
-                  class="rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors"
+                  class="rounded-full border px-3.5 py-2.5 text-xs font-semibold transition-colors"
                   :class="editBandForm.daysOfWeek.includes(d)
                     ? 'border-brand-600 bg-brand-600 text-white'
                     : 'border-slate-300 text-slate-600 hover:border-slate-400'"
@@ -801,14 +815,14 @@ async function call(key: string, fn: () => Promise<unknown>) {
               </div>
             </div>
             <details class="text-sm">
-              <summary class="cursor-pointer text-xs font-medium text-slate-500">Réglages avancés</summary>
+              <summary class="cursor-pointer py-2 text-xs font-medium text-slate-500">Réglages avancés</summary>
               <div class="mt-2 grid grid-cols-2 gap-3">
                 <div>
                   <label class="label">Priorité <span class="font-normal text-slate-400">(la + haute gagne)</span></label>
                   <input v-model.number="editBandForm.priority" type="number" min="0" class="field" />
                 </div>
-                <label class="flex items-end gap-2 pb-3 text-sm text-slate-600">
-                  <input v-model="editBandForm.isDefault" type="checkbox" class="h-4 w-4 rounded" />
+                <label class="flex items-end gap-2.5 pb-3 text-sm text-slate-600">
+                  <input v-model="editBandForm.isDefault" type="checkbox" class="h-5 w-5 shrink-0 rounded accent-brand-600" />
                   Tarif de secours
                 </label>
               </div>
@@ -834,9 +848,9 @@ async function call(key: string, fn: () => Promise<unknown>) {
             </div>
             <div class="shrink-0 text-right">
               <p class="font-serif text-lg font-medium text-slate-950">{{ formatMoney(b.pricePerKmCents as number, currency) }}<span class="text-xs font-sans text-slate-500">/km</span></p>
-              <p class="mt-0.5 space-x-3 text-xs">
-                <button type="button" class="font-semibold text-brand-700 hover:underline" @click="startEditBand(b)">Modifier</button>
-                <button type="button" class="text-red-600 hover:underline" @click="deleteBand(b.id as string)">Supprimer</button>
+              <p class="-mr-2.5 mt-0.5 flex justify-end gap-1 text-xs">
+                <button type="button" class="rounded-lg px-2.5 py-2 font-semibold text-brand-700 hover:bg-brand-50" @click="startEditBand(b)">Modifier</button>
+                <button type="button" class="rounded-lg px-2.5 py-2 font-semibold text-red-600 hover:bg-red-50" @click="deleteBand(b.id as string)">Supprimer</button>
               </p>
             </div>
           </div>
@@ -857,11 +871,12 @@ async function call(key: string, fn: () => Promise<unknown>) {
               </div>
               <div>
                 <label class="label">De</label>
-                <input v-model="newBand.startTime" type="time" class="field" />
+                <input v-model="newBand.startTime" type="time" class="field !px-2.5" />
               </div>
               <div>
-                <label class="label">À <span class="font-normal text-slate-400">(avant = lendemain)</span></label>
-                <input v-model="newBand.endTime" type="time" class="field" />
+                <label class="label">À</label>
+                <input v-model="newBand.endTime" type="time" class="field !px-2.5" />
+                <p class="mt-1 text-xs text-slate-400">Avant « De » = le lendemain.</p>
               </div>
             </div>
             <div>
@@ -871,7 +886,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
                   v-for="d in DAY_ORDER"
                   :key="d"
                   type="button"
-                  class="rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors"
+                  class="rounded-full border px-3.5 py-2.5 text-xs font-semibold transition-colors"
                   :class="newBand.daysOfWeek.includes(d)
                     ? 'border-brand-600 bg-brand-600 text-white'
                     : 'border-slate-300 text-slate-600 hover:border-slate-400'"
@@ -882,8 +897,8 @@ async function call(key: string, fn: () => Promise<unknown>) {
               </div>
             </div>
             <div class="flex gap-2">
-              <button type="button" class="btn-primary !py-2.5 text-sm" :disabled="saving === 'band-add' || !newBand.name || !newBand.pricePerKmEuros" @click="addBand">
-                {{ saving === 'band-add' ? '…' : 'Ajouter ce tarif' }}
+              <button type="button" class="btn-primary whitespace-nowrap !py-2.5 text-sm" :disabled="saving === 'band-add' || !newBand.name || !newBand.pricePerKmEuros" @click="addBand">
+                {{ saving === 'band-add' ? '…' : 'Ajouter' }}
               </button>
               <button type="button" class="btn-ghost !py-2.5 text-sm" @click="addingBand = false">Annuler</button>
             </div>
@@ -932,9 +947,9 @@ async function call(key: string, fn: () => Promise<unknown>) {
             <p class="font-semibold text-slate-900">{{ tierRangeLabel(i) }}</p>
             <div class="shrink-0 text-right">
               <p class="font-serif text-lg font-medium text-slate-950">{{ formatMoney(t.pricePerHourCents as number, currency) }}<span class="font-sans text-xs text-slate-500">/h</span></p>
-              <p class="mt-0.5 space-x-3 text-xs">
-                <button type="button" class="font-semibold text-brand-700 hover:underline" @click="startEditTier(t)">Modifier</button>
-                <button type="button" class="text-red-600 hover:underline" @click="deleteTier(t.id as string)">Supprimer</button>
+              <p class="-mr-2.5 mt-0.5 flex justify-end gap-1 text-xs">
+                <button type="button" class="rounded-lg px-2.5 py-2 font-semibold text-brand-700 hover:bg-brand-50" @click="startEditTier(t)">Modifier</button>
+                <button type="button" class="rounded-lg px-2.5 py-2 font-semibold text-red-600 hover:bg-red-50" @click="deleteTier(t.id as string)">Supprimer</button>
               </p>
             </div>
           </div>
@@ -953,8 +968,8 @@ async function call(key: string, fn: () => Promise<unknown>) {
             </div>
           </div>
           <div class="mt-3 flex gap-2">
-            <button type="button" class="btn-primary !py-2.5 text-sm" :disabled="saving === 'tier-add' || !newTier.pricePerHourEuros" @click="addTier">
-              {{ saving === 'tier-add' ? '…' : 'Ajouter ce palier' }}
+            <button type="button" class="btn-primary whitespace-nowrap !py-2.5 text-sm" :disabled="saving === 'tier-add' || !newTier.pricePerHourEuros" @click="addTier">
+              {{ saving === 'tier-add' ? '…' : 'Ajouter' }}
             </button>
             <button type="button" class="btn-ghost !py-2.5 text-sm" @click="addingTier = false">Annuler</button>
           </div>
@@ -1007,7 +1022,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
 
         <div v-for="s in surcharges" :key="(s as Record<string, unknown>).id as string" class="rounded-xl border border-slate-200 p-4">
           <div v-if="editingSurcharge === (s.id as string)" class="space-y-3">
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid gap-3 sm:grid-cols-2">
               <div>
                 <label class="label">Nom</label>
                 <input v-model="editSurchargeForm.name" type="text" class="field" />
@@ -1023,8 +1038,8 @@ async function call(key: string, fn: () => Promise<unknown>) {
                 </div>
               </div>
             </div>
-            <label class="flex items-center gap-2 text-sm text-slate-600">
-              <input v-model="editSurchargeForm.autoApply" type="checkbox" class="h-4 w-4 rounded" />
+            <label class="flex items-center gap-2.5 py-1 text-sm text-slate-600">
+              <input v-model="editSurchargeForm.autoApply" type="checkbox" class="h-5 w-5 shrink-0 rounded accent-brand-600" />
               Inclure automatiquement dans chaque devis
             </label>
             <div class="flex gap-2">
@@ -1044,9 +1059,9 @@ async function call(key: string, fn: () => Promise<unknown>) {
             </div>
             <div class="shrink-0 text-right">
               <p class="font-serif text-lg font-medium text-slate-950">{{ surchargeAmount(s) }}</p>
-              <p class="mt-0.5 space-x-3 text-xs">
-                <button type="button" class="font-semibold text-brand-700 hover:underline" @click="startEditSurcharge(s)">Modifier</button>
-                <button type="button" class="text-red-600 hover:underline" @click="deleteSurcharge(s.id as string)">Supprimer</button>
+              <p class="-mr-2.5 mt-0.5 flex justify-end gap-1 text-xs">
+                <button type="button" class="rounded-lg px-2.5 py-2 font-semibold text-brand-700 hover:bg-brand-50" @click="startEditSurcharge(s)">Modifier</button>
+                <button type="button" class="rounded-lg px-2.5 py-2 font-semibold text-red-600 hover:bg-red-50" @click="deleteSurcharge(s.id as string)">Supprimer</button>
               </p>
             </div>
           </div>
@@ -1055,7 +1070,9 @@ async function call(key: string, fn: () => Promise<unknown>) {
         <div v-if="addingSurcharge" class="rounded-xl border border-dashed border-brand-300 p-4">
           <p class="mb-3 text-sm font-semibold text-slate-900">Nouveau supplément</p>
           <div class="space-y-3">
-            <div class="grid grid-cols-2 gap-3">
+            <!-- Nom en pleine largeur sur mobile : en demi-colonne, montant et
+                 placeholders étaient tronqués. -->
+            <div class="grid gap-3 sm:grid-cols-2">
               <div>
                 <label class="label">Nom</label>
                 <input v-model="newSurcharge.name" type="text" class="field" placeholder="Bagage volumineux" />
@@ -1071,8 +1088,8 @@ async function call(key: string, fn: () => Promise<unknown>) {
                 </div>
               </div>
             </div>
-            <label class="flex items-center gap-2 text-sm text-slate-600">
-              <input v-model="newSurcharge.autoApply" type="checkbox" class="h-4 w-4 rounded" />
+            <label class="flex items-center gap-2.5 py-1 text-sm text-slate-600">
+              <input v-model="newSurcharge.autoApply" type="checkbox" class="h-5 w-5 shrink-0 rounded accent-brand-600" />
               Inclure automatiquement dans chaque devis
             </label>
             <div class="flex gap-2">
@@ -1126,7 +1143,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
             {{ saving === 'sumup-api-key' ? 'Vérification auprès de SumUp…' : 'Enregistrer la clé' }}
           </button>
           <details class="text-sm text-slate-600">
-            <summary class="cursor-pointer font-medium text-slate-700">Où trouver ma clé API SumUp ?</summary>
+            <summary class="cursor-pointer py-2 font-medium text-slate-700">Où trouver ma clé API SumUp ?</summary>
             <ol class="mt-2 list-decimal space-y-1 pl-5">
               <li>
                 Connectez-vous sur
@@ -1202,7 +1219,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
         </div>
 
         <details v-if="!telegramLinked" class="mt-4 text-sm text-slate-600">
-          <summary class="cursor-pointer font-medium text-slate-700">Comment ça marche ?</summary>
+          <summary class="cursor-pointer py-2 font-medium text-slate-700">Comment ça marche ?</summary>
           <ol class="mt-2 list-decimal space-y-1 pl-5">
             <li>Installez <strong>Telegram</strong> sur votre téléphone (si ce n'est pas déjà fait).</li>
             <li>Cliquez sur <strong>Connecter Telegram</strong> : la conversation avec notre bot s'ouvre.</li>
@@ -1240,8 +1257,11 @@ async function call(key: string, fn: () => Promise<unknown>) {
         <fieldset>
           <legend class="text-sm font-semibold text-slate-800">1. Paiement des courses</legend>
           <div class="mt-2 space-y-2">
-            <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
-              <input v-model="payChoice" type="radio" class="mt-0.5" value="ONLINE_REQUIRED" name="pay-choice" />
+            <label
+              class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
+              :class="payChoice === 'ONLINE_REQUIRED' ? 'border-brand-600 bg-brand-50/60' : 'border-slate-200 hover:border-brand-200'"
+            >
+              <input v-model="payChoice" type="radio" class="mt-0.5 h-5 w-5 shrink-0 accent-brand-600" value="ONLINE_REQUIRED" name="pay-choice" />
               <span class="flex-1">
                 <span class="text-sm font-medium text-slate-800">💳 En ligne, à la réservation</span>
                 <span class="mt-1 block text-xs text-slate-500">
@@ -1254,8 +1274,11 @@ async function call(key: string, fn: () => Promise<unknown>) {
               </span>
             </label>
 
-            <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
-              <input v-model="payChoice" type="radio" class="mt-0.5" value="CLIENT_CHOICE" name="pay-choice" />
+            <label
+              class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
+              :class="payChoice === 'CLIENT_CHOICE' ? 'border-brand-600 bg-brand-50/60' : 'border-slate-200 hover:border-brand-200'"
+            >
+              <input v-model="payChoice" type="radio" class="mt-0.5 h-5 w-5 shrink-0 accent-brand-600" value="CLIENT_CHOICE" name="pay-choice" />
               <span class="flex-1">
                 <span class="text-sm font-medium text-slate-800">🤝 Au choix du client : en ligne ou sur place</span>
                 <span class="mt-1 block text-xs text-slate-500">
@@ -1268,8 +1291,11 @@ async function call(key: string, fn: () => Promise<unknown>) {
               </span>
             </label>
 
-            <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
-              <input v-model="payChoice" type="radio" class="mt-0.5" value="ONSITE_ONLY" name="pay-choice" />
+            <label
+              class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
+              :class="payChoice === 'ONSITE_ONLY' ? 'border-brand-600 bg-brand-50/60' : 'border-slate-200 hover:border-brand-200'"
+            >
+              <input v-model="payChoice" type="radio" class="mt-0.5 h-5 w-5 shrink-0 accent-brand-600" value="ONSITE_ONLY" name="pay-choice" />
               <span class="flex-1">
                 <span class="text-sm font-medium text-slate-800">📍 Sur place uniquement</span>
                 <span class="mt-1 block text-xs text-slate-500">
@@ -1289,7 +1315,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
               >
                 <input
                   type="checkbox"
-                  class="rounded"
+                  class="h-5 w-5 shrink-0 rounded accent-brand-600"
                   :checked="onsiteMethods.includes(method)"
                   @change="toggleOnsiteMethod(method)"
                 />
@@ -1305,8 +1331,11 @@ async function call(key: string, fn: () => Promise<unknown>) {
         <fieldset>
           <legend class="text-sm font-semibold text-slate-800">2. Confirmation des réservations</legend>
           <div class="mt-2 space-y-2">
-            <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
-              <input v-model="autoConfirm" type="radio" class="mt-0.5" :value="true" name="auto-confirm" />
+            <label
+              class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
+              :class="autoConfirm === true ? 'border-brand-600 bg-brand-50/60' : 'border-slate-200 hover:border-brand-200'"
+            >
+              <input v-model="autoConfirm" type="radio" class="mt-0.5 h-5 w-5 shrink-0 accent-brand-600" :value="true" name="auto-confirm" />
               <span class="flex-1">
                 <span class="text-sm font-medium text-slate-800">⚡ Automatique — si le créneau est libre</span>
                 <span class="mt-1 block text-xs text-slate-500">
@@ -1317,8 +1346,11 @@ async function call(key: string, fn: () => Promise<unknown>) {
               </span>
             </label>
 
-            <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:border-brand-200">
-              <input v-model="autoConfirm" type="radio" class="mt-0.5" :value="false" name="auto-confirm" />
+            <label
+              class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
+              :class="autoConfirm === false ? 'border-brand-600 bg-brand-50/60' : 'border-slate-200 hover:border-brand-200'"
+            >
+              <input v-model="autoConfirm" type="radio" class="mt-0.5 h-5 w-5 shrink-0 accent-brand-600" :value="false" name="auto-confirm" />
               <span class="flex-1">
                 <span class="text-sm font-medium text-slate-800">✋ Je valide chaque demande</span>
                 <span class="mt-1 block text-xs text-slate-500">
@@ -1361,7 +1393,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
       <!-- Paramètres métier -->
       <form class="card space-y-4" @submit.prevent="saveSettings">
         <h2 class="font-semibold text-slate-900">Réservations</h2>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid gap-3 sm:grid-cols-2">
           <div>
             <label class="label" for="leadTime">Délai minimum de réservation (min)</label>
             <input id="leadTime" v-model.number="settings.minLeadTimeMinutes" type="number" min="0" class="field" />
@@ -1385,7 +1417,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
       <!-- Politique d'annulation -->
       <form class="card space-y-4" @submit.prevent="saveCancelPolicy">
         <h2 class="font-semibold text-slate-900">Politique d'annulation</h2>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid gap-3 sm:grid-cols-2">
           <div>
             <label class="label" for="freeUntil">Annulation gratuite jusqu'à (h avant)</label>
             <input id="freeUntil" v-model.number="cancelPolicy.freeUntilHours" type="number" min="0" max="720" class="field" />

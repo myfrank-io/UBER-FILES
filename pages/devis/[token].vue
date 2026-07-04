@@ -87,10 +87,14 @@ async function confirmOnSite() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-lg px-5 py-10">
+  <div class="mx-auto max-w-lg px-5 pb-10 pt-4">
+    <div class="mb-3 flex justify-end">
+      <LangSwitcher />
+    </div>
     <div v-if="error" class="card text-center">
       <p class="text-3xl">🔒</p>
       <p class="mt-2 font-semibold text-slate-700">{{ $t('common.invalidLink') }}</p>
+      <p class="mt-2 text-sm text-slate-500">{{ $t('common.invalidLinkHelp') }}</p>
     </div>
 
     <div v-else-if="quote" class="card">

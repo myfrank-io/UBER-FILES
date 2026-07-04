@@ -4,8 +4,11 @@
     "securePayment": "Secure payment · Slot guaranteed after payment",
     "genericError": "Something went wrong.",
     "invalidLink": "Invalid or expired link.",
+    "invalidLinkHelp": "Check the link you received by email, or make a new request from your driver's page.",
     "places": "{count} seats",
-    "roundTripSuffix": " (round trip)"
+    "roundTripSuffix": " (round trip)",
+    "pickup": "Pickup",
+    "dropoff": "Drop-off"
   },
   "lang": {
     "fr": "Français",
@@ -36,7 +39,7 @@
     "disabledBodyFallback": "the driver directly",
     "disabledBodySuffix": "to book.",
     "formTitle": "Book your ride",
-    "typeTransfer": "Transfer (A → B)",
+    "typeTransfer": "Transfer (A → B)",
     "typeHourly": "Hourly hire",
     "fromPerKm": "from {price}/km",
     "fromPerHour": "from {price}/h",

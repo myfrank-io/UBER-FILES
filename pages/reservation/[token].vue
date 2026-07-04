@@ -36,10 +36,14 @@ async function cancel() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-lg px-5 py-10">
+  <div class="mx-auto max-w-lg px-5 pb-10 pt-4">
+    <div class="mb-3 flex justify-end">
+      <LangSwitcher />
+    </div>
     <div v-if="error" class="card text-center">
       <p class="text-3xl">🔒</p>
       <p class="mt-2 font-semibold text-slate-700">{{ $t('common.invalidLink') }}</p>
+      <p class="mt-2 text-sm text-slate-500">{{ $t('common.invalidLinkHelp') }}</p>
     </div>
 
     <div v-else-if="booking" class="card">
@@ -74,11 +78,28 @@ async function cancel() {
         </p>
       </div>
 
-      <!-- Coordonnées chauffeur -->
+      <!-- Coordonnées chauffeur : rangées pleine largeur ≥44px (appeler/écrire est
+           L'action principale de cette page pour le client). -->
       <div v-if="booking.driver.phone || booking.driver.contactEmail" class="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-        <p class="mb-1 font-medium text-slate-800">{{ $t('reservation.driverContact') }}</p>
-        <p v-if="booking.driver.phone">📞 <a :href="`tel:${booking.driver.phone}`" class="text-brand-600 hover:underline">{{ booking.driver.phone }}</a></p>
-        <p v-if="booking.driver.contactEmail">✉️ <a :href="`mailto:${booking.driver.contactEmail}`" class="text-brand-600 hover:underline">{{ booking.driver.contactEmail }}</a></p>
+        <p class="font-medium text-slate-800">{{ $t('reservation.driverContact') }}</p>
+        <div class="mt-1 divide-y divide-slate-200/70">
+          <a
+            v-if="booking.driver.phone"
+            :href="`tel:${booking.driver.phone}`"
+            class="flex min-h-[48px] items-center gap-3 py-2 font-medium text-brand-700"
+          >
+            <span aria-hidden="true">📞</span>
+            <span class="min-w-0 truncate">{{ booking.driver.phone }}</span>
+          </a>
+          <a
+            v-if="booking.driver.contactEmail"
+            :href="`mailto:${booking.driver.contactEmail}`"
+            class="flex min-h-[48px] items-center gap-3 py-2 font-medium text-brand-700"
+          >
+            <span aria-hidden="true">✉️</span>
+            <span class="min-w-0 truncate">{{ booking.driver.contactEmail }}</span>
+          </a>
+        </div>
       </div>
 
       <template v-if="booking.status === 'CONFIRMED'">

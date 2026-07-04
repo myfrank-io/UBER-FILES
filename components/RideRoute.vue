@@ -14,6 +14,9 @@ withDefaults(
   }>(),
   { pickup: null, dropoff: null, nav: false, wrap: false },
 )
+
+// Libellés traduits : les pages client existent en FR/EN (l'espace chauffeur reste FR).
+const { t } = useI18n()
 </script>
 
 <template>
@@ -21,14 +24,14 @@ withDefaults(
     <!-- Départ -->
     <span class="flex min-w-0 items-start gap-2">
       <span class="mt-[3px] h-2.5 w-2.5 shrink-0 rounded-full border-2 border-emerald-500 bg-white"></span>
-      <span class="mt-px shrink-0 text-[10px] font-semibold uppercase tracking-wide text-emerald-600">Départ</span>
+      <span class="mt-px shrink-0 text-[10px] font-semibold uppercase tracking-wide text-emerald-600">{{ t('common.pickup') }}</span>
       <NavAddress v-if="nav && pickup" :address="pickup" class="min-w-0 flex-1" :class="wrap ? 'break-words' : 'truncate'" />
       <span v-else class="min-w-0 flex-1" :class="wrap ? 'break-words' : 'truncate'">{{ pickup }}</span>
     </span>
     <!-- Arrivée -->
     <span v-if="dropoff" class="flex min-w-0 items-start gap-2">
       <span class="mt-[3px] h-2.5 w-2.5 shrink-0 rounded-full bg-rose-500 ring-2 ring-rose-100"></span>
-      <span class="mt-px shrink-0 text-[10px] font-semibold uppercase tracking-wide text-rose-600">Arrivée</span>
+      <span class="mt-px shrink-0 text-[10px] font-semibold uppercase tracking-wide text-rose-600">{{ t('common.dropoff') }}</span>
       <NavAddress v-if="nav" :address="dropoff" class="min-w-0 flex-1" :class="wrap ? 'break-words' : 'truncate'" />
       <span v-else class="min-w-0 flex-1" :class="wrap ? 'break-words' : 'truncate'">{{ dropoff }}</span>
     </span>

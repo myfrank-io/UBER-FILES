@@ -3,8 +3,9 @@
 </script>
 
 <template>
+  <!-- Le sélecteur de langue n'est plus global : seules les pages client
+       traduites ([slug], devis, réservation) l'affichent, dans leur flux. -->
   <div class="min-h-screen">
-    <LangSwitcher />
     <slot />
     <AppToast />
   </div>

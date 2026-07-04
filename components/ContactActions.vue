@@ -18,14 +18,14 @@ const tel = computed(() => (props.phone ?? '').replace(/[^+\d]/g, ''))
     <a
       v-if="phone"
       :href="`tel:${tel}`"
-      class="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-brand-400 hover:text-brand-700"
+      class="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-brand-400 hover:text-brand-700"
     >
       📞 {{ showPhone === false ? 'Appeler' : phone }}
     </a>
     <a
       v-if="phone"
       :href="`sms:${tel}`"
-      class="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-brand-400 hover:text-brand-700"
+      class="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-brand-400 hover:text-brand-700"
     >
       💬 SMS
     </a>
@@ -33,7 +33,7 @@ const tel = computed(() => (props.phone ?? '').replace(/[^+\d]/g, ''))
       v-if="email"
       :href="`mailto:${email}`"
       :title="email"
-      class="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-brand-400 hover:text-brand-700"
+      class="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-brand-400 hover:text-brand-700"
     >
       ✉️ Email
     </a>

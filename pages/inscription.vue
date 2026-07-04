@@ -170,7 +170,7 @@ async function register() {
             <template v-if="step === 1">1</template>
             <template v-else>✓</template>
           </span>
-          <span class="text-[13px] font-semibold" :class="step === 1 ? 'text-[#16283D]' : 'text-[#2E7D5B]'">Votre compte</span>
+          <span class="whitespace-nowrap text-[13px] font-semibold" :class="step === 1 ? 'text-[#16283D]' : 'text-[#2E7D5B]'">Votre compte</span>
         </button>
         <span class="h-px flex-1 bg-[#E4DCCC]" />
         <div class="flex flex-1 items-center gap-2.5">
@@ -178,7 +178,7 @@ async function register() {
             class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
             :class="step === 2 ? 'bg-[#B5793F] text-white' : 'bg-[#EDE4D3] text-[#9A8B72]'"
           >2</span>
-          <span class="text-[13px] font-semibold" :class="step === 2 ? 'text-[#16283D]' : 'text-[#9A8B72]'">Votre profil</span>
+          <span class="whitespace-nowrap text-[13px] font-semibold" :class="step === 2 ? 'text-[#16283D]' : 'text-[#9A8B72]'">Votre profil</span>
         </div>
       </div>
 
@@ -211,7 +211,7 @@ async function register() {
               <button
                 v-if="!editingSlug"
                 type="button"
-                class="ml-auto text-[12px] font-semibold text-[#B5793F] hover:underline"
+                class="-m-2 ml-auto p-2 text-[12px] font-semibold text-[#B5793F] hover:underline"
                 @click="editingSlug = true"
               >
                 Modifier
@@ -262,7 +262,7 @@ async function register() {
               />
               <button
                 type="button"
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[#B5793F] hover:underline"
+                class="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-[12px] font-semibold text-[#B5793F] hover:underline"
                 @click="showPassword = !showPassword"
               >
                 {{ showPassword ? 'Masquer' : 'Afficher' }}
@@ -337,14 +337,14 @@ async function register() {
         </button>
         <button
           type="button"
-          class="w-full py-1 text-center text-sm font-semibold text-[#B5793F] hover:underline disabled:opacity-50"
+          class="w-full py-3 text-center text-sm font-semibold text-[#B5793F] hover:underline disabled:opacity-50"
           :disabled="loading"
           @click="register"
         >
           Passer cette étape et créer mon compte →
         </button>
 
-        <button type="button" class="w-full text-center text-[13px] text-[#9A8B72] hover:text-[#6C7889]" @click="step = 1">
+        <button type="button" class="w-full py-3 text-center text-[13px] text-[#9A8B72] hover:text-[#6C7889]" @click="step = 1">
           ← Revenir à l'étape précédente
         </button>
       </form>
@@ -397,7 +397,8 @@ async function register() {
   border-radius: 12px;
   background: #fff;
   font-family: 'DM Sans', sans-serif;
-  font-size: 15px;
+  /* 16px minimum : sous ce seuil, iOS Safari zoome automatiquement au focus. */
+  font-size: 16px;
   color: #16283d;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;

@@ -74,6 +74,11 @@ const statusColors: Record<string, string> = {
   SUSPENDED: 'bg-red-100 text-red-700',
   PENDING: 'bg-amber-100 text-amber-800',
 }
+const statusLabels: Record<string, string> = {
+  ACTIVE: 'Actif',
+  SUSPENDED: 'Suspendu',
+  PENDING: 'En attente',
+}
 
 const search = ref('')
 const filteredDrivers = computed(() => {
@@ -88,9 +93,11 @@ const filteredDrivers = computed(() => {
 
 <template>
   <div class="mx-auto max-w-5xl px-5 py-8">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-2">
       <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Administration — Chams</h1>
-      <button class="text-sm text-slate-400 hover:text-slate-700" @click="logout">Déconnexion</button>
+      <button class="-mr-3 rounded-lg px-3 py-2.5 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-700" @click="logout">
+        Déconnexion
+      </button>
     </div>
 
     <!-- Stats -->
@@ -162,11 +169,53 @@ const filteredDrivers = computed(() => {
     <div class="mt-8">
       <input v-model="search" class="field max-w-sm" placeholder="Rechercher par nom ou slug…" />
     </div>
-    <div class="mt-3 overflow-x-auto">
+    <!-- Mobile : cartes empilées (rien à scroller, actions larges). Desktop : tableau. -->
+    <div class="mt-3 space-y-3 sm:hidden">
+      <div v-for="d in filteredDrivers" :key="d.id" class="card !p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="min-w-0">
+            <NuxtLink :to="`/admin/drivers/${d.id}`" class="font-medium text-slate-900 hover:text-brand-600">{{ d.displayName }}</NuxtLink>
+            <br />
+            <NuxtLink :to="`/${d.slug}`" target="_blank" class="text-xs text-brand-600 hover:underline">/{{ d.slug }}</NuxtLink>
+          </div>
+          <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold" :class="statusColors[d.status]">
+            {{ statusLabels[d.status] ?? d.status }}
+          </span>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">
+          SumUp : {{ d.sumupConnected ? 'connecté' : 'non connecté' }} · {{ d.bookings }} course(s)
+        </p>
+        <div class="mt-3 flex gap-2 border-t border-slate-100 pt-3">
+          <NuxtLink
+            :to="`/admin/drivers/${d.id}`"
+            class="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Détail →
+          </NuxtLink>
+          <button
+            v-if="d.status !== 'ACTIVE'"
+            class="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-green-300 px-3 text-sm font-semibold text-green-700 hover:bg-green-50"
+            @click="setStatus(d.id, 'ACTIVE')"
+          >
+            Activer
+          </button>
+          <button
+            v-else
+            class="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-red-200 px-3 text-sm font-semibold text-red-600 hover:bg-red-50"
+            @click="setStatus(d.id, 'SUSPENDED')"
+          >
+            Suspendre
+          </button>
+        </div>
+      </div>
+      <p v-if="filteredDrivers.length === 0" class="py-8 text-center text-sm text-slate-400">Aucun chauffeur trouvé.</p>
+    </div>
+
+    <div class="mt-3 hidden overflow-x-auto sm:block">
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
-            <th class="py-2">Chauffeur</th><th>Statut</th><th>SumUp</th><th>Courses</th><th></th>
+            <th class="py-2">Chauffeur</th><th>Statut</th><th>SumUp</th><th>Courses</th><th class="text-right">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -176,13 +225,13 @@ const filteredDrivers = computed(() => {
               <br />
               <NuxtLink :to="`/${d.slug}`" target="_blank" class="text-xs text-brand-600 hover:underline">/{{ d.slug }}</NuxtLink>
             </td>
-            <td><span class="rounded-full px-2 py-0.5 text-xs font-semibold" :class="statusColors[d.status]">{{ d.status }}</span></td>
-            <td>{{ d.sumupConnected ? '✅' : '⏳' }}</td>
+            <td><span class="whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold" :class="statusColors[d.status]">{{ statusLabels[d.status] ?? d.status }}</span></td>
+            <td class="whitespace-nowrap text-xs text-slate-600">{{ d.sumupConnected ? '✅ Connecté' : '— Non connecté' }}</td>
             <td>{{ d.bookings }}</td>
-            <td class="text-right">
-              <NuxtLink :to="`/admin/drivers/${d.id}`" class="mr-2 text-xs text-slate-500 hover:text-slate-800">Détail →</NuxtLink>
-              <button v-if="d.status !== 'ACTIVE'" class="text-xs font-semibold text-green-700 hover:underline" @click="setStatus(d.id, 'ACTIVE')">Activer</button>
-              <button v-else class="text-xs font-semibold text-red-600 hover:underline" @click="setStatus(d.id, 'SUSPENDED')">Suspendre</button>
+            <td class="whitespace-nowrap text-right">
+              <NuxtLink :to="`/admin/drivers/${d.id}`" class="mr-1 inline-flex items-center rounded-lg px-2.5 py-2 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-800">Détail →</NuxtLink>
+              <button v-if="d.status !== 'ACTIVE'" class="inline-flex items-center rounded-lg px-2.5 py-2 text-xs font-semibold text-green-700 hover:bg-green-50" @click="setStatus(d.id, 'ACTIVE')">Activer</button>
+              <button v-else class="inline-flex items-center rounded-lg px-2.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50" @click="setStatus(d.id, 'SUSPENDED')">Suspendre</button>
             </td>
           </tr>
         </tbody>

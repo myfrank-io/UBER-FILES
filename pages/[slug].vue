@@ -64,6 +64,16 @@ const appBase = useRuntimeConfig().public.appBaseUrl
 // Véhicule agrandi au clic (lightbox).
 const zoomedVehicle = ref<PublicVehicle | null>(null)
 
+// Libellé de vignette sans la marque (« Classe E » au lieu de « Mercedes Classe E »
+// tronqué) : sur 144px, seul le modèle distingue les véhicules d'une même marque.
+function vehicleShortLabel(v: PublicVehicle): string {
+  const label = v.modelLabel
+  if (label.toLowerCase().startsWith(v.make.toLowerCase())) {
+    return label.slice(v.make.length).trim() || label
+  }
+  return label
+}
+
 useHead(() => {
   const d = driver.value
   if (!d) return { title: t('common.appName') }
@@ -215,6 +225,10 @@ async function buildPayload() {
   return base
 }
 
+// Amène le résultat (et le bouton « Réserver ») dans le viewport : sur mobile,
+// l'estimation apparaît sinon sous la ligne de flottaison sans aucun indice.
+const estimateBox = ref<HTMLElement | null>(null)
+
 async function getEstimate() {
   errorMsg.value = ''
   estimating.value = true
@@ -222,6 +236,8 @@ async function getEstimate() {
   try {
     const payload = await buildPayload()
     estimate.value = await $fetch(`/api/public/${slug}/estimate`, { method: 'POST', body: payload })
+    await nextTick()
+    estimateBox.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   } catch (e) {
     errorMsg.value = errMessage(e)
   } finally {
@@ -311,7 +327,10 @@ function goToContact() {
 </script>
 
 <template>
-  <div v-if="driver" class="mx-auto max-w-lg px-5 pb-24 pt-8">
+  <div v-if="driver" class="mx-auto max-w-lg px-5 pb-24 pt-4">
+    <div class="mb-3 flex justify-end">
+      <LangSwitcher />
+    </div>
     <!-- En-tête chauffeur -->
     <div class="card">
       <div class="flex items-center gap-4">
@@ -359,10 +378,10 @@ function goToContact() {
           v-for="v in driver.vehicles"
           :key="v.id"
           type="button"
-          class="group flex w-32 shrink-0 flex-col rounded-xl border border-slate-100 bg-white p-2 transition hover:border-slate-200 hover:shadow-sm"
+          class="group flex w-36 shrink-0 flex-col rounded-xl border border-slate-100 bg-white p-2 transition hover:border-slate-200 hover:shadow-sm"
           @click="zoomedVehicle = v"
         >
-          <div class="flex h-16 w-full items-center justify-center">
+          <div class="flex h-16 w-full items-center justify-center overflow-hidden">
             <VehicleImage
               :make="v.make"
               :model-family="v.modelFamily"
@@ -372,7 +391,9 @@ function goToContact() {
               class="h-full w-full transition group-hover:scale-105"
             />
           </div>
-          <p class="mt-1.5 w-full truncate text-xs font-medium text-slate-700">{{ v.modelLabel }}</p>
+          <!-- Modèle sans la marque (« Classe E ») : lisible sur la vignette,
+               le libellé complet reste visible dans la lightbox. -->
+          <p class="mt-1.5 w-full truncate text-xs font-medium text-slate-700">{{ vehicleShortLabel(v) }}</p>
           <p class="w-full truncate text-[11px] text-slate-400">
             <span v-if="v.vehicleClass">{{ v.vehicleClass }}</span>
             <span v-if="v.seats"> · {{ v.seats }} pl.</span>
@@ -487,8 +508,8 @@ function goToContact() {
             <label class="label" for="dropoff">{{ $t('public.dropoffLabel') }}</label>
             <AddressField id="dropoff" v-model="dropoff" :placeholder="$t('public.dropoffPlaceholder')" />
           </div>
-          <label class="flex items-center gap-2 text-sm text-slate-700">
-            <input v-model="roundTrip" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+          <label class="flex items-center gap-2.5 py-1 text-sm text-slate-700">
+            <input v-model="roundTrip" type="checkbox" class="h-5 w-5 shrink-0 rounded border-slate-300" />
             {{ $t('public.roundTrip') }}
           </label>
         </template>
@@ -521,7 +542,7 @@ function goToContact() {
         <p v-if="errorMsg" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
 
         <template v-if="estimate">
-          <div class="rounded-xl bg-slate-50 p-4">
+          <div ref="estimateBox" class="scroll-mt-4 rounded-xl bg-slate-50 p-4">
             <div class="flex items-baseline justify-between">
               <span class="text-sm text-slate-600">{{ $t('public.estimateLabel') }}</span>
               <span class="font-serif text-2xl font-medium tracking-tight text-slate-900">
@@ -529,9 +550,9 @@ function goToContact() {
               </span>
             </div>
             <ul class="mt-2 space-y-1 text-xs text-slate-500">
-              <li v-for="(line, i) in estimate.breakdown" :key="i" class="flex justify-between">
+              <li v-for="(line, i) in estimate.breakdown" :key="i" class="flex justify-between gap-3">
                 <span>{{ line.label }}<span v-if="line.detail"> — {{ line.detail }}</span></span>
-                <span>{{ formatMoney(line.amountCents, estimate.currency) }}</span>
+                <span class="shrink-0">{{ formatMoney(line.amountCents, estimate.currency) }}</span>
               </li>
             </ul>
             <p class="mt-2 text-xs text-slate-400">{{ $t('public.estimateIndicative') }}</p>
@@ -556,7 +577,7 @@ function goToContact() {
           </div>
           <button
             type="button"
-            class="mt-2 text-xs font-medium text-brand-700 hover:underline"
+            class="-mb-2 mt-1 inline-flex min-h-[44px] items-center text-xs font-medium text-brand-700 hover:underline"
             @click="step = 'details'"
           >
             ← {{ $t('public.modifyTrip') }}
@@ -569,7 +590,8 @@ function goToContact() {
             <label class="label" for="name">{{ $t('public.nameLabel') }}</label>
             <input id="name" v-model="customer.name" type="text" class="field" required />
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <!-- Empilés sur mobile : côte à côte, téléphone et email saisis seraient illisibles. -->
+          <div class="grid gap-3 sm:grid-cols-2">
             <div>
               <label class="label" for="phone">{{ $t('public.phoneLabel') }}</label>
               <input id="phone" v-model="customer.phone" type="tel" class="field" required />
@@ -606,8 +628,8 @@ function goToContact() {
         </p>
 
         <!-- CGV -->
-        <label class="flex items-start gap-2 text-xs text-slate-600">
-          <input v-model="cgvAccepted" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" />
+        <label class="flex items-start gap-2.5 text-xs text-slate-600">
+          <input v-model="cgvAccepted" type="checkbox" class="mt-0.5 h-5 w-5 shrink-0 rounded border-slate-300" />
           <span>{{ $t('public.cgv') }}</span>
         </label>
 

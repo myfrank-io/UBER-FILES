@@ -275,7 +275,7 @@ async function save() {
       <p v-if="errorMsg" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
 
       <div class="flex justify-end">
-        <button type="submit" class="btn-primary" :disabled="saving">
+        <button type="submit" class="btn-primary w-full sm:w-auto" :disabled="saving">
           {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
         </button>
       </div>

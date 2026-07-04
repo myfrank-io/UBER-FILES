@@ -96,6 +96,11 @@ const statusColors: Record<string, string> = {
   SUSPENDED: 'bg-red-100 text-red-700',
   PENDING: 'bg-amber-100 text-amber-800',
 }
+const statusLabels: Record<string, string> = {
+  ACTIVE: 'Actif',
+  SUSPENDED: 'Suspendu',
+  PENDING: 'En attente',
+}
 </script>
 
 <template>
@@ -109,16 +114,17 @@ const statusColors: Record<string, string> = {
           <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">{{ data.displayName }}</h1>
           <NuxtLink :to="`/${data.slug}`" target="_blank" class="text-sm text-brand-600 hover:underline">/{{ data.slug }}</NuxtLink>
         </div>
-        <div class="flex items-center gap-2">
-          <span class="rounded-full px-3 py-1 text-xs font-semibold" :class="statusColors[data.status]">{{ data.status }}</span>
-          <button class="rounded-lg border border-brand-300 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50" :disabled="impersonating" @click="enterSpace">
+        <!-- flex-wrap + nowrap sur chaque bouton : la rangée ne déborde jamais de l'écran. -->
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold" :class="statusColors[data.status]">{{ statusLabels[data.status] ?? data.status }}</span>
+          <button class="whitespace-nowrap rounded-lg border border-brand-300 px-3 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50" :disabled="impersonating" @click="enterSpace">
             {{ impersonating ? '…' : '↗ Accéder à son espace' }}
           </button>
-          <button class="btn-primary text-sm" @click="openEdit">Modifier</button>
-          <button v-if="data.status !== 'SUSPENDED'" class="rounded-lg border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50" :disabled="archiving" @click="archive">
+          <button class="btn-primary whitespace-nowrap text-sm" @click="openEdit">Modifier</button>
+          <button v-if="data.status !== 'SUSPENDED'" class="whitespace-nowrap rounded-lg border border-red-300 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50" :disabled="archiving" @click="archive">
             Suspendre
           </button>
-          <button v-else class="rounded-lg border border-green-300 px-3 py-1.5 text-sm text-green-700 hover:bg-green-50" @click="activate">
+          <button v-else class="whitespace-nowrap rounded-lg border border-green-300 px-3 py-2.5 text-sm text-green-700 hover:bg-green-50" @click="activate">
             Réactiver
           </button>
         </div>
@@ -127,10 +133,10 @@ const statusColors: Record<string, string> = {
       <p v-if="archiveError" class="mt-2 text-sm text-red-600">{{ archiveError }}</p>
 
       <!-- Stats -->
-      <div class="mt-6 grid grid-cols-3 gap-3">
+      <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatCard title="Courses" :value="data.stats.bookings" />
         <StatCard title="À venir" :value="data.stats.upcomingBookings" />
-        <StatCard title="Volume encaissé" :value="formatMoney(data.stats.revenueCents)" />
+        <StatCard class="col-span-2 sm:col-span-1" title="Volume encaissé" :value="formatMoney(data.stats.revenueCents)" />
       </div>
 
       <!-- Details grid -->
@@ -172,8 +178,15 @@ const statusColors: Record<string, string> = {
           <h2 class="mb-3 font-semibold text-slate-900">Encaissement</h2>
           <dl class="space-y-2 text-sm">
             <div class="flex justify-between">
-              <dt class="text-slate-500">SumUp connecté</dt>
-              <dd>{{ data.sumup.connected ? '✅' : '⏳' }}</dd>
+              <dt class="text-slate-500">SumUp</dt>
+              <dd>
+                <span
+                  class="rounded-full px-2 py-0.5 text-xs font-semibold"
+                  :class="data.sumup.connected ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-500'"
+                >
+                  {{ data.sumup.connected ? 'Connecté' : 'Non connecté' }}
+                </span>
+              </dd>
             </div>
             <div v-if="data.sumup.merchantCode" class="flex justify-between">
               <dt class="text-slate-500">Code marchand</dt>
@@ -187,10 +200,18 @@ const statusColors: Record<string, string> = {
           <h2 class="mb-3 font-semibold text-slate-900">Intégrations</h2>
           <dl class="space-y-2 text-sm">
             <div class="flex justify-between">
-              <dt class="text-slate-500">Telegram lié</dt>
-              <dd>{{ data.telegramLinked ? '✅' : '⏳' }}</dd>
+              <dt class="text-slate-500">Telegram</dt>
+              <dd>
+                <span
+                  class="rounded-full px-2 py-0.5 text-xs font-semibold"
+                  :class="data.telegramLinked ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-500'"
+                >
+                  {{ data.telegramLinked ? 'Connecté' : 'Non connecté' }}
+                </span>
+              </dd>
             </div>
-            <div v-if="!data.telegramLinked" class="flex justify-between">
+            <!-- Uniquement si un code existe : une pastille vide ressemble à un bug. -->
+            <div v-if="!data.telegramLinked && data.telegramLinkCode" class="flex justify-between">
               <dt class="text-slate-500">Code d'appairage</dt>
               <dd><code class="rounded bg-slate-100 px-1.5 py-0.5">{{ data.telegramLinkCode }}</code></dd>
             </div>

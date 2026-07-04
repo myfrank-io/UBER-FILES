@@ -5,7 +5,7 @@ import { notifyDriver } from './notify-driver'
 import { preRideAlertMessage, driverFirstName } from './telegram'
 import { googleMapsNavUrl, wazeNavUrl } from '~/lib/nav-links'
 import { formatMoney } from '~/lib/money'
-import { isOnSiteMethod, PAYMENT_METHOD_LABELS, type PaymentMethod } from '~/lib/payment-methods'
+import { isOnSiteMethod, PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
 
 // Envoi des rappels J-1 : pour chaque course confirmée dont la prise en charge a lieu
 // dans ~24h et qui n'a pas encore reçu de rappel, on notifie le client par email.
@@ -77,8 +77,9 @@ export async function sendPreRideAlerts(now: Date = new Date()): Promise<{ sent:
     const pendingOnSite = b.payments.find(
       (p) => p.status === 'PENDING' && isOnSiteMethod(p.method as PaymentMethod),
     )
+    // Libellé court (« Espèces ») : la phrase dit déjà « sur place ».
     const paymentNote = pendingOnSite
-      ? `À encaisser sur place : ${formatMoney(pendingOnSite.amountCents, pendingOnSite.currency)} (${PAYMENT_METHOD_LABELS[pendingOnSite.method as PaymentMethod]})`
+      ? `À encaisser sur place : ${formatMoney(pendingOnSite.amountCents, pendingOnSite.currency)} (${PAYMENT_METHOD_SHORT_LABELS[pendingOnSite.method as PaymentMethod]})`
       : `Course déjà réglée en ligne — rien à encaisser.`
     const paymentNoteEmoji = `${pendingOnSite ? '💶' : '💳'} ${paymentNote}`
 
