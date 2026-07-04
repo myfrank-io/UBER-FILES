@@ -4,8 +4,11 @@
     "securePayment": "Paiement sécurisé · Créneau garanti après paiement",
     "genericError": "Une erreur est survenue.",
     "invalidLink": "Lien invalide ou expiré.",
+    "invalidLinkHelp": "Vérifiez le lien reçu par email, ou refaites une demande depuis la page de votre chauffeur.",
     "places": "{count} places",
-    "roundTripSuffix": " (aller-retour)"
+    "roundTripSuffix": " (aller-retour)",
+    "pickup": "Départ",
+    "dropoff": "Arrivée"
   },
   "lang": {
     "fr": "Français",
@@ -36,7 +39,7 @@
     "disabledBodyFallback": "le chauffeur directement",
     "disabledBodySuffix": "pour réserver.",
     "formTitle": "Réservez votre course",
-    "typeTransfer": "Transfert (A → B)",
+    "typeTransfer": "Transfert (A → B)",
     "typeHourly": "Mise à disposition",
     "fromPerKm": "dès {price}/km",
     "fromPerHour": "dès {price}/h",

@@ -94,7 +94,7 @@ async function resend(quoteId: string) {
       <button
         v-for="t in tabs"
         :key="t.key"
-        class="-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors"
+        class="-mb-px min-h-[44px] border-b-2 px-4 py-2 text-sm font-medium transition-colors"
         :class="tab === t.key
           ? 'border-brand-600 text-brand-700'
           : 'border-transparent text-slate-500 hover:text-slate-700'"
@@ -115,18 +115,19 @@ async function resend(quoteId: string) {
     <p v-if="pending && !data" class="mt-4 text-sm text-slate-400">Chargement…</p>
 
     <!-- Stats -->
+    <!-- Libellés courts + chiffres alignés en pied de carte (mt-auto) sur 390px. -->
     <div v-if="data" class="mt-5 grid grid-cols-3 gap-3">
-      <div class="card !p-4">
-        <p class="text-xs text-slate-500">Courses confirmées</p>
-        <p class="mt-1 font-serif text-2xl font-medium tracking-tight text-slate-900">{{ data.stats.confirmed }}</p>
+      <div class="card flex flex-col !p-4">
+        <p class="text-xs text-slate-500">Confirmées</p>
+        <p class="mt-auto pt-1 font-serif text-2xl font-medium tracking-tight text-slate-900">{{ data.stats.confirmed }}</p>
       </div>
-      <div class="card !p-4">
+      <div class="card flex flex-col !p-4">
         <p class="text-xs text-slate-500">Annulées</p>
-        <p class="mt-1 font-serif text-2xl font-medium tracking-tight text-slate-900">{{ data.stats.cancelled }}</p>
+        <p class="mt-auto pt-1 font-serif text-2xl font-medium tracking-tight text-slate-900">{{ data.stats.cancelled }}</p>
       </div>
-      <div class="card !p-4">
+      <div class="card flex flex-col !p-4">
         <p class="text-xs text-slate-500">Encaissé</p>
-        <p class="mt-1 font-serif text-2xl font-medium tracking-tight text-slate-900">
+        <p class="mt-auto pt-1 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
           {{ formatMoney(data.stats.totalRevenueCents) }}
         </p>
       </div>
@@ -151,14 +152,14 @@ async function resend(quoteId: string) {
             <p class="font-semibold text-slate-900">{{ q.ride.customerName }}</p>
             <ContactActions class="mt-1" :phone="q.ride.customerPhone" />
           </div>
-          <div class="flex flex-col items-end gap-1">
-            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
+          <div class="flex shrink-0 flex-col items-end gap-1">
+            <span class="whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
               {{ q.ride.type === 'TRANSFER' ? 'Transfert' : 'Mise à dispo' }}
             </span>
             <!-- Règlement attendu, en un coup d'œil -->
             <span
               v-if="q.payment"
-              class="rounded-full px-2.5 py-1 text-xs font-medium"
+              class="whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium"
               :class="q.payment.kind === 'ONLINE' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'"
             >
               {{ q.payment.kind === 'ONLINE' ? '💳' : '📍' }} {{ q.payment.label }}
@@ -182,7 +183,7 @@ async function resend(quoteId: string) {
         </div>
 
         <div class="mt-3 flex flex-wrap items-center gap-2">
-          <button class="btn-primary flex-1" :disabled="busyId === q.id" @click="validate(q.id)">
+          <button class="btn-primary flex-1 whitespace-nowrap" :disabled="busyId === q.id" @click="validate(q.id)">
             {{ busyId === q.id ? '…' : q.directAccept ? 'Accepter la réservation' : 'Valider & envoyer' }}
           </button>
           <button class="btn-ghost" :disabled="busyId === q.id" @click="reject(q.id)">Refuser</button>
@@ -195,7 +196,7 @@ async function resend(quoteId: string) {
             v-model.number="adjustValue[q.id]"
             type="number"
             step="0.01"
-            class="field !py-2 text-sm"
+            class="field !py-2"
             :placeholder="`Ajuster (${(q.amountCents / 100).toFixed(2)} €)`"
           />
           <button class="btn-ghost !py-2 text-sm" :disabled="busyId === q.id || !adjustValue[q.id]" @click="validate(q.id, true)">
@@ -212,7 +213,7 @@ async function resend(quoteId: string) {
          Repliés par défaut pour rester discrets (compteur toujours visible). -->
     <section v-if="data?.sentQuotes.length" class="mt-8">
       <button
-        class="flex w-full items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700"
+        class="flex min-h-[44px] w-full items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700"
         :aria-expanded="showSent"
         @click="showSent = !showSent"
       >
@@ -235,8 +236,8 @@ async function resend(quoteId: string) {
             <ContactActions class="mt-1" :phone="q.ride.customerPhone" :email="q.ride.customerEmail" />
           </div>
           <!-- Ce que l'on attend du client : paiement en ligne ou acceptation (sur place) -->
-          <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
-            ⏳ {{ q.payment?.kind === 'ONSITE' ? "Attente d'acceptation" : 'Attente paiement' }}
+          <span class="shrink-0 whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+            ⏳ {{ q.payment?.kind === 'ONSITE' ? 'Attente client' : 'Attente paiement' }}
           </span>
         </div>
         <div class="mt-2 space-y-1 text-sm text-slate-600">
@@ -247,13 +248,13 @@ async function resend(quoteId: string) {
           </div>
           <p v-else>⏱️ {{ q.ride.durationHours }} h</p>
         </div>
-        <div class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-          <div>
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+          <div class="min-w-0">
             <span class="font-bold text-slate-900">{{ formatMoney(q.amountCents, q.currency) }}</span>
             <p class="text-xs text-slate-400">Valable jusqu'au {{ formatDateTime(q.expiresAt) }}</p>
           </div>
-          <button class="btn-ghost text-sm" :disabled="busyId === q.id" @click="resend(q.id)">
-            {{ busyId === q.id ? '…' : '↩ Relancer le client' }}
+          <button class="btn-ghost shrink-0 whitespace-nowrap text-sm" :disabled="busyId === q.id" @click="resend(q.id)">
+            {{ busyId === q.id ? '…' : '↩ Relancer' }}
           </button>
         </div>
       </div>
@@ -266,37 +267,38 @@ async function resend(quoteId: string) {
       <p v-if="data && !data.upcomingBookings.length" class="mt-3 text-sm text-slate-500">
         Aucune course planifiée.
       </p>
-      <div v-for="b in data?.upcomingBookings" :key="b.id" class="card mt-3 flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <p class="font-semibold text-slate-900">{{ b.customerName }}</p>
-          <p class="text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
-          <RideRoute
-            v-if="b.type === 'TRANSFER'"
-            nav
-            class="text-xs text-slate-500"
-            :pickup="b.pickupAddress"
-            :dropoff="b.dropoffAddress"
-          />
-          <p v-else class="text-xs text-slate-500">
-            Mise à disposition — {{ b.durationHours }} h<template v-if="b.pickupAddress"> · <NavAddress :address="b.pickupAddress" /></template>
-          </p>
-          <!-- Règlement de la course, en un coup d'œil -->
-          <PaymentBadge
-            v-if="b.payment"
-            class="mt-1.5"
-            :method="b.payment.method"
-            :status="b.payment.status"
-          />
-          <ContactActions class="mt-2" :phone="b.customerPhone" :show-phone="false" />
+      <!-- Nom + prix sur la première ligne, le trajet en pleine largeur dessous. -->
+      <div v-for="b in data?.upcomingBookings" :key="b.id" class="card mt-3">
+        <div class="flex items-baseline justify-between gap-3">
+          <p class="min-w-0 truncate font-semibold text-slate-900">{{ b.customerName }}</p>
+          <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</span>
         </div>
-        <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</span>
+        <p class="text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
+        <RideRoute
+          v-if="b.type === 'TRANSFER'"
+          nav
+          class="mt-1 text-xs text-slate-500"
+          :pickup="b.pickupAddress"
+          :dropoff="b.dropoffAddress"
+        />
+        <p v-else class="mt-1 text-xs text-slate-500">
+          Mise à disposition — {{ b.durationHours }} h<template v-if="b.pickupAddress"> · <NavAddress :address="b.pickupAddress" /></template>
+        </p>
+        <!-- Règlement de la course, en un coup d'œil -->
+        <PaymentBadge
+          v-if="b.payment"
+          class="mt-1.5"
+          :method="b.payment.method"
+          :status="b.payment.status"
+        />
+        <ContactActions class="mt-2" :phone="b.customerPhone" :show-phone="false" />
       </div>
     </section>
 
     <!-- Demandes expirées (archivées) : repliées par défaut, discrètes, en fin de page -->
     <section v-if="data?.expiredQuotes.length" class="mt-8">
       <button
-        class="flex w-full items-center gap-2 text-sm font-medium text-slate-400 hover:text-slate-600"
+        class="flex min-h-[44px] w-full items-center gap-2 text-sm font-medium text-slate-400 hover:text-slate-600"
         :aria-expanded="showExpired"
         @click="showExpired = !showExpired"
       >
@@ -324,8 +326,8 @@ async function resend(quoteId: string) {
           </div>
           <p v-else>⏱️ {{ q.ride.durationHours }} h</p>
         </div>
-        <div class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-          <span class="font-bold text-slate-900">{{ formatMoney(q.amountCents, q.currency) }}</span>
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-slate-100 pt-3">
+          <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(q.amountCents, q.currency) }}</span>
           <span class="text-xs text-slate-400">Expirée — le client peut refaire une demande</span>
         </div>
       </div>

@@ -372,16 +372,17 @@ const faq = [
         </div>
 
         <div class="space-y-3">
+          <!-- Le padding vit sur le <summary> : toute la carte est tappable pour déplier. -->
           <details
             v-for="item in faq"
             :key="item.q"
-            class="group rounded-2xl border border-[#EFE7D8] bg-[#FBF7F0] px-6 py-5 open:bg-white"
+            class="group rounded-2xl border border-[#EFE7D8] bg-[#FBF7F0] open:bg-white"
           >
-            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 text-[15px] font-semibold text-[#16283D] [&::-webkit-details-marker]:hidden">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 text-[15px] font-semibold text-[#16283D] [&::-webkit-details-marker]:hidden">
               {{ item.q }}
               <span class="text-xl leading-none text-[#B5793F] transition-transform group-open:rotate-45">+</span>
             </summary>
-            <p class="mt-3 text-sm leading-relaxed text-[#6C7889]">{{ item.a }}</p>
+            <p class="-mt-2 px-6 pb-5 text-sm leading-relaxed text-[#6C7889]">{{ item.a }}</p>
           </details>
         </div>
       </div>
@@ -393,7 +394,7 @@ const faq = [
       <div class="pointer-events-none absolute -bottom-32 -right-20 h-96 w-96 rounded-full border border-[#E0B579]/15" />
       <div class="relative mx-auto max-w-3xl px-5 py-14 sm:py-28">
         <p class="rw-serif text-2xl italic leading-snug text-[#E0B579] sm:text-4xl">
-          « Votre chauffeur, votre signature. »
+          «&nbsp;Votre chauffeur, votre signature.&nbsp;»
         </p>
         <p class="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-[#C9D2DC]">
           Rejoignez les chauffeurs qui reprennent la main sur leur clientèle.
@@ -417,8 +418,8 @@ const faq = [
           <span class="rw-serif text-lg text-[#F6F1E9]">Ridewiz</span>
         </div>
         <div class="flex items-center gap-6 text-sm text-[#96A6B8]">
-          <NuxtLink to="/inscription" class="hover:text-[#E0B579]">Devenir chauffeur</NuxtLink>
-          <NuxtLink to="/dashboard/login" class="hover:text-[#E0B579]">Espace chauffeur</NuxtLink>
+          <NuxtLink to="/inscription" class="inline-flex items-center py-2.5 hover:text-[#E0B579]">Devenir chauffeur</NuxtLink>
+          <NuxtLink to="/dashboard/login" class="inline-flex items-center py-2.5 hover:text-[#E0B579]">Espace chauffeur</NuxtLink>
         </div>
         <p class="text-xs text-[#96A6B8]">© 2026 Ridewiz — La réservation en marque blanche</p>
       </div>

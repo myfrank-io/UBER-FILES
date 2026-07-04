@@ -168,7 +168,8 @@ describe('emailTemplates client — variantes des flux', () => {
     })
     expect(tpl.html).toContain('règlement sur place')
     expect(tpl.html).toContain('85,50')
-    expect(tpl.html).toContain('Carte sur place')
+    // Libellé court : la phrase dit déjà « sur place », pas de « Carte sur place ».
+    expect(tpl.html).toContain('(Carte)')
 
     const noPayment = emailTemplates.reminder({
       driverName: 'Karim VTC',

@@ -97,9 +97,11 @@ async function submit() {
 
 <template>
   <div>
-    <!-- Bouton flottant (au-dessus de la barre de navigation mobile) -->
+    <!-- Bouton flottant (au-dessus de la barre de navigation mobile).
+         z-20 : sous les panneaux et modales (z-40/z-50) pour ne jamais intercepter
+         leurs taps ; le padding bas du layout dégage le contenu en fin de scroll. -->
     <button
-      class="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-2xl text-white shadow-lg transition hover:scale-105 hover:bg-brand-700 sm:bottom-6 sm:right-6"
+      class="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-2xl text-white shadow-lg transition hover:scale-105 hover:bg-brand-700 sm:bottom-6 sm:right-6"
       title="Partager ma page de réservation"
       aria-label="Partager ma page de réservation"
       @click="open = true"
@@ -134,11 +136,21 @@ async function submit() {
 
       <!-- Formulaire -->
       <form v-else class="space-y-4" @submit.prevent="submit">
-        <div>
-          <h2 class="text-lg font-semibold text-slate-900">Partager ma page de réservation</h2>
-          <p class="mt-1 text-sm text-slate-500">
-            Enregistrez votre client et envoyez-lui le lien pour réserver ses prochaines courses.
-          </p>
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-semibold text-slate-900">Partager ma page de réservation</h2>
+            <p class="mt-1 text-sm text-slate-500">
+              Enregistrez votre client et envoyez-lui le lien pour réserver ses prochaines courses.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="-mr-2 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Fermer"
+            @click="close"
+          >
+            ✕
+          </button>
         </div>
 
         <div>

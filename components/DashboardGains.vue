@@ -51,19 +51,19 @@ function exportCsv() {
       </div>
     </div>
 
-    <!-- Totaux globaux -->
+    <!-- Totaux globaux : libellés courts et chiffres alignés en pied de carte (390px). -->
     <div v-if="data" class="mt-5 grid grid-cols-3 gap-3">
-      <div class="card !p-4">
-        <p class="text-xs text-slate-500">Total encaissé</p>
-        <p class="mt-1 font-serif text-xl font-medium tracking-tight text-slate-900">{{ formatMoney(totals.grossCents) }}</p>
+      <div class="card flex flex-col !p-4">
+        <p class="text-xs text-slate-500">Encaissé</p>
+        <p class="mt-auto pt-1 font-serif text-lg font-medium tracking-tight text-slate-900 sm:text-xl">{{ formatMoney(totals.grossCents) }}</p>
       </div>
-      <div class="card !p-4">
-        <p class="text-xs text-slate-500">Net (après commission)</p>
-        <p class="mt-1 text-xl font-bold text-green-700">{{ formatMoney(totals.netCents) }}</p>
+      <div class="card flex flex-col !p-4">
+        <p class="text-xs text-slate-500">Net <span class="hidden sm:inline">(après commission)</span></p>
+        <p class="mt-auto pt-1 font-serif text-lg font-medium tracking-tight text-green-700 sm:text-xl">{{ formatMoney(totals.netCents) }}</p>
       </div>
-      <div class="card !p-4">
+      <div class="card flex flex-col !p-4">
         <p class="text-xs text-slate-500">Courses à venir</p>
-        <p class="mt-1 font-serif text-xl font-medium tracking-tight text-slate-900">{{ totals.upcomingBookings }}</p>
+        <p class="mt-auto pt-1 font-serif text-lg font-medium tracking-tight text-slate-900 sm:text-xl">{{ totals.upcomingBookings }}</p>
       </div>
     </div>
 
@@ -106,9 +106,9 @@ function exportCsv() {
       </div>
     </div>
 
-    <!-- Tableau détaillé -->
-    <div class="card mt-4">
-      <table class="w-full text-sm">
+    <!-- Tableau détaillé : scroll horizontal contenu dans la carte, la page ne déborde jamais. -->
+    <div class="card mt-4 overflow-x-auto">
+      <table class="w-full min-w-[480px] text-sm">
         <thead>
           <tr class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">
             <th class="pb-2 text-left font-medium">Période</th>

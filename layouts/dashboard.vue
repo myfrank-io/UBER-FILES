@@ -59,7 +59,9 @@ async function logout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 pb-20 sm:flex sm:pb-0">
+  <!-- pb mobile : dégage la barre basse (56px + safe-area) ET le bouton flottant
+       « Partager » qui la surplombe, pour qu'aucun contenu ne reste masqué en fin de scroll. -->
+  <div class="min-h-screen bg-slate-50 pb-[calc(9.5rem+env(safe-area-inset-bottom))] sm:flex sm:pb-0">
     <!-- Sidebar desktop -->
     <aside class="hidden w-60 shrink-0 border-r border-slate-200 bg-white p-5 sm:block">
       <div class="flex items-center gap-2.5">

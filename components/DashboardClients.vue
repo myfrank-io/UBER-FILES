@@ -45,18 +45,18 @@ function exportCsv() {
     </p>
 
     <div class="mt-5 space-y-3">
-      <div v-for="c in customers" :key="c.id" class="card flex items-center justify-between">
-        <div>
-          <p class="font-semibold text-slate-900">{{ c.name }}</p>
-          <ContactActions class="mt-1" :phone="c.phone" :email="c.email" />
-          <p v-if="c.lastRideAt" class="mt-1 text-xs text-slate-400">
-            Dernière course : {{ formatDateTime(c.lastRideAt) }}
+      <div v-for="c in customers" :key="c.id" class="card">
+        <div class="flex items-baseline justify-between gap-3">
+          <p class="min-w-0 truncate font-semibold text-slate-900">{{ c.name }}</p>
+          <p class="shrink-0 whitespace-nowrap font-bold text-slate-900">
+            {{ formatMoney(c.totalSpentCents) }}
+            <span class="text-xs font-normal text-slate-500">· {{ c.ridesCount }} course(s)</span>
           </p>
         </div>
-        <div class="text-right">
-          <p class="font-bold text-slate-900">{{ formatMoney(c.totalSpentCents) }}</p>
-          <p class="text-xs text-slate-500">{{ c.ridesCount }} course(s)</p>
-        </div>
+        <ContactActions class="mt-1.5" :phone="c.phone" :email="c.email" />
+        <p v-if="c.lastRideAt" class="mt-1.5 text-xs text-slate-400">
+          Dernière course : {{ formatDateTime(c.lastRideAt) }}
+        </p>
       </div>
     </div>
   </div>

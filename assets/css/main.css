@@ -6,7 +6,8 @@
    Boutons cuivre radius 12, champs bordure 1.5px focus cuivre, cartes radius 20. */
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[15px] font-semibold leading-none transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed;
+    /* min-h-[44px] : cible tactile minimale iOS, même quand un !py-* compact l'écrase. */
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-5 py-3 text-[15px] font-semibold leading-none transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed;
   }
   .btn-primary {
     @apply btn bg-brand-600 text-white hover:bg-brand-700 hover:shadow-[0_6px_16px_-6px_rgba(181,121,63,.6)] focus-visible:ring-brand-500 disabled:bg-[#EDE4D3] disabled:text-[#B3A488] disabled:shadow-none;
@@ -18,7 +19,8 @@
     @apply btn bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500 disabled:opacity-50;
   }
   .field {
-    @apply w-full rounded-xl border-[1.5px] border-slate-300 bg-white px-3.5 py-3 text-[15px] text-slate-900 placeholder-[#B3A488] transition focus:border-brand-600 focus:outline-none focus:ring-[3px] focus:ring-brand-600/15;
+    /* text-base (16px) : sous 16px, iOS Safari zoome automatiquement au focus. */
+    @apply w-full rounded-xl border-[1.5px] border-slate-300 bg-white px-3.5 py-3 text-base text-slate-900 placeholder-[#B3A488] transition focus:border-brand-600 focus:outline-none focus:ring-[3px] focus:ring-brand-600/15;
   }
   .label {
     @apply mb-1.5 block text-[13px] font-semibold text-slate-700;

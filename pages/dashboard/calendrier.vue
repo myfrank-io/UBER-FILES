@@ -94,6 +94,13 @@ function goMonth(delta: number) {
   const d = new Date(viewYear.value, viewMonth.value + delta, 1)
   viewYear.value = d.getFullYear()
   viewMonth.value = d.getMonth()
+  // L'agenda suit le mois affiché : garder un jour d'un autre mois sous la grille
+  // (« Jeudi 16 juillet » sous « Août ») est source de confusion.
+  if (d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth()) {
+    selectedKey.value = todayKey
+  } else {
+    selectedKey.value = dateKey(d)
+  }
 }
 function goToday() {
   viewYear.value = today.getFullYear()
@@ -324,16 +331,18 @@ function eventTimeLabel(e: CalEvent): string {
     <!-- En-tête -->
     <div class="flex items-center justify-between gap-3">
       <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Calendrier</h1>
-      <button class="btn-primary !px-4 !py-2 text-sm" @click="openBlock">+ Bloquer</button>
+      <button class="btn-primary !px-4 text-sm" @click="openBlock">+ Bloquer</button>
     </div>
 
-    <div class="mt-5 grid gap-5 lg:grid-cols-[1fr,360px] lg:items-start">
+    <!-- minmax(0,1fr) : sans lui, la piste de grille s'élargit au min-content de la
+         carte agenda (adresses) et TOUTE la page déborde horizontalement sur mobile. -->
+    <div class="mt-5 grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr),360px] lg:items-start">
       <!-- ════ Vue mensuelle ════ -->
-      <div class="card !p-3 sm:!p-5">
+      <div class="card min-w-0 !p-3 sm:!p-5">
         <!-- Navigation mois -->
         <div class="flex items-center justify-between">
           <button
-            class="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"
+            class="flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"
             aria-label="Mois précédent"
             @click="goMonth(-1)"
           >
@@ -345,14 +354,14 @@ function eventTimeLabel(e: CalEvent): string {
             </p>
             <button
               v-if="viewMonth !== today.getMonth() || viewYear !== today.getFullYear() || selectedKey !== todayKey"
-              class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+              class="rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200"
               @click="goToday"
             >
               Aujourd'hui
             </button>
           </div>
           <button
-            class="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"
+            class="flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"
             aria-label="Mois suivant"
             @click="goMonth(1)"
           >
@@ -398,7 +407,7 @@ function eventTimeLabel(e: CalEvent): string {
                     ? day.key === selectedKey ? 'bg-white' : 'bg-brand-600'
                     : e.type === 'PENDING_QUOTE'
                       ? day.key === selectedKey ? 'bg-white/60 ring-1 ring-white' : 'bg-white ring-1 ring-brand-400'
-                      : day.key === selectedKey ? 'bg-amber-200' : 'bg-amber-400',
+                      : day.key === selectedKey ? 'bg-white/70' : 'bg-slate-400',
                 ]"
               />
             </span>
@@ -414,7 +423,7 @@ function eventTimeLabel(e: CalEvent): string {
                     ? day.key === selectedKey ? 'bg-white/20 text-white' : 'bg-brand-50 text-brand-700'
                     : e.type === 'PENDING_QUOTE'
                       ? day.key === selectedKey ? 'bg-white/10 text-white ring-1 ring-white/40' : 'bg-white text-brand-600 ring-1 ring-brand-200'
-                      : day.key === selectedKey ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-700',
+                      : day.key === selectedKey ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600',
                 ]"
               >
                 <template v-if="e.type === 'BOOKING'">🚗 {{ e.booking?.customerName ?? 'Course' }}</template>
@@ -442,7 +451,7 @@ function eventTimeLabel(e: CalEvent): string {
               <span class="h-2.5 w-2.5 rounded-full bg-white ring-1 ring-brand-400" /> Attente paiement
             </span>
             <span class="flex items-center gap-1.5">
-              <span class="h-2.5 w-2.5 rounded-full bg-amber-400" /> Indisponible
+              <span class="h-2.5 w-2.5 rounded-full bg-slate-400" /> Indisponible
             </span>
           </span>
           <span>
@@ -453,10 +462,10 @@ function eventTimeLabel(e: CalEvent): string {
       </div>
 
       <!-- ════ Agenda du jour sélectionné ════ -->
-      <div class="card !p-4 sm:!p-5">
+      <div class="card min-w-0 !p-4 sm:!p-5">
         <div class="flex items-center justify-between gap-2">
-          <h2 class="font-bold capitalize text-slate-900">{{ fmtLongDate(selectedKey) }}</h2>
-          <button class="btn-ghost !px-3 !py-1.5 text-xs" @click="openBlock">Bloquer ce jour</button>
+          <h2 class="min-w-0 font-bold capitalize text-slate-900">{{ fmtLongDate(selectedKey) }}</h2>
+          <button class="btn-ghost shrink-0 whitespace-nowrap !px-3 !py-2 text-xs" @click="openBlock">Bloquer ce jour</button>
         </div>
 
         <p v-if="!dayEvents.length" class="mt-4 rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">
@@ -474,7 +483,7 @@ function eventTimeLabel(e: CalEvent): string {
                 ? 'border-brand-100 bg-brand-50/60 transition hover:border-brand-300'
                 : e.type === 'PENDING_QUOTE'
                   ? 'border-dashed border-brand-300 bg-white transition hover:border-brand-400'
-                  : 'border-amber-100 bg-amber-50/60'
+                  : 'border-slate-200 bg-slate-50'
             "
             @click="isRide(e) ? (openedBooking = e) : undefined"
           >
@@ -485,7 +494,7 @@ function eventTimeLabel(e: CalEvent): string {
                   ? 'bg-brand-600'
                   : e.type === 'PENDING_QUOTE'
                     ? 'bg-white ring-1 ring-brand-400'
-                    : 'bg-amber-400'
+                    : 'bg-slate-400'
               "
             />
             <span class="min-w-0 flex-1">
@@ -540,9 +549,10 @@ function eventTimeLabel(e: CalEvent): string {
       class="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-6"
       @click.self="openedBooking = null"
     >
-      <div class="w-full rounded-t-2xl bg-white p-5 shadow-xl sm:max-w-md sm:rounded-2xl">
+      <!-- Bottom sheet : hauteur bornée + scroll interne + safe-area sous les actions. -->
+      <div class="max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-xl sm:max-w-md sm:rounded-2xl sm:pb-5">
         <div class="flex items-start justify-between">
-          <div>
+          <div class="min-w-0">
             <p class="text-xs font-semibold uppercase tracking-wide text-brand-600">
               {{ openedBooking.booking?.type === 'TRANSFER' ? 'Transfert' : 'Mise à disposition' }}
               <span v-if="openedBooking.booking?.roundTrip"> · Aller-retour</span>
@@ -558,7 +568,8 @@ function eventTimeLabel(e: CalEvent): string {
             </span>
           </div>
           <button
-            class="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
+            class="-mr-2 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
+            aria-label="Fermer"
             @click="openedBooking = null"
           >
             ✕
@@ -646,11 +657,12 @@ function eventTimeLabel(e: CalEvent): string {
       class="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-6"
       @click.self="showBlock = false"
     >
-      <div class="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:max-w-md sm:rounded-2xl">
+      <div class="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-xl sm:max-w-md sm:rounded-2xl sm:pb-5">
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-bold text-slate-900">Bloquer un créneau</h3>
           <button
-            class="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
+            class="-mr-2 flex h-11 w-11 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
+            aria-label="Fermer"
             @click="showBlock = false"
           >
             ✕
@@ -662,7 +674,7 @@ function eventTimeLabel(e: CalEvent): string {
           <button
             v-for="p in PRESETS"
             :key="p.label"
-            class="rounded-full border px-3 py-1.5 text-xs font-semibold transition"
+            class="rounded-full border px-3.5 py-2.5 text-xs font-semibold transition"
             :class="
               (p.allDay && block.allDay) || (!p.allDay && !block.allDay && block.startTime === p.start && block.endTime === p.end)
                 ? 'border-brand-600 bg-brand-50 text-brand-700'

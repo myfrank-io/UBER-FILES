@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '~/lib/payment-methods'
+import { PAYMENT_METHOD_LABELS, PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
 
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Réservations' })
@@ -8,6 +8,11 @@ const { error: toastError, success: toastSuccess } = useToast()
 
 function methodLabel(method: unknown): string {
   return PAYMENT_METHOD_LABELS[method as PaymentMethod] ?? ''
+}
+
+// Version courte (« Espèces », « Carte ») pour les phrases qui disent déjà « sur place ».
+function shortMethodLabel(method: unknown): string {
+  return PAYMENT_METHOD_SHORT_LABELS[method as PaymentMethod] ?? ''
 }
 
 // ─── Filtres ──────────────────────────────────────────────────────────────────
@@ -83,6 +88,20 @@ async function markComplete(id: string) {
 
 const markingPaid = ref<string | null>(null)
 
+// Conditions des actions rapides d'une carte (partagées entre le conteneur et
+// chaque bouton, pour éviter de dupliquer la logique dans le template).
+interface BookingRow {
+  status: string
+  scheduledAt: string
+  payment?: { status?: string } | null
+}
+function canMarkPaid(b: BookingRow): boolean {
+  return Boolean(b.payment && b.payment.status === 'PENDING' && b.status !== 'CANCELLED')
+}
+function canComplete(b: BookingRow): boolean {
+  return b.status === 'CONFIRMED' && new Date(b.scheduledAt) <= new Date()
+}
+
 async function markPaid(id: string) {
   if (!confirm('Confirmer l’encaissement de cette course ?')) return
   markingPaid.value = id
@@ -103,11 +122,12 @@ async function markPaid(id: string) {
   <div>
     <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Réservations</h1>
 
-    <!-- Filtres -->
-    <div class="mt-4 flex flex-wrap items-end gap-3">
-      <div>
+    <!-- Filtres : grille propre sur mobile (statut pleine largeur, dates côte à côte,
+         rangée d'actions dédiée), rangée libre sur desktop. -->
+    <div class="mt-4 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end">
+      <div class="col-span-2 sm:col-span-1">
         <label class="label">Statut</label>
-        <select v-model="filterStatus" class="field !py-2 text-sm">
+        <select v-model="filterStatus" class="field !py-2.5">
           <option value="">Tous</option>
           <option value="CONFIRMED">Confirmées</option>
           <option value="COMPLETED">Terminées</option>
@@ -116,14 +136,14 @@ async function markPaid(id: string) {
       </div>
       <div>
         <label class="label">Du</label>
-        <input v-model="filterFrom" type="date" class="field !py-2 text-sm" />
+        <input v-model="filterFrom" type="date" class="field !py-2.5" />
       </div>
       <div>
         <label class="label">Au</label>
-        <input v-model="filterTo" type="date" class="field !py-2 text-sm" />
+        <input v-model="filterTo" type="date" class="field !py-2.5" />
       </div>
-      <button class="btn-primary !py-2 text-sm" @click="applyFilters">Filtrer</button>
-      <button class="btn-ghost !py-2 text-sm" @click="resetFilters">Réinitialiser</button>
+      <button class="btn-primary !py-2.5 text-sm" @click="applyFilters">Filtrer</button>
+      <button class="btn-ghost !py-2.5 text-sm" @click="resetFilters">Réinitialiser</button>
     </div>
 
     <!-- Compteur -->
@@ -146,13 +166,15 @@ async function markPaid(id: string) {
       >
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
               <p class="font-semibold text-slate-900">{{ b.customer.name }}</p>
               <StatusBadge :status="b.status" />
             </div>
             <p class="mt-1 text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
+            <!-- Adresses en texte simple sur la carte (le tap ouvre le détail, où les
+                 liens de navigation GPS restent disponibles). -->
             <div v-if="b.ride.type === 'TRANSFER'" class="mt-0.5 text-xs text-slate-500">
-              <RideRoute nav :pickup="b.ride.pickupAddress" :dropoff="b.ride.dropoffAddress" />
+              <RideRoute :pickup="b.ride.pickupAddress" :dropoff="b.ride.dropoffAddress" />
               <span v-if="b.ride.roundTrip" class="text-slate-400">Aller-retour</span>
             </div>
             <p v-else class="mt-0.5 truncate text-xs text-slate-500">
@@ -170,28 +192,24 @@ async function markPaid(id: string) {
           <p class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</p>
         </div>
 
-        <!-- Encaissement sur place : action rapide (jamais sur une course annulée) -->
+        <!-- Actions rapides regroupées sous un seul séparateur, hauteurs unifiées.
+             Encaissement sur place (jamais sur une course annulée) + clôture de course. -->
         <div
-          v-if="b.payment && b.payment.status === 'PENDING' && b.status !== 'CANCELLED'"
-          class="mt-3 border-t border-slate-100 pt-3"
+          v-if="canMarkPaid(b) || canComplete(b)"
+          class="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3"
           @click.stop
         >
           <button
-            class="rounded-lg border border-green-600 bg-white px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-50 disabled:opacity-50"
+            v-if="canMarkPaid(b)"
+            class="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-green-600 bg-white px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-50 disabled:opacity-50"
             :disabled="markingPaid === b.id"
             @click="markPaid(b.id)"
           >
             {{ markingPaid === b.id ? '…' : 'Marquer comme encaissé' }}
           </button>
-        </div>
-
-        <div
-          v-if="b.status === 'CONFIRMED' && new Date(b.scheduledAt) <= new Date()"
-          class="mt-3 border-t border-slate-100 pt-3"
-          @click.stop
-        >
           <button
-            class="btn-primary !py-1.5 text-xs"
+            v-if="canComplete(b)"
+            class="btn-primary flex-1 !py-2 text-xs"
             :disabled="completing === b.id"
             @click="markComplete(b.id)"
           >
@@ -208,16 +226,22 @@ async function markPaid(id: string) {
 
   <!-- Panneau de détail -->
   <Teleport to="body">
-    <div v-if="selected" class="fixed inset-0 z-40 flex justify-end" @click.self="closeDetail">
+    <div v-if="selected" class="fixed inset-0 z-40 flex justify-end bg-slate-900/30" @click.self="closeDetail">
       <div class="relative w-full max-w-md overflow-y-auto bg-white shadow-2xl">
-        <div class="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+        <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white py-2 pl-5 pr-2">
           <h2 class="font-semibold text-slate-900">Détail de la réservation</h2>
-          <button class="text-xl leading-none text-slate-400 hover:text-slate-700" @click="closeDetail">✕</button>
+          <button
+            class="flex h-11 w-11 items-center justify-center rounded-full text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Fermer"
+            @click="closeDetail"
+          >
+            ✕
+          </button>
         </div>
 
         <div v-if="loadingDetail" class="p-5 text-sm text-slate-400">Chargement…</div>
 
-        <div v-else-if="detail" class="space-y-5 p-5">
+        <div v-else-if="detail" class="space-y-5 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
           <div class="flex flex-wrap items-center gap-2">
             <StatusBadge :status="(detail.status as string)" />
             <PaymentBadge
@@ -277,13 +301,13 @@ async function markPaid(id: string) {
                 <span class="text-green-700">Réglé</span>
                 <span class="text-slate-500"> ({{ methodLabel(p.method) }}) — le {{ formatDateTime(p.createdAt as string) }}</span>
               </template>
-              <span v-else-if="p.status === 'PENDING'" class="text-amber-600">À encaisser sur place — {{ methodLabel(p.method) }}</span>
+              <span v-else-if="p.status === 'PENDING'" class="text-amber-600">À encaisser sur place — {{ shortMethodLabel(p.method) }}</span>
               <span v-else class="text-slate-500">{{ p.status }} — le {{ formatDateTime(p.createdAt as string) }}</span>
             </p>
 
             <button
               v-if="detail.status !== 'CANCELLED' && (detail.payments as Record<string, unknown>[]).some((p) => p.status === 'PENDING')"
-              class="mt-3 rounded-lg border border-green-600 bg-white px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-50 disabled:opacity-50"
+              class="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-green-600 bg-white px-4 py-2 text-xs font-semibold text-green-700 hover:bg-green-50 disabled:opacity-50"
               :disabled="markingPaid === (detail.id as string)"
               @click="markPaid(detail.id as string)"
             >

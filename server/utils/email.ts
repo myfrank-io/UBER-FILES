@@ -1,7 +1,7 @@
 // Envoi d'emails transactionnels via Resend. Sans clé API, on journalise et on
 // renvoie un succès simulé (dev/test). Tous les emails client passent par ici.
 import { formatMoney } from '~/lib/money'
-import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '~/lib/payment-methods'
+import { PAYMENT_METHOD_LABELS, PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
 
 interface SendArgs {
   to: string
@@ -407,7 +407,7 @@ export const emailTemplates = {
   }) {
     const paiement = opts.paidOnline
       ? `<strong>${formatMoney(opts.amountCents, opts.currency)}</strong> payés en ligne.`
-      : `<strong>${formatMoney(opts.amountCents, opts.currency)}</strong> à encaisser sur place${opts.method ? ` (${PAYMENT_METHOD_LABELS[opts.method]})` : ''}.`
+      : `<strong>${formatMoney(opts.amountCents, opts.currency)}</strong> à encaisser sur place${opts.method ? ` (${PAYMENT_METHOD_SHORT_LABELS[opts.method]})` : ''}.`
     const intro = opts.autoConfirmed
       ? `<p><strong>${esc(opts.customerName)}</strong> vient de réserver : la course du
          <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong> a été <strong>confirmée
@@ -508,7 +508,7 @@ export const emailTemplates = {
     const paymentLine =
       opts.onSiteMethod && opts.amountCents != null
         ? `<p>💶 Pensez à votre règlement sur place : <strong>${formatMoney(opts.amountCents, opts.currency ?? 'eur')}
-           (${PAYMENT_METHOD_LABELS[opts.onSiteMethod]})</strong>.</p>`
+           (${PAYMENT_METHOD_SHORT_LABELS[opts.onSiteMethod]})</strong>.</p>`
         : ''
     return {
       subject: `Rappel : votre course demain — ${opts.driverName}`,

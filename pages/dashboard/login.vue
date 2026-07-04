@@ -52,8 +52,8 @@ async function login() {
       <button type="submit" class="btn-primary w-full" :disabled="loading">
         {{ loading ? 'Connexion…' : 'Se connecter' }}
       </button>
-      <p class="text-center text-sm">
-        <NuxtLink to="/auth/forgot-password" class="text-brand-700 hover:underline text-xs">
+      <p class="text-center">
+        <NuxtLink to="/auth/forgot-password" class="inline-block py-2.5 text-sm text-brand-700 hover:underline">
           Mot de passe oublié ?
         </NuxtLink>
       </p>
