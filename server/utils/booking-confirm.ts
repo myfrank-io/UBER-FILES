@@ -3,6 +3,7 @@ import { prisma } from '~/server/utils/prisma'
 import { bookingSlot, findConflict } from '~/server/utils/calendar'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { notifyDriver } from '~/server/utils/notify-driver'
+import { bookingConfirmedMessage, driverFirstName } from '~/server/utils/telegram'
 import { signClientToken } from '~/server/utils/tokens'
 
 type QuoteWithRelations = Prisma.QuoteGetPayload<{
@@ -118,6 +119,7 @@ export async function confirmBookingFromQuote(quote: QuoteWithRelations, payment
   try {
     await notifyDriver(quote.driver, {
       email: emailTemplates.bookingConfirmedDriver({
+        driverFirstName: driverFirstName(quote.driver.displayName),
         customerName: req.customerName,
         customerPhone: req.customerPhone,
         customerEmail: req.customerEmail,
@@ -127,6 +129,20 @@ export async function confirmBookingFromQuote(quote: QuoteWithRelations, payment
         paidOnline: true,
         conflictWarning: Boolean(conflict),
         dashboardUrl: `${config.public.appBaseUrl}/dashboard/reservations`,
+      }),
+      telegram: bookingConfirmedMessage({
+        driverDisplayName: quote.driver.displayName,
+        customerName: req.customerName,
+        customerPhone: req.customerPhone,
+        scheduledAt: req.scheduledAt,
+        type: req.type,
+        durationHours: req.durationHours,
+        pickupAddress: req.pickupAddress,
+        dropoffAddress: req.dropoffAddress,
+        amountCents: quote.amountCents,
+        currency: quote.currency,
+        paidOnline: true,
+        conflictWarning: Boolean(conflict),
       }),
     })
   } catch (err) {

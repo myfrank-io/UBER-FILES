@@ -5,6 +5,7 @@ import { createRefund } from '~/server/utils/stripe'
 import { getValidAccessToken, refundTransaction } from '~/server/utils/sumup'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { notifyDriver } from '~/server/utils/notify-driver'
+import { driverFirstName } from '~/server/utils/telegram'
 import { formatMoney } from '~/lib/money'
 import { isOnSiteMethod } from '~/lib/payment-methods'
 
@@ -121,6 +122,7 @@ export default defineEventHandler(async (event) => {
 
   await notifyDriver(booking.driver, {
     email: emailTemplates.bookingCancelledDriver({
+      driverFirstName: driverFirstName(booking.driver.displayName),
       customerName: req.customerName,
       scheduledAt: booking.scheduledAt,
       refundCents: refunded ? refund.refundCents : 0,
@@ -128,6 +130,7 @@ export default defineEventHandler(async (event) => {
     }),
     telegram: {
       text:
+        `Hello ${driverFirstName(booking.driver.displayName)} 👋\n` +
         `❌ <b>Annulation client</b>\n` +
         `Client : ${req.customerName}\n` +
         `Course prévue le ${scheduledStr}\n` +

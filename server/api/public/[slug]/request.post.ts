@@ -6,7 +6,7 @@ import { computeApplicationFee } from '~/lib/pricing'
 import { resolveRequestPayment } from '~/lib/booking-policy'
 import { PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
 import { prisma } from '~/server/utils/prisma'
-import { newRequestMessage } from '~/server/utils/telegram'
+import { newRequestMessage, driverFirstName } from '~/server/utils/telegram'
 import { notifyDriver } from '~/server/utils/notify-driver'
 import { emailTemplates, sendEmail } from '~/server/utils/email'
 import { sendQuoteToClient } from '~/server/utils/quote-actions'
@@ -205,6 +205,7 @@ export default defineEventHandler(async (event) => {
   if (!confirmed) {
     await notifyDriver(driver, {
       email: emailTemplates.newRequestDriver({
+        driverFirstName: driverFirstName(driver.displayName),
         customerName: input.customer.name,
         customerPhone: input.customer.phone,
         type: input.type,
@@ -223,6 +224,7 @@ export default defineEventHandler(async (event) => {
         paymentLabel,
       }),
       telegram: newRequestMessage({
+        driverDisplayName: driver.displayName,
         customerName: input.customer.name,
         type: input.type,
         scheduledAt,

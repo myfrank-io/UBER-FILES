@@ -59,6 +59,12 @@ const button = (url: string, label: string) =>
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
+// Salutation en tête des emails chauffeur : « Hello (prénom) 👋 ».
+const helloDriver = (firstName?: string) =>
+  firstName
+    ? `<p style="font-size:15px;margin:0 0 10px"><strong>Hello ${esc(firstName)} 👋</strong></p>`
+    : ''
+
 // Pastille de contact cliquable (tel:/sms:/mailto:), style charte.
 const contactPill = (href: string, label: string) =>
   `<a href="${href}" style="display:inline-block;margin:0 8px 8px 0;padding:9px 14px;background:#ffffff;border:1.5px solid #E4DCCC;border-radius:999px;color:#16283D;text-decoration:none;font-size:13px;font-weight:600">${label}</a>`
@@ -328,6 +334,7 @@ export const emailTemplates = {
   },
   // ── Emails chauffeur (canal principal depuis la coupure des notifications Telegram) ──
   newRequestDriver(opts: {
+    driverFirstName?: string
     customerName: string
     customerPhone?: string | null
     type: 'TRANSFER' | 'HOURLY'
@@ -364,7 +371,8 @@ export const emailTemplates = {
       subject: `Nouvelle demande de course — ${opts.customerName}`,
       html: wrap(
         'Nouvelle demande de course 🚗',
-        `<p><strong>${esc(opts.customerName)}</strong>${opts.customerPhone ? ` (${esc(opts.customerPhone)})` : ''} souhaite réserver :</p>
+        `${helloDriver(opts.driverFirstName)}
+         <p><strong>${esc(opts.customerName)}</strong>${opts.customerPhone ? ` (${esc(opts.customerPhone)})` : ''} souhaite réserver :</p>
          <p>📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
             📍 ${trajet}</p>
          <p>Prix calculé : <strong style="font-size:20px">${formatMoney(opts.amountCents, opts.currency)}</strong></p>
@@ -376,6 +384,7 @@ export const emailTemplates = {
     }
   },
   bookingConfirmedDriver(opts: {
+    driverFirstName?: string
     customerName: string
     customerPhone?: string | null
     customerEmail?: string | null
@@ -411,7 +420,8 @@ export const emailTemplates = {
       subject: `Course confirmée — ${opts.customerName} (${opts.scheduledAt.toLocaleString('fr-FR')})`,
       html: wrap(
         'Course confirmée ✅',
-        `${intro}
+        `${helloDriver(opts.driverFirstName)}
+         ${intro}
          <p>${paiement}</p>
          ${opts.conflictWarning ? '<p style="color:#96691E"><strong>⚠️ Attention :</strong> cette course chevauche un autre événement de votre calendrier. Vérifiez votre planning et contactez le client si besoin.</p>' : ''}
          ${contactBlock('Votre client', { name: opts.customerName, phone: opts.customerPhone, email: opts.customerEmail })}
@@ -421,6 +431,7 @@ export const emailTemplates = {
     }
   },
   bookingCancelledDriver(opts: {
+    driverFirstName?: string
     customerName: string
     scheduledAt: Date
     refundCents: number
@@ -433,9 +444,51 @@ export const emailTemplates = {
       subject: `Course annulée — ${opts.customerName} (${opts.scheduledAt.toLocaleString('fr-FR')})`,
       html: wrap(
         'Annulation client ❌',
-        `<p><strong>${esc(opts.customerName)}</strong> a annulé sa réservation prévue le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
+        `${helloDriver(opts.driverFirstName)}
+         <p><strong>${esc(opts.customerName)}</strong> a annulé sa réservation prévue le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
          <p>${refundStr}</p>
          <p>Le créneau est libéré dans votre calendrier.</p>`,
+      ),
+    }
+  },
+  /**
+   * Alerte pré-course chauffeur (~2 h avant la prise en charge) : récap complet
+   * + liens de navigation « un tap » (Google Maps / Waze) vers le départ.
+   */
+  preRideDriver(opts: {
+    driverFirstName?: string
+    customerName: string
+    customerPhone?: string | null
+    scheduledAt: Date
+    type: 'TRANSFER' | 'HOURLY'
+    durationHours?: number | null
+    pickupAddress?: string | null
+    dropoffAddress?: string | null
+    mapsUrl?: string | null
+    wazeUrl?: string | null
+    paymentNote?: string
+  }) {
+    const trajet =
+      opts.type === 'TRANSFER'
+        ? `📍 Départ : <strong>${esc(opts.pickupAddress ?? '?')}</strong><br />
+           🏁 Arrivée : <strong>${esc(opts.dropoffAddress ?? '?')}</strong>`
+        : `🕐 Mise à disposition ${opts.durationHours ?? '?'} h${opts.pickupAddress ? `<br />📍 Départ : <strong>${esc(opts.pickupAddress)}</strong>` : ''}`
+    const navButtons = [
+      opts.mapsUrl ? button(opts.mapsUrl, '🧭 Lancer Google Maps') : '',
+      opts.wazeUrl ? button(opts.wazeUrl, '🚗 Lancer Waze') : '',
+    ].filter(Boolean).join('')
+    return {
+      subject: `⏰ Course dans ~2 h — ${opts.customerName} (${opts.scheduledAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })})`,
+      html: wrap(
+        'Votre course approche ⏰',
+        `${helloDriver(opts.driverFirstName)}
+         <p>Prise en charge le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
+         <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0">
+           ${trajet}
+         </div>
+         <p style="font-size:13px;color:#3C4A5A">Client : <strong>${esc(opts.customerName)}</strong>${opts.customerPhone ? ` — 📞 <a href="tel:${esc(opts.customerPhone)}" style="color:#4f46e5">${esc(opts.customerPhone)}</a>` : ''}</p>
+         ${opts.paymentNote ? `<p style="font-size:13px;color:#3C4A5A">${esc(opts.paymentNote)}</p>` : ''}
+         ${navButtons}`,
       ),
     }
   },

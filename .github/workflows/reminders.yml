@@ -1,16 +1,19 @@
-name: Rappels J-1
+name: Rappels & alertes courses
 
 on:
   schedule:
-    # Tous les jours à 08h00 UTC (10h Paris été, 09h hiver)
-    - cron: '0 8 * * *'
+    # Toutes les heures. Nécessaire pour ne rater aucune course :
+    #  - rappel client J-1 (fenêtre 23 h → 25 h avant la course)
+    #  - alerte chauffeur pré-course (fenêtre 1 h → 3 h avant la course)
+    # Les deux passes sont idempotentes (une seule notification par course).
+    - cron: '19 * * * *'
   workflow_dispatch: # déclenchement manuel possible
 
 jobs:
   send-reminders:
     runs-on: ubuntu-latest
     steps:
-      - name: Déclencher les rappels
+      - name: Déclencher les rappels et alertes
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST "${{ vars.APP_BASE_URL }}/api/cron/reminders" \

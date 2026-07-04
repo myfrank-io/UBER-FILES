@@ -3,9 +3,10 @@ import { prisma } from './prisma'
 import { bookingSlot, findConflict } from './calendar'
 import { sendEmail, emailTemplates } from './email'
 import { notifyDriver } from './notify-driver'
+import { bookingConfirmedMessage, driverFirstName } from './telegram'
 import { signClientToken } from './tokens'
 import { isQuotePaymentExpired } from './quote-status'
-import type { PaymentMethod } from '~/lib/payment-methods'
+import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '~/lib/payment-methods'
 
 type QuoteForConfirm = Prisma.QuoteGetPayload<{
   include: { driver: true; rideRequest: true; booking: true }
@@ -157,6 +158,7 @@ export async function confirmQuoteOnSite(
   try {
     await notifyDriver(quote.driver, {
       email: emailTemplates.bookingConfirmedDriver({
+        driverFirstName: driverFirstName(quote.driver.displayName),
         customerName: req.customerName,
         customerPhone: req.customerPhone,
         customerEmail: req.customerEmail,
@@ -168,6 +170,20 @@ export async function confirmQuoteOnSite(
         autoConfirmed: opts.autoConfirmed,
         acceptedByDriver: opts.acceptedByDriver,
         dashboardUrl: `${config.public.appBaseUrl}/dashboard/reservations`,
+      }),
+      telegram: bookingConfirmedMessage({
+        driverDisplayName: quote.driver.displayName,
+        customerName: req.customerName,
+        customerPhone: req.customerPhone,
+        scheduledAt: req.scheduledAt,
+        type: req.type,
+        durationHours: req.durationHours,
+        pickupAddress: req.pickupAddress,
+        dropoffAddress: req.dropoffAddress,
+        amountCents: quote.amountCents,
+        currency: quote.currency,
+        paidOnline: false,
+        methodLabel: PAYMENT_METHOD_LABELS[method],
       }),
     })
   } catch (err) {
