@@ -37,6 +37,7 @@ export default defineEventHandler(async (event) => {
     serviceArea: driver.serviceArea,
     phone: driver.phone,
     contactEmail: driver.contactEmail,
+    reviewUrl: driver.reviewUrl,
     status: driver.status,
     currency: driver.currency,
     timezone: driver.timezone,
