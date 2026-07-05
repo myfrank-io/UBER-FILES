@@ -850,4 +850,35 @@ export const emailTemplates = {
       ),
     }
   },
+  // Annulation à l'initiative du CHAUFFEUR (imprévu, indisponibilité). Ton
+  // d'excuse ; remboursement intégral quand la course avait été payée en ligne.
+  bookingCancelledByDriver(opts: {
+    customerName: string
+    driverName: string
+    scheduledAt: Date
+    refunded: boolean // remboursement en ligne déclenché
+    refundCents: number
+    currency: string
+    paidOnSite: boolean // réglé sur place (remboursement à voir avec le chauffeur)
+    rebookUrl: string
+  }) {
+    const money =
+      opts.refunded
+        ? `<p>Vous êtes intégralement remboursé de <strong>${formatMoney(opts.refundCents, opts.currency)}</strong> (délai bancaire habituel : 5 à 10 jours).</p>`
+        : opts.paidOnSite
+          ? '<p>Aucun montant ne vous ayant été prélevé en ligne, rien n’est à rembourser de notre côté.</p>'
+          : '<p>Aucun montant ne vous a été prélevé.</p>'
+    return {
+      subject: `Course annulée par le chauffeur — ${opts.driverName}`,
+      html: wrap(
+        'Votre course a été annulée',
+        `<p>Bonjour ${esc(opts.customerName)},</p>
+         <p>Nous sommes désolés : ${esc(opts.driverName)} a dû annuler votre course prévue le
+          <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>, en raison d'un imprévu.</p>
+         ${money}
+         <p>Vous pouvez refaire une demande dès maintenant — un autre créneau est peut-être disponible.</p>
+         ${button(opts.rebookUrl, 'Refaire une demande')}`,
+      ),
+    }
+  },
 }

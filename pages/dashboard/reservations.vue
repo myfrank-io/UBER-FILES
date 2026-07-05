@@ -116,6 +116,31 @@ async function markPaid(id: string) {
     markingPaid.value = null
   }
 }
+
+const cancelling = ref<string | null>(null)
+
+// Le chauffeur peut annuler une course à venir (non terminée, non déjà annulée).
+function canCancel(b: BookingRow): boolean {
+  return (
+    (b.status === 'CONFIRMED' || b.status === 'PENDING_PAYMENT') &&
+    new Date(b.scheduledAt) > new Date()
+  )
+}
+
+async function cancelBooking(id: string) {
+  if (!confirm('Annuler cette course ? Le client sera prévenu et intégralement remboursé s’il a payé en ligne.')) return
+  cancelling.value = id
+  try {
+    await $fetch(`/api/dashboard/bookings/${id}/cancel`, { method: 'POST' })
+    toastSuccess('Course annulée, client prévenu.')
+    await refresh()
+    if (selected.value === id) await openDetail(id)
+  } catch (e) {
+    toastError((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.')
+  } finally {
+    cancelling.value = null
+  }
+}
 </script>
 
 <template>
@@ -333,6 +358,16 @@ async function markPaid(id: string) {
               @click="markComplete(detail.id as string)"
             >
               {{ completing === detail.id ? '…' : 'Marquer comme terminée' }}
+            </button>
+          </div>
+
+          <div v-if="canCancel(detail as unknown as BookingRow)">
+            <button
+              class="w-full rounded-xl border border-red-200 bg-red-50 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+              :disabled="cancelling === (detail.id as string)"
+              @click="cancelBooking(detail.id as string)"
+            >
+              {{ cancelling === detail.id ? '…' : 'Annuler la course' }}
             </button>
           </div>
         </div>
