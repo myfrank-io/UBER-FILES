@@ -650,6 +650,40 @@ export const emailTemplates = {
       ),
     }
   },
+  // Compte chauffeur suspendu par l'administration : sa page publique n'est plus
+  // accessible et il ne peut plus recevoir de réservations.
+  accountSuspended(opts: { displayName: string; supportEmail?: string }) {
+    const support = opts.supportEmail
+      ? `<p style="font-size:13px;color:#6C7889">Pour toute question ou pour demander la réactivation,
+          contactez-nous à <a href="mailto:${opts.supportEmail}" style="color:#B5793F">${opts.supportEmail}</a>.</p>`
+      : `<p style="font-size:13px;color:#6C7889">Pour toute question ou pour demander la réactivation, répondez à cet email.</p>`
+    return {
+      subject: 'Votre compte a été suspendu',
+      html: wrap(
+        'Compte suspendu',
+        `<p>Bonjour ${esc(opts.displayName)},</p>
+         <p>Votre compte chauffeur a été <strong>suspendu</strong>. Votre page publique
+          n'est plus accessible et vous ne recevez plus de nouvelles demandes de course
+          le temps de cette suspension.</p>
+         ${support}`,
+      ),
+    }
+  },
+  // Compte chauffeur réactivé après une suspension : tout repart normalement.
+  accountReactivated(opts: { displayName: string; publicUrl: string; dashboardUrl: string }) {
+    return {
+      subject: 'Votre compte est réactivé ✅',
+      html: wrap(
+        'Compte réactivé ✅',
+        `<p>Bonjour ${esc(opts.displayName)},</p>
+         <p>Bonne nouvelle : votre compte chauffeur a été <strong>réactivé</strong>.
+          Votre page publique est de nouveau en ligne et vous pouvez recevoir des réservations.</p>
+         ${button(opts.publicUrl, 'Voir ma page publique')}
+         <p style="font-size:13px;color:#6C7889">Retrouvez votre activité dans
+          <a href="${opts.dashboardUrl}" style="color:#B5793F">votre espace</a>.</p>`,
+      ),
+    }
+  },
   // Invitation d'un chauffeur créée par l'admin : il clique pour définir son mot
   // de passe et activer son compte, puis complète son profil dans son espace.
   driverInvitation(opts: { firstName: string; inviteUrl: string }) {
