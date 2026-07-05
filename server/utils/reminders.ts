@@ -211,3 +211,87 @@ export async function sendExpiredQuoteNotices(now: Date = new Date()): Promise<{
   }
   return { sent }
 }
+
+// Récap hebdomadaire chauffeur : envoyé le lundi (créneau matinal) avec les
+// courses à venir sur 7 jours et le bilan de la semaine écoulée. Idempotent par
+// chauffeur et par semaine ISO (clé weekly-recap:{driverId}:{year}-W{week}).
+export async function sendWeeklyDriverRecap(now: Date = new Date()): Promise<{ sent: number }> {
+  const config = useRuntimeConfig()
+
+  // Ne s'exécute que le lundi, à partir de 7 h (heure serveur, UTC). L'idempotence
+  // hebdomadaire garantit un seul envoi même si le cron tourne plusieurs fois.
+  if (now.getUTCDay() !== 1 || now.getUTCHours() < 7) return { sent: 0 }
+
+  const weekKey = isoWeekKey(now)
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 3_600_000)
+  const weekAhead = new Date(now.getTime() + 7 * 24 * 3_600_000)
+
+  const drivers = await prisma.driver.findMany({
+    where: { status: 'ACTIVE' },
+    include: {
+      bookings: {
+        where: {
+          OR: [
+            { status: 'CONFIRMED', scheduledAt: { gte: now, lte: weekAhead } },
+            { status: 'COMPLETED', scheduledAt: { gte: weekAgo, lte: now } },
+          ],
+        },
+        include: { quote: { include: { rideRequest: true } } },
+        orderBy: { scheduledAt: 'asc' },
+      },
+    },
+  })
+
+  let sent = 0
+  for (const d of drivers) {
+    const key = `weekly-recap:${d.id}:${weekKey}`
+    const existing = await prisma.webhookEvent.findUnique({ where: { id: key } })
+    if (existing) continue
+
+    const upcoming = d.bookings.filter((b) => b.status === 'CONFIRMED')
+    const done = d.bookings.filter((b) => b.status === 'COMPLETED')
+    const lastWeekEarningsCents = done.reduce((sum, b) => sum + b.amountCents, 0)
+
+    // Rien à raconter (ni passé ni futur) : on n'envoie pas d'email vide.
+    if (upcoming.length === 0 && done.length === 0) {
+      await prisma.webhookEvent.create({
+        data: { id: key, provider: 'cron', type: 'weekly-recap', processedAt: new Date() },
+      })
+      continue
+    }
+
+    await notifyDriver(d, {
+      email: emailTemplates.weeklyDriverRecap({
+        driverFirstName: driverFirstName(d.displayName),
+        upcomingCount: upcoming.length,
+        upcoming: upcoming.slice(0, 5).map((b) => ({
+          scheduledAt: b.scheduledAt,
+          customerName: b.quote.rideRequest.customerName,
+          label:
+            b.quote.rideRequest.type === 'TRANSFER'
+              ? 'Transfert'
+              : `Mise à disposition ${b.quote.rideRequest.durationHours ?? ''} h`,
+        })),
+        lastWeekCount: done.length,
+        lastWeekEarningsCents,
+        currency: d.currency,
+        dashboardUrl: `${config.public.appBaseUrl}/dashboard`,
+      }),
+    })
+    await prisma.webhookEvent.create({
+      data: { id: key, provider: 'cron', type: 'weekly-recap', processedAt: new Date() },
+    })
+    sent++
+  }
+  return { sent }
+}
+
+/** Clé « année-semaine ISO » (ex: "2026-W27") pour l'idempotence hebdomadaire. */
+function isoWeekKey(date: Date): string {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7)
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`
+}

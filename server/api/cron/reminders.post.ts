@@ -3,6 +3,7 @@ import {
   sendPreRideAlerts,
   sendQuoteExpiryReminders,
   sendExpiredQuoteNotices,
+  sendWeeklyDriverRecap,
 } from '~/server/utils/reminders'
 
 // Déclencheur des tâches planifiées, à appeler toutes les heures par un cron
@@ -23,10 +24,12 @@ export default defineEventHandler(async (event) => {
   const preRide = await sendPreRideAlerts()
   const quoteReminders = await sendQuoteExpiryReminders()
   const expiredNotices = await sendExpiredQuoteNotices()
+  const weeklyRecaps = await sendWeeklyDriverRecap()
   return {
     remindersSent: reminders.sent,
     preRideAlertsSent: preRide.sent,
     quoteRemindersSent: quoteReminders.sent,
     expiredNoticesSent: expiredNotices.sent,
+    weeklyRecapsSent: weeklyRecaps.sent,
   }
 })

@@ -807,4 +807,47 @@ export const emailTemplates = {
       ),
     }
   },
+  // Récap hebdomadaire chauffeur (lundi matin) : courses à venir sur 7 jours +
+  // gains de la semaine écoulée. Vue d'ensemble motivante de l'activité.
+  weeklyDriverRecap(opts: {
+    driverFirstName?: string
+    upcomingCount: number
+    upcoming: { scheduledAt: Date; customerName: string; label: string }[]
+    lastWeekCount: number
+    lastWeekEarningsCents: number
+    currency: string
+    dashboardUrl: string
+  }) {
+    const upcomingRows = opts.upcoming
+      .map(
+        (r) =>
+          `<tr>
+             <td style="padding:6px 0;font-size:13px;color:#16283D">${r.scheduledAt.toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+             <td style="padding:6px 0;font-size:13px;color:#5B6B7E">${esc(r.customerName)} — ${esc(r.label)}</td>
+           </tr>`,
+      )
+      .join('')
+    const upcomingBlock = opts.upcomingCount
+      ? `<p style="margin:18px 0 6px;font-weight:600;color:#0E1B2C">📅 ${opts.upcomingCount} course${opts.upcomingCount > 1 ? 's' : ''} à venir cette semaine</p>
+         <table style="width:100%;border-collapse:collapse">${upcomingRows}</table>
+         ${opts.upcomingCount > opts.upcoming.length ? `<p style="font-size:12px;color:#9A8B72;margin-top:6px">…et ${opts.upcomingCount - opts.upcoming.length} autre(s). Tout est dans votre espace.</p>` : ''}`
+      : `<p style="margin:18px 0 6px;color:#5B6B7E">Aucune course programmée cette semaine pour l'instant. Partagez votre page pour recevoir de nouvelles demandes !</p>`
+
+    return {
+      subject: `Votre semaine Ridewiz — ${opts.upcomingCount} course${opts.upcomingCount > 1 ? 's' : ''} à venir`,
+      html: wrap(
+        'Votre point hebdo 📊',
+        `${helloDriver(opts.driverFirstName)}
+         <div style="background:#FBF7F0;border:1px solid #EFE7D8;border-radius:12px;padding:16px;margin:14px 0">
+           <p style="margin:0;font-size:13px;color:#9A8B72">Semaine écoulée</p>
+           <p style="margin:4px 0 0;font-size:15px;color:#16283D">
+             <strong>${opts.lastWeekCount}</strong> course${opts.lastWeekCount > 1 ? 's' : ''} réalisée${opts.lastWeekCount > 1 ? 's' : ''}
+             &nbsp;·&nbsp; <strong>${formatMoney(opts.lastWeekEarningsCents, opts.currency)}</strong> encaissés
+           </p>
+         </div>
+         ${upcomingBlock}
+         ${button(opts.dashboardUrl, 'Ouvrir mon espace')}`,
+      ),
+    }
+  },
 }
