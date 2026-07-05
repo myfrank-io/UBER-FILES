@@ -2,6 +2,7 @@ import { prisma } from './prisma'
 import { signClientToken } from './tokens'
 import { sendEmail, emailTemplates } from './email'
 import { notifyDriver } from './notify-driver'
+import { driverBookingMode } from './driver'
 import { preRideAlertMessage, driverFirstName } from './telegram'
 import { googleMapsNavUrl, wazeNavUrl } from '~/lib/nav-links'
 import { formatMoney } from '~/lib/money'
@@ -117,6 +118,53 @@ export async function sendPreRideAlerts(now: Date = new Date()): Promise<{ sent:
     })
     await prisma.webhookEvent.create({
       data: { id: alertKey, provider: 'cron', type: 'preride', processedAt: new Date() },
+    })
+    sent++
+  }
+  return { sent }
+}
+
+// Relance des devis envoyés mais non payés qui expirent dans moins de 6 h :
+// on renvoie au client le lien de paiement avant que le créneau soit perdu.
+// Ne concerne que les chauffeurs dont le paiement en ligne est opérationnel
+// (un devis « règlement sur place » n'a rien à payer en ligne). Idempotent
+// via WebhookEvent : une seule relance par devis.
+export async function sendQuoteExpiryReminders(now: Date = new Date()): Promise<{ sent: number }> {
+  const config = useRuntimeConfig()
+  const windowEnd = new Date(now.getTime() + 6 * 3_600_000)
+
+  const quotes = await prisma.quote.findMany({
+    where: {
+      status: 'SENT',
+      booking: null,
+      expiresAt: { gt: now, lte: windowEnd },
+      // La course elle-même doit être encore à venir.
+      rideRequest: { scheduledAt: { gt: now } },
+    },
+    include: { driver: true, rideRequest: true },
+  })
+
+  let sent = 0
+  for (const q of quotes) {
+    const key = `quote-reminder:${q.id}`
+    const existing = await prisma.webhookEvent.findUnique({ where: { id: key } })
+    if (existing) continue
+
+    // Relance uniquement si le client peut effectivement payer en ligne.
+    if (!driverBookingMode(q.driver).onlineAvailable) continue
+
+    const payToken = await signClientToken({ purpose: 'quote', ref: q.id }, config.linkTokenSecret, '7d')
+    const tpl = emailTemplates.quoteExpiringReminder({
+      driverName: q.driver.displayName,
+      amountCents: q.amountCents,
+      currency: q.currency,
+      scheduledAt: q.rideRequest.scheduledAt,
+      payUrl: `${config.public.appBaseUrl}/devis/${payToken}`,
+      expiresAt: q.expiresAt,
+    })
+    await sendEmail({ to: q.rideRequest.customerEmail, ...tpl })
+    await prisma.webhookEvent.create({
+      data: { id: key, provider: 'cron', type: 'quote-reminder', processedAt: new Date() },
     })
     sent++
   }

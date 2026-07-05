@@ -711,4 +711,71 @@ export const emailTemplates = {
       ),
     }
   },
+  // Relance client : devis validé mais toujours pas payé, expire bientôt.
+  quoteExpiringReminder(opts: {
+    driverName: string
+    amountCents: number
+    currency: string
+    scheduledAt: Date
+    payUrl: string
+    expiresAt: Date
+  }) {
+    return {
+      subject: `Votre devis expire bientôt — ${opts.driverName}`,
+      html: wrap(
+        'Votre devis expire bientôt ⏳',
+        `<p>Votre course avec ${esc(opts.driverName)} prévue le
+          <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong> n'est pas encore confirmée.</p>
+         <p style="font-size:28px;font-weight:700;color:#0E1B2C">${formatMoney(opts.amountCents, opts.currency)}</p>
+         <p>Le devis expire le <strong>${opts.expiresAt.toLocaleString('fr-FR')}</strong>.
+          Passé ce délai, le créneau sera libéré et il faudra refaire une demande.</p>
+         ${button(opts.payUrl, 'Payer et confirmer ma course')}`,
+      ),
+    }
+  },
+  // Reçu détaillé envoyé au client quand la course est terminée.
+  paymentReceipt(opts: {
+    driverName: string
+    companyName?: string | null
+    siren?: string | null
+    customerName: string
+    scheduledAt: Date
+    rideLabel: string // "Transfert — CDG → Paris" / "Mise à disposition — 4 h"
+    breakdown: { label: string; amountCents: number; detail?: string }[]
+    amountCents: number
+    currency: string
+    paymentLabel: string // "Payé en ligne le …" / "Réglé sur place (Espèces)"
+    bookingRef: string
+  }) {
+    const lines = opts.breakdown
+      .map(
+        (l) =>
+          `<tr><td style="padding:4px 0;color:#5B6B7E;font-size:13px">${esc(l.label)}${l.detail ? ` <span style="color:#9A8B72">— ${esc(l.detail)}</span>` : ''}</td>
+           <td style="padding:4px 0;text-align:right;font-size:13px;color:#16283D">${formatMoney(l.amountCents, opts.currency)}</td></tr>`,
+      )
+      .join('')
+    return {
+      subject: `Reçu de votre course du ${opts.scheduledAt.toLocaleDateString('fr-FR')} — ${opts.driverName}`,
+      html: wrap(
+        'Reçu de course',
+        `<p>Bonjour ${esc(opts.customerName)},</p>
+         <p>Merci d'avoir voyagé avec ${esc(opts.driverName)}. Voici le récapitulatif de votre course.</p>
+         <table style="width:100%;margin:16px 0;border-collapse:collapse">
+           <tr><td style="padding:4px 0;color:#9A8B72;font-size:13px">Référence</td><td style="padding:4px 0;text-align:right;font-size:13px">${esc(opts.bookingRef)}</td></tr>
+           <tr><td style="padding:4px 0;color:#9A8B72;font-size:13px">Prestation</td><td style="padding:4px 0;text-align:right;font-size:13px">${esc(opts.rideLabel)}</td></tr>
+           <tr><td style="padding:4px 0;color:#9A8B72;font-size:13px">Prise en charge</td><td style="padding:4px 0;text-align:right;font-size:13px">${opts.scheduledAt.toLocaleString('fr-FR')}</td></tr>
+           <tr><td style="padding:4px 0;color:#9A8B72;font-size:13px">Paiement</td><td style="padding:4px 0;text-align:right;font-size:13px">${esc(opts.paymentLabel)}</td></tr>
+         </table>
+         <hr style="border:none;border-top:1px solid #EFE7D8;margin:8px 0" />
+         <table style="width:100%;border-collapse:collapse">${lines}</table>
+         <table style="width:100%;border-collapse:collapse;margin-top:8px;border-top:1px solid #EFE7D8">
+           <tr><td style="padding:8px 0;font-weight:700;color:#0E1B2C">Total TTC</td>
+           <td style="padding:8px 0;text-align:right;font-weight:700;font-size:18px;color:#0E1B2C">${formatMoney(opts.amountCents, opts.currency)}</td></tr>
+         </table>
+         <p style="font-size:11px;color:#9A8B72;margin-top:16px">
+           Prestataire : ${esc(opts.companyName || opts.driverName)}${opts.siren ? ` · SIREN ${esc(opts.siren)}` : ''}.
+           Ce reçu est émis au nom du chauffeur, seul encaisseur de la course.</p>`,
+      ),
+    }
+  },
 }
