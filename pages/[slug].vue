@@ -109,6 +109,10 @@ useHead(() => {
 const type = ref<'TRANSFER' | 'HOURLY'>(driver.value?.hasTransfer ? 'TRANSFER' : 'HOURLY')
 const pickup = ref('')
 const dropoff = ref('')
+// Coordonnées exactes résolues à la sélection d'une suggestion (placeId → Place
+// Details). null tant que l'utilisateur tape librement → repli géocodage du texte.
+const pickupCoords = ref<{ lat: number; lng: number } | null>(null)
+const dropoffCoords = ref<{ lat: number; lng: number } | null>(null)
 const roundTrip = ref(false)
 const durationHours = ref(2)
 const scheduledAt = ref(defaultDateTime())
@@ -202,6 +206,17 @@ async function geocode(address: string) {
   })
 }
 
+// Coordonnées d'un champ : on privilégie la résolution exacte (placeId) faite à la
+// sélection ; à défaut (saisie libre sans choix de suggestion) on géocode le texte.
+async function resolveCoords(
+  text: string,
+  resolved: { lat: number; lng: number } | null,
+): Promise<{ lat: number; lng: number }> {
+  if (resolved) return resolved
+  const g = await geocode(text)
+  return { lat: g.lat, lng: g.lng }
+}
+
 function isoScheduledAt(): string {
   return new Date(scheduledAt.value).toISOString()
 }
@@ -209,16 +224,18 @@ function isoScheduledAt(): string {
 async function buildPayload() {
   const base: Record<string, unknown> = { type: type.value, scheduledAt: isoScheduledAt() }
   if (type.value === 'TRANSFER') {
-    const [p, d] = await Promise.all([geocode(pickup.value), geocode(dropoff.value)])
-    base.pickup = { lat: p.lat, lng: p.lng }
-    base.dropoff = { lat: d.lat, lng: d.lng }
+    const [p, d] = await Promise.all([
+      resolveCoords(pickup.value, pickupCoords.value),
+      resolveCoords(dropoff.value, dropoffCoords.value),
+    ])
+    base.pickup = p
+    base.dropoff = d
     base.pickupAddress = pickup.value
     base.dropoffAddress = dropoff.value
     base.roundTrip = roundTrip.value
   } else {
     // Mise à disposition : le lieu de prise en charge est requis aussi.
-    const p = await geocode(pickup.value)
-    base.pickup = { lat: p.lat, lng: p.lng }
+    base.pickup = await resolveCoords(pickup.value, pickupCoords.value)
     base.pickupAddress = pickup.value
     base.durationHours = durationHours.value
   }
@@ -502,11 +519,11 @@ function goToContact() {
         <template v-if="type === 'TRANSFER'">
           <div>
             <label class="label" for="pickup">{{ $t('public.pickupLabel') }}</label>
-            <AddressField id="pickup" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" />
+            <AddressField id="pickup" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" @resolve="pickupCoords = $event" />
           </div>
           <div>
             <label class="label" for="dropoff">{{ $t('public.dropoffLabel') }}</label>
-            <AddressField id="dropoff" v-model="dropoff" :placeholder="$t('public.dropoffPlaceholder')" />
+            <AddressField id="dropoff" v-model="dropoff" :placeholder="$t('public.dropoffPlaceholder')" @resolve="dropoffCoords = $event" />
           </div>
           <label class="flex items-center gap-2.5 py-1 text-sm text-slate-700">
             <input v-model="roundTrip" type="checkbox" class="h-5 w-5 shrink-0 rounded border-slate-300" />
@@ -518,7 +535,7 @@ function goToContact() {
         <template v-else>
           <div>
             <label class="label" for="pickup-hourly">{{ $t('public.pickupLabel') }}</label>
-            <AddressField id="pickup-hourly" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" />
+            <AddressField id="pickup-hourly" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" @resolve="pickupCoords = $event" />
           </div>
           <div>
             <label class="label" for="duration">{{ $t('public.durationLabel') }}</label>

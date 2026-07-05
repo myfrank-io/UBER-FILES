@@ -12,6 +12,10 @@ export interface RouteResult {
 export interface PlacePrediction {
   description: string
   placeId: string
+  // Coordonnées déjà connues (repli BAN). Absentes pour Google (résolues via
+  // Place Details au moment de la sélection).
+  lat?: number
+  lng?: number
 }
 
 export interface LatLng {
@@ -126,12 +130,20 @@ async function autocompleteBan(input: string): Promise<PlacePrediction[]> {
   }
   if (!res.ok) return []
   const data = (await res.json()) as {
-    features?: { properties?: { label?: string; id?: string } }[]
+    features?: { geometry?: { coordinates?: [number, number] }; properties?: { label?: string; id?: string } }[]
   }
   return (data.features ?? [])
-    .map((f) => f.properties)
-    .filter((p): p is NonNullable<typeof p> => Boolean(p?.label && p?.id))
-    .map((p) => ({ description: p.label!, placeId: p.id! }))
+    .filter((f): f is typeof f & { properties: { label: string; id: string } } =>
+      Boolean(f.properties?.label && f.properties?.id),
+    )
+    .map((f) => ({
+      description: f.properties.label,
+      placeId: f.properties.id,
+      // BAN renvoie [longitude, latitude] : on expose directement les coordonnées.
+      ...(f.geometry?.coordinates
+        ? { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] }
+        : {}),
+    }))
 }
 
 /**
