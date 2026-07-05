@@ -64,6 +64,7 @@ export default defineEventHandler(async (event) => {
       currency: booking.quote.currency,
       paymentLabel,
       bookingRef: booking.id.slice(-8).toUpperCase(),
+      reviewUrl: booking.driver.reviewUrl,
     })
     await sendEmail({ to: req.customerEmail, ...tpl })
   } catch (err) {

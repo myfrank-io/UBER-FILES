@@ -91,6 +91,10 @@ model Driver {
   phone        String?
   contactEmail String?
 
+  // Lien où inviter le client à laisser un avis (fiche Google, page Trustpilot…).
+  // Ajouté au reçu de fin de course quand il est renseigné.
+  reviewUrl    String?
+
   // Identité légale
   siren         String?
   sirenVerified Boolean @default(false)

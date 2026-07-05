@@ -25,6 +25,8 @@ const schema = z.object({
   serviceArea: z.string().max(500).optional().nullable(),
   phone: z.string().max(30).optional().nullable(),
   contactEmail: z.string().email().optional().nullable(),
+  // Lien d'avis (Google, Trustpilot…). Chaîne vide = effacement.
+  reviewUrl: z.union([z.string().url('Lien d’avis invalide.').max(500), z.literal(''), z.null()]).optional(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -38,9 +40,13 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Chaîne vide sur le lien d'avis = effacement (stocké NULL).
+  const data = { ...body.data }
+  if (data.reviewUrl === '') data.reviewUrl = null
+
   const driver = await prisma.driver.update({
     where: { id: driverId },
-    data: body.data,
+    data,
   })
 
   return { ok: true, displayName: driver.displayName }

@@ -170,3 +170,44 @@ export async function sendQuoteExpiryReminders(now: Date = new Date()): Promise<
   }
   return { sent }
 }
+
+// Notice « devis expiré » : un devis SENT non payé dont la fenêtre de paiement
+// vient de se clore (délai dépassé OU course déjà passée). On prévient le client
+// une fois, dans les 24 h suivant l'expiration, avec un lien pour refaire une
+// demande. Idempotent via WebhookEvent (clé quote-expired:{id}).
+export async function sendExpiredQuoteNotices(now: Date = new Date()): Promise<{ sent: number }> {
+  const config = useRuntimeConfig()
+  const since = new Date(now.getTime() - 24 * 3_600_000)
+
+  // Candidats : SENT, non réservés, dont expiresAt OU scheduledAt est passé récemment.
+  const quotes = await prisma.quote.findMany({
+    where: {
+      status: 'SENT',
+      booking: null,
+      OR: [
+        { expiresAt: { lte: now, gt: since } },
+        { rideRequest: { scheduledAt: { lte: now, gt: since } } },
+      ],
+    },
+    include: { driver: true, rideRequest: true },
+  })
+
+  let sent = 0
+  for (const q of quotes) {
+    const key = `quote-expired:${q.id}`
+    const existing = await prisma.webhookEvent.findUnique({ where: { id: key } })
+    if (existing) continue
+
+    const tpl = emailTemplates.quoteExpiredNotice({
+      driverName: q.driver.displayName,
+      scheduledAt: q.rideRequest.scheduledAt,
+      rebookUrl: `${config.public.appBaseUrl}/${q.driver.slug}`,
+    })
+    await sendEmail({ to: q.rideRequest.customerEmail, ...tpl })
+    await prisma.webhookEvent.create({
+      data: { id: key, provider: 'cron', type: 'quote-expired', processedAt: new Date() },
+    })
+    sent++
+  }
+  return { sent }
+}

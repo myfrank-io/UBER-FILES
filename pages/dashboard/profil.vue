@@ -112,6 +112,7 @@ const form = reactive({
   serviceArea: '',
   phone: '',
   contactEmail: '',
+  reviewUrl: '',
 })
 
 watchEffect(() => {
@@ -129,6 +130,7 @@ watchEffect(() => {
   form.serviceArea = (d.serviceArea as string) ?? ''
   form.phone = (d.phone as string) ?? ''
   form.contactEmail = (d.contactEmail as string) ?? ''
+  form.reviewUrl = (d.reviewUrl as string) ?? ''
 })
 
 async function save() {
@@ -153,6 +155,7 @@ async function save() {
         serviceArea: form.serviceArea || null,
         phone: form.phone || null,
         contactEmail: form.contactEmail || null,
+        reviewUrl: form.reviewUrl || null,
       },
     })
     await refresh()
@@ -268,6 +271,11 @@ async function save() {
         <div>
           <label class="label" for="contactEmail">Email de contact (notifications)</label>
           <input id="contactEmail" v-model="form.contactEmail" type="email" class="field" placeholder="vous@exemple.fr" />
+        </div>
+        <div>
+          <label class="label" for="reviewUrl">Lien d'avis (facultatif)</label>
+          <input id="reviewUrl" v-model="form.reviewUrl" type="url" class="field" placeholder="https://g.page/r/… (Google, Trustpilot…)" />
+          <p class="mt-1 text-xs text-slate-500">Ajouté au reçu envoyé au client après chaque course pour l'inviter à vous noter.</p>
         </div>
       </div>
 

@@ -746,6 +746,7 @@ export const emailTemplates = {
     currency: string
     paymentLabel: string // "Payé en ligne le …" / "Réglé sur place (Espèces)"
     bookingRef: string
+    reviewUrl?: string | null // lien d'avis du chauffeur (facultatif)
   }) {
     const lines = opts.breakdown
       .map(
@@ -772,9 +773,37 @@ export const emailTemplates = {
            <tr><td style="padding:8px 0;font-weight:700;color:#0E1B2C">Total TTC</td>
            <td style="padding:8px 0;text-align:right;font-weight:700;font-size:18px;color:#0E1B2C">${formatMoney(opts.amountCents, opts.currency)}</td></tr>
          </table>
+         ${
+           opts.reviewUrl
+             ? `<div style="margin:22px 0 4px;padding:16px;background:#FBF7F0;border:1px solid #EFE7D8;border-radius:12px;text-align:center">
+                  <p style="margin:0 0 4px;font-size:14px;color:#16283D">Votre trajet vous a plu ?</p>
+                  <p style="margin:0 0 10px;font-size:13px;color:#6C7889">Votre avis aide énormément ${esc(opts.driverName)}.</p>
+                  ${button(opts.reviewUrl, '⭐ Laisser un avis')}
+                </div>`
+             : ''
+         }
          <p style="font-size:11px;color:#9A8B72;margin-top:16px">
            Prestataire : ${esc(opts.companyName || opts.driverName)}${opts.siren ? ` · SIREN ${esc(opts.siren)}` : ''}.
            Ce reçu est émis au nom du chauffeur, seul encaisseur de la course.</p>`,
+      ),
+    }
+  },
+  // Notice au client quand son devis a expiré sans paiement : le créneau est
+  // libéré, on l'invite à refaire une demande depuis la page publique du chauffeur.
+  quoteExpiredNotice(opts: {
+    driverName: string
+    scheduledAt: Date
+    rebookUrl: string
+  }) {
+    return {
+      subject: `Votre devis a expiré — ${opts.driverName}`,
+      html: wrap(
+        'Votre devis a expiré ⌛',
+        `<p>Votre devis pour la course prévue le
+          <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong> a expiré sans être confirmé,
+          et le créneau a été libéré.</p>
+         <p>Pas d'inquiétude : vous pouvez refaire une demande en quelques secondes.</p>
+         ${button(opts.rebookUrl, 'Refaire une demande')}`,
       ),
     }
   },
