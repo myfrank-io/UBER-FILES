@@ -346,6 +346,13 @@ model RideRequest {
   distanceMeters Int?    // calculé via Google Routes
   durationSeconds Int?   // calculé via Google Routes
 
+  // Précision aéroport / gare (Niveau 2) : terminal/hall de prise en charge choisi
+  // par le client (code du catalogue lib/hubs.ts), affiché au chauffeur.
+  pickupTerminal String?
+  // Connexion au vol (Niveau 3, préparé) : numéro de vol saisi par le client, pour
+  // récupérer plus tard terminal + horaire d'arrivée et suivre les retards.
+  flightNumber   String?
+
   // Mise à disposition
   durationHours Int?
 
