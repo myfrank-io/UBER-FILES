@@ -113,6 +113,9 @@ const dropoff = ref('')
 // Details). null tant que l'utilisateur tape librement → repli géocodage du texte.
 const pickupCoords = ref<{ lat: number; lng: number } | null>(null)
 const dropoffCoords = ref<{ lat: number; lng: number } | null>(null)
+// Terminal/hall de prise en charge choisi (hubs) + coords précises de ce terminal.
+const pickupTerminal = ref<string | null>(null)
+const terminalCoords = ref<{ lat: number; lng: number } | null>(null)
 const roundTrip = ref(false)
 const durationHours = ref(2)
 const scheduledAt = ref(defaultDateTime())
@@ -223,9 +226,12 @@ function isoScheduledAt(): string {
 
 async function buildPayload() {
   const base: Record<string, unknown> = { type: type.value, scheduledAt: isoScheduledAt() }
+  // Le terminal choisi (hub) fournit la coordonnée de prise en charge la plus précise.
+  const pickupResolved = terminalCoords.value ?? pickupCoords.value
+  if (pickupTerminal.value) base.pickupTerminal = pickupTerminal.value
   if (type.value === 'TRANSFER') {
     const [p, d] = await Promise.all([
-      resolveCoords(pickup.value, pickupCoords.value),
+      resolveCoords(pickup.value, pickupResolved),
       resolveCoords(dropoff.value, dropoffCoords.value),
     ])
     base.pickup = p
@@ -235,7 +241,7 @@ async function buildPayload() {
     base.roundTrip = roundTrip.value
   } else {
     // Mise à disposition : le lieu de prise en charge est requis aussi.
-    base.pickup = await resolveCoords(pickup.value, pickupCoords.value)
+    base.pickup = await resolveCoords(pickup.value, pickupResolved)
     base.pickupAddress = pickup.value
     base.durationHours = durationHours.value
   }
@@ -520,6 +526,7 @@ function goToContact() {
           <div>
             <label class="label" for="pickup">{{ $t('public.pickupLabel') }}</label>
             <AddressField id="pickup" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" @resolve="pickupCoords = $event" />
+            <TerminalPicker class="mt-3" :address="pickup" v-model="pickupTerminal" @coords="terminalCoords = $event" />
           </div>
           <div>
             <label class="label" for="dropoff">{{ $t('public.dropoffLabel') }}</label>
@@ -536,6 +543,7 @@ function goToContact() {
           <div>
             <label class="label" for="pickup-hourly">{{ $t('public.pickupLabel') }}</label>
             <AddressField id="pickup-hourly" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" @resolve="pickupCoords = $event" />
+            <TerminalPicker class="mt-3" :address="pickup" v-model="pickupTerminal" @coords="terminalCoords = $event" />
           </div>
           <div>
             <label class="label" for="duration">{{ $t('public.durationLabel') }}</label>

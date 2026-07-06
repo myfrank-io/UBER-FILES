@@ -121,3 +121,20 @@ export function findTerminal(hub: Hub, code: string | null | undefined): HubTerm
   if (!code) return null
   return hub.terminals.find((t) => t.code === code) ?? null
 }
+
+/**
+ * Adresse de prise en charge enrichie du terminal choisi, pour l'affichage au
+ * chauffeur : « Aéroport CDG · Terminal 2E ». Renvoie l'adresse inchangée si aucun
+ * terminal (ou hub non reconnu).
+ */
+export function pickupWithTerminal(
+  address: string | null | undefined,
+  terminalCode: string | null | undefined,
+): string {
+  const base = address ?? ''
+  if (!terminalCode) return base
+  const hub = findHubByText(address)
+  const terminal = hub ? findTerminal(hub, terminalCode) : null
+  const label = terminal?.label ?? terminalCode
+  return base ? `${base} · ${label}` : label
+}
