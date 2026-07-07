@@ -154,6 +154,21 @@ export function findTerminal(hub: Hub, code: string | null | undefined): HubTerm
 }
 
 /**
+ * Libellé lisible du terminal choisi (ex: « Terminal 2E »), à partir de l'adresse
+ * de départ et du code stocké. Renvoie le code brut si le hub n'est pas reconnu,
+ * ou null si aucun terminal.
+ */
+export function terminalLabel(
+  address: string | null | undefined,
+  terminalCode: string | null | undefined,
+): string | null {
+  if (!terminalCode) return null
+  const hub = findHubByText(address)
+  const terminal = hub ? findTerminal(hub, terminalCode) : null
+  return terminal?.label ?? terminalCode
+}
+
+/**
  * Adresse de prise en charge enrichie du terminal choisi, pour l'affichage au
  * chauffeur : « Aéroport CDG · Terminal 2E ». Renvoie l'adresse inchangée si aucun
  * terminal (ou hub non reconnu).

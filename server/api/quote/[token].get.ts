@@ -57,6 +57,7 @@ export default defineEventHandler(async (event) => {
       scheduledAt: quote.rideRequest.scheduledAt,
       pickupAddress: quote.rideRequest.pickupAddress,
       dropoffAddress: quote.rideRequest.dropoffAddress,
+      pickupTerminal: quote.rideRequest.pickupTerminal,
       roundTrip: quote.rideRequest.roundTrip,
       durationHours: quote.rideRequest.durationHours,
     },

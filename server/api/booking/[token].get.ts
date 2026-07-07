@@ -58,6 +58,7 @@ export default defineEventHandler(async (event) => {
       type: req.type,
       pickupAddress: req.pickupAddress,
       dropoffAddress: req.dropoffAddress,
+      pickupTerminal: req.pickupTerminal,
       roundTrip: req.roundTrip,
       durationHours: req.durationHours,
     },

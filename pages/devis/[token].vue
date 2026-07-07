@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Page client : consultation d'un devis validé + paiement (en ligne ou sur place).
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '~/lib/payment-methods'
+import { terminalLabel } from '~/lib/hubs'
 
 const route = useRoute()
 const token = route.params.token as string
@@ -136,6 +137,9 @@ async function confirmOnSite() {
           </div>
           <p v-else>
             <strong>{{ $t('quote.hourly') }}</strong> — {{ $t('quote.hourlyDuration', { hours: quote.ride.durationHours }) }}<template v-if="quote.ride.pickupAddress"><br />{{ quote.ride.pickupAddress }}</template>
+          </p>
+          <p v-if="terminalLabel(quote.ride.pickupAddress, quote.ride.pickupTerminal)" class="text-slate-500">
+            🚪 {{ terminalLabel(quote.ride.pickupAddress, quote.ride.pickupTerminal) }}
           </p>
           <p>{{ $t('quote.on', { date: formatDateTime(quote.ride.scheduledAt) }) }}</p>
         </div>
