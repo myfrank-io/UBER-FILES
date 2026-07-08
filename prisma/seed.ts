@@ -13,14 +13,10 @@ function hashPassword(password: string): string {
 }
 
 async function main() {
-  const demoPasswordHash = hashPassword('password123')
-
-  // Admin Chams
-  await prisma.user.upsert({
-    where: { email: 'admin@chams.fr' },
-    update: {},
-    create: { email: 'admin@chams.fr', passwordHash: demoPasswordHash, role: 'ADMIN', emailVerified: true },
-  })
+  // Les comptes de DÉMONSTRATION (mot de passe "password123") ne sont créés QUE
+  // hors production, ou explicitement via SEED_DEMO=1. En prod, un `db:seed` ne
+  // crée jamais de compte à mot de passe faible.
+  const seedDemo = process.env.SEED_DEMO === '1' || process.env.NODE_ENV !== 'production'
 
   // Admin Uber Files (arrive directement sur l'admin center après connexion).
   // Le mot de passe N'EST PLUS EN DUR : il provient de ADMIN_SEED_PASSWORD.
@@ -45,6 +41,21 @@ async function main() {
       data: { role: 'ADMIN', emailVerified: true },
     })
   }
+
+  // ─── Données de démonstration (hors production uniquement) ────────────────
+  if (!seedDemo) {
+    console.log('✅ Seed terminé (admin uniquement — démo désactivée en production).')
+    return
+  }
+
+  const demoPasswordHash = hashPassword('password123')
+
+  // Admin de démo Chams
+  await prisma.user.upsert({
+    where: { email: 'admin@chams.fr' },
+    update: {},
+    create: { email: 'admin@chams.fr', passwordHash: demoPasswordHash, role: 'ADMIN', emailVerified: true },
+  })
 
   // Chauffeur de démo
   const driver = await prisma.driver.upsert({
@@ -202,9 +213,9 @@ async function main() {
     },
   })
 
-  console.log('✅ Seed terminé.')
-  console.log('   Admin   : admin@chams.fr / password123')
-  console.log('   Chauffeur: karim@example.com / password123')
+  console.log('✅ Seed terminé (avec données de démonstration).')
+  console.log('   Démo admin    : admin@chams.fr / password123')
+  console.log('   Démo chauffeur: karim@example.com / password123')
   console.log('   Page publique : /karim-paris')
 }
 
