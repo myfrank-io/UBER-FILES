@@ -17,6 +17,10 @@ export const estimateSchema = z
     dropoff: latLngSchema.optional(),
     pickupAddress: z.string().min(1).max(300).optional(),
     dropoffAddress: z.string().min(1).max(300).optional(),
+    // Terminal/hall de prise en charge (aéroport/gare) choisi par le client —
+    // code du catalogue lib/hubs.ts. N° de vol : prep Niveau 3.
+    pickupTerminal: z.string().max(40).optional(),
+    flightNumber: z.string().max(16).optional(),
     roundTrip: z.boolean().default(false),
     // Mise à disposition
     durationHours: z.number().int().min(1).max(24).optional(),

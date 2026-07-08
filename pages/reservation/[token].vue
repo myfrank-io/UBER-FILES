@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Page client : gestion d'une réservation confirmée (consultation + annulation).
 import { PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
+import { terminalLabel } from '~/lib/hubs'
 
 const route = useRoute()
 const token = route.params.token as string
@@ -63,6 +64,9 @@ async function cancel() {
           <RideRoute wrap class="mt-1" :pickup="booking.ride.pickupAddress" :dropoff="booking.ride.dropoffAddress" />
         </div>
         <p v-else><strong>{{ $t('reservation.hourly') }}</strong> — {{ $t('reservation.hourlyDuration', { hours: booking.ride.durationHours }) }}</p>
+        <p v-if="terminalLabel(booking.ride.pickupAddress, booking.ride.pickupTerminal)" class="text-slate-500">
+          🚪 {{ terminalLabel(booking.ride.pickupAddress, booking.ride.pickupTerminal) }}
+        </p>
         <p>{{ $t('reservation.on', { date: formatDateTime(booking.scheduledAt) }) }}</p>
         <p class="font-semibold text-slate-900">{{ formatMoney(booking.amountCents, booking.currency) }}</p>
         <!-- Situation de règlement, en un coup d'œil -->

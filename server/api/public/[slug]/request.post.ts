@@ -12,6 +12,7 @@ import { emailTemplates, sendEmail } from '~/server/utils/email'
 import { sendQuoteToClient } from '~/server/utils/quote-actions'
 import { createQuoteCheckoutUrl } from '~/server/utils/checkout'
 import { confirmQuoteOnSite } from '~/server/utils/booking-onsite'
+import { pickupWithTerminal } from '~/lib/hubs'
 
 // Soumission d'une demande de course par le client (sans compte).
 // Crée/retrouve le client, enregistre la demande + un devis BROUILLON, puis selon
@@ -120,6 +121,8 @@ export default defineEventHandler(async (event) => {
         distanceMeters: computation.distanceMeters,
         durationSeconds: computation.durationSeconds,
         durationHours: input.durationHours,
+        pickupTerminal: input.pickupTerminal,
+        flightNumber: input.flightNumber,
         notes: input.notes,
         preferredPaymentMethod,
       },
@@ -202,6 +205,8 @@ export default defineEventHandler(async (event) => {
       : resolved.kind === 'ONSITE'
         ? `Sur place — ${PAYMENT_METHOD_SHORT_LABELS[resolved.method]}`
         : undefined
+  // Adresse de départ enrichie du terminal/hall choisi, pour l'affichage chauffeur.
+  const pickupDisplay = pickupWithTerminal(input.pickupAddress, input.pickupTerminal)
   if (!confirmed) {
     await notifyDriver(driver, {
       email: emailTemplates.newRequestDriver({
@@ -210,7 +215,7 @@ export default defineEventHandler(async (event) => {
         customerPhone: input.customer.phone,
         type: input.type,
         scheduledAt,
-        pickupAddress: input.pickupAddress,
+        pickupAddress: pickupDisplay,
         dropoffAddress: input.dropoffAddress,
         roundTrip: input.roundTrip,
         durationHours: input.durationHours,
@@ -230,7 +235,7 @@ export default defineEventHandler(async (event) => {
         scheduledAt,
         amountCents: computation.price.amountCents,
         currency: computation.price.currency,
-        pickupAddress: input.pickupAddress,
+        pickupAddress: pickupDisplay,
         dropoffAddress: input.dropoffAddress,
         durationHours: input.durationHours,
         quoteId: quote.id,

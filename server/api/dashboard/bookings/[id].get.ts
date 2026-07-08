@@ -1,6 +1,8 @@
 import { requireDriverId } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import { computeRefund } from '~/lib/cancellation'
+import { googleMapsNavUrl, wazeNavUrl } from '~/lib/nav-links'
+import { terminalLabel } from '~/lib/hubs'
 
 export default defineEventHandler(async (event) => {
   const driverId = await requireDriverId(event)
@@ -41,11 +43,17 @@ export default defineEventHandler(async (event) => {
       type: req.type,
       pickupAddress: req.pickupAddress,
       dropoffAddress: req.dropoffAddress,
+      pickupTerminal: req.pickupTerminal,
+      terminalLabel: terminalLabel(req.pickupAddress, req.pickupTerminal),
       roundTrip: req.roundTrip,
       durationHours: req.durationHours,
       distanceMeters: req.distanceMeters,
       durationSeconds: req.durationSeconds,
       notes: req.notes,
+      // Liens de navigation « un tap » vers le point de départ (coords exactes si
+      // disponibles — celles du terminal choisi le cas échéant).
+      mapsUrl: googleMapsNavUrl({ address: req.pickupAddress, lat: req.pickupLat, lng: req.pickupLng }),
+      wazeUrl: wazeNavUrl({ address: req.pickupAddress, lat: req.pickupLat, lng: req.pickupLng }),
     },
     payments: booking.payments.map((p) => ({
       id: p.id,

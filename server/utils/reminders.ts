@@ -5,6 +5,7 @@ import { notifyDriver } from './notify-driver'
 import { driverBookingMode } from './driver'
 import { preRideAlertMessage, driverFirstName } from './telegram'
 import { googleMapsNavUrl, wazeNavUrl } from '~/lib/nav-links'
+import { pickupWithTerminal } from '~/lib/hubs'
 import { formatMoney } from '~/lib/money'
 import { isOnSiteMethod, PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
 
@@ -87,6 +88,9 @@ export async function sendPreRideAlerts(now: Date = new Date()): Promise<{ sent:
     const pickup = { address: req.pickupAddress, lat: req.pickupLat, lng: req.pickupLng }
     const mapsUrl = googleMapsNavUrl(pickup)
     const wazeUrl = wazeNavUrl(pickup)
+    // Adresse enrichie du terminal/hall pour l'affichage (la navigation reste sur
+    // les coordonnées exactes, déjà celles du terminal choisi).
+    const pickupDisplay = pickupWithTerminal(req.pickupAddress, req.pickupTerminal)
 
     await notifyDriver(b.driver, {
       email: emailTemplates.preRideDriver({
@@ -96,7 +100,7 @@ export async function sendPreRideAlerts(now: Date = new Date()): Promise<{ sent:
         scheduledAt: b.scheduledAt,
         type: req.type,
         durationHours: req.durationHours,
-        pickupAddress: req.pickupAddress,
+        pickupAddress: pickupDisplay,
         dropoffAddress: req.dropoffAddress,
         mapsUrl,
         wazeUrl,
@@ -109,7 +113,7 @@ export async function sendPreRideAlerts(now: Date = new Date()): Promise<{ sent:
         scheduledAt: b.scheduledAt,
         type: req.type,
         durationHours: req.durationHours,
-        pickupAddress: req.pickupAddress,
+        pickupAddress: pickupDisplay,
         dropoffAddress: req.dropoffAddress,
         mapsUrl,
         wazeUrl,
