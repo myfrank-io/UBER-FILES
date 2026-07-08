@@ -29,7 +29,9 @@ export async function sendEmail(args: SendArgs): Promise<{ sent: boolean }> {
     }),
   })
   if (!res.ok) {
-    console.error('[email] échec Resend', await res.text())
+    // On journalise le statut + un extrait tronqué (évite de déverser un corps
+    // d'erreur potentiellement verbeux dans les logs).
+    console.error(`[email] échec Resend ${res.status}:`, (await res.text()).slice(0, 200))
     return { sent: false }
   }
   return { sent: true }

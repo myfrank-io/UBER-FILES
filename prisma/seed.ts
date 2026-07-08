@@ -13,25 +13,48 @@ function hashPassword(password: string): string {
 }
 
 async function main() {
+  // Les comptes de DÉMONSTRATION (mot de passe "password123") ne sont créés QUE
+  // hors production, ou explicitement via SEED_DEMO=1. En prod, un `db:seed` ne
+  // crée jamais de compte à mot de passe faible.
+  const seedDemo = process.env.SEED_DEMO === '1' || process.env.NODE_ENV !== 'production'
+
+  // Admin Uber Files (arrive directement sur l'admin center après connexion).
+  // Le mot de passe N'EST PLUS EN DUR : il provient de ADMIN_SEED_PASSWORD.
+  // À la (re)création uniquement — un seed ne réécrase jamais un mot de passe
+  // existant, pour ne pas annuler un changement fait depuis l'app.
+  const adminEmail = 'uber.files75@gmail.com'
+  const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } })
+  if (!existingAdmin) {
+    // Sans variable fournie, on génère un mot de passe aléatoire fort et on le
+    // journalise une seule fois (à changer ensuite) plutôt qu'un défaut connu.
+    const seedPassword = process.env.ADMIN_SEED_PASSWORD || randomBytes(15).toString('base64url')
+    await prisma.user.create({
+      data: { email: adminEmail, passwordHash: hashPassword(seedPassword), role: 'ADMIN', emailVerified: true },
+    })
+    if (!process.env.ADMIN_SEED_PASSWORD) {
+      console.warn(`⚠️  Admin ${adminEmail} créé avec un mot de passe ALÉATOIRE : ${seedPassword}\n   → connectez-vous et changez-le immédiatement.`)
+    }
+  } else {
+    // Compte déjà présent : on garantit le rôle/vérif sans toucher au mot de passe.
+    await prisma.user.update({
+      where: { email: adminEmail },
+      data: { role: 'ADMIN', emailVerified: true },
+    })
+  }
+
+  // ─── Données de démonstration (hors production uniquement) ────────────────
+  if (!seedDemo) {
+    console.log('✅ Seed terminé (admin uniquement — démo désactivée en production).')
+    return
+  }
+
   const demoPasswordHash = hashPassword('password123')
 
-  // Admin Chams
+  // Admin de démo Chams
   await prisma.user.upsert({
     where: { email: 'admin@chams.fr' },
     update: {},
     create: { email: 'admin@chams.fr', passwordHash: demoPasswordHash, role: 'ADMIN', emailVerified: true },
-  })
-
-  // Admin Uber Files (arrive directement sur l'admin center après connexion).
-  await prisma.user.upsert({
-    where: { email: 'uber.files75@gmail.com' },
-    update: { role: 'ADMIN', passwordHash: hashPassword('Gscam1Uber.com'), emailVerified: true },
-    create: {
-      email: 'uber.files75@gmail.com',
-      passwordHash: hashPassword('Gscam1Uber.com'),
-      role: 'ADMIN',
-      emailVerified: true,
-    },
   })
 
   // Chauffeur de démo
@@ -190,9 +213,9 @@ async function main() {
     },
   })
 
-  console.log('✅ Seed terminé.')
-  console.log('   Admin   : admin@chams.fr / password123')
-  console.log('   Chauffeur: karim@example.com / password123')
+  console.log('✅ Seed terminé (avec données de démonstration).')
+  console.log('   Démo admin    : admin@chams.fr / password123')
+  console.log('   Démo chauffeur: karim@example.com / password123')
   console.log('   Page publique : /karim-paris')
 }
 
