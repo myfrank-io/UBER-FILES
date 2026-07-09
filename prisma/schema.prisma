@@ -187,6 +187,12 @@ model Vehicle {
   isPrimary   Boolean @default(false) // véhicule mis en avant
   position    Int     @default(0)     // ordre d'affichage
 
+  // Photo personnelle du véhicule importée par le chauffeur (data URL base64,
+  // compressée côté client). Prioritaire sur l'image CDN du modèle. Servie en
+  // vraie image HTTP par /api/public/{slug}/vehicles/{id}/photo (jamais
+  // embarquée dans les réponses JSON).
+  photoUrl String? @db.Text
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

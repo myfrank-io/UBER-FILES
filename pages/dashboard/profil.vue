@@ -16,33 +16,9 @@ const photoLoading = ref(false)
 const photoError = ref('')
 const photoSuccess = ref('')
 
-const MAX_PHOTO_SOURCE_BYTES = 15 * 1024 * 1024 // 15 Mo en entrée (photos de smartphone)
-const MAX_PHOTO_DIMENSION = 512 // px, côté le plus long après redimensionnement
-
-function resizeImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error('Lecture du fichier impossible.'))
-    reader.onload = () => {
-      const img = new Image()
-      img.onerror = () => reject(new Error("Ce fichier n'est pas une image valide."))
-      img.onload = () => {
-        const scale = Math.min(1, MAX_PHOTO_DIMENSION / Math.max(img.width, img.height))
-        const width = Math.round(img.width * scale)
-        const height = Math.round(img.height * scale)
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return reject(new Error('Traitement de l’image impossible.'))
-        ctx.drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', 0.85))
-      }
-      img.src = reader.result as string
-    }
-    reader.readAsDataURL(file)
-  })
-}
+// Compression partagée (composables/useImageResize) : 512 px suffisent pour un
+// portrait affiché en vignette ronde.
+const MAX_PHOTO_DIMENSION = 512
 
 // Enregistre immédiatement la photo en base (sans attendre le bouton « Enregistrer »
 // en bas de page) : plus simple et plus fiable côté mobile. On envoie uniquement le
@@ -85,7 +61,7 @@ async function onPhotoSelected(e: Event) {
 
   photoLoading.value = true
   try {
-    const dataUrl = await resizeImage(file)
+    const dataUrl = await resizeImageToDataUrl(file, MAX_PHOTO_DIMENSION)
     await persistPhoto(dataUrl)
   } catch (err) {
     photoError.value = (err as Error).message || 'Import de la photo impossible.'

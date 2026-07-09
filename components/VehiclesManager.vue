@@ -11,6 +11,8 @@ interface Vehicle {
   seats: number | null
   color: string | null
   isPrimary: boolean
+  // URL de la photo personnelle servie par l'API publique (null = pas de photo).
+  photoSrc: string | null
 }
 
 const { data, refresh } = await useFetch<{ vehicles: Vehicle[] }>('/api/dashboard/vehicles')
@@ -30,6 +32,47 @@ const form = reactive({
   color: '',
   isPrimary: false,
 })
+
+// Photo personnelle : `pendingPhoto` porte le changement à envoyer au save
+// (undefined = inchangée, data URL = nouvelle, null = retirer) ; `photoPreview`
+// est ce qu'affiche la modale (photo existante servie par l'API, ou nouvelle).
+const pendingPhoto = ref<string | null | undefined>(undefined)
+const photoPreview = ref<string | null>(null)
+const photoBusy = ref(false)
+const VEHICLE_PHOTO_DIMENSION = 1280 // px — affichée en grand dans la lightbox client
+
+async function onPhotoSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  errorMsg.value = ''
+  if (!file.type.startsWith('image/')) {
+    errorMsg.value = 'Veuillez choisir une image (JPG, PNG, WEBP…).'
+    input.value = ''
+    return
+  }
+  if (file.size > MAX_PHOTO_SOURCE_BYTES) {
+    errorMsg.value = 'Image trop volumineuse (15 Mo maximum).'
+    input.value = ''
+    return
+  }
+  photoBusy.value = true
+  try {
+    const dataUrl = await resizeImageToDataUrl(file, VEHICLE_PHOTO_DIMENSION)
+    pendingPhoto.value = dataUrl
+    photoPreview.value = dataUrl
+  } catch (err) {
+    errorMsg.value = (err as Error).message || 'Import de la photo impossible.'
+  } finally {
+    photoBusy.value = false
+    input.value = '' // permet de re-sélectionner le même fichier
+  }
+}
+
+function removePhoto() {
+  pendingPhoto.value = null
+  photoPreview.value = null
+}
 
 const modelQuery = ref('')
 const showResults = ref(false)
@@ -66,6 +109,8 @@ function resetForm() {
   modelQuery.value = ''
   showResults.value = false
   errorMsg.value = ''
+  pendingPhoto.value = undefined
+  photoPreview.value = null
 }
 
 function openCreate() {
@@ -86,6 +131,8 @@ function openEdit(v: Vehicle) {
   modelQuery.value = v.modelLabel
   showResults.value = false
   errorMsg.value = ''
+  pendingPhoto.value = undefined
+  photoPreview.value = v.photoSrc
   showModal.value = true
 }
 
@@ -121,6 +168,8 @@ async function save() {
       seats: form.seats || null,
       color: form.color || null,
       isPrimary: form.isPrimary,
+      // Photo : envoyée seulement si elle a changé (data URL) ou été retirée (null).
+      ...(pendingPhoto.value !== undefined ? { photoUrl: pendingPhoto.value } : {}),
     }
     if (editingId.value) {
       await $fetch(`/api/dashboard/vehicles/${editingId.value}`, { method: 'PATCH', body: payload })
@@ -172,6 +221,7 @@ async function remove(v: Vehicle) {
             :model-family="v.modelFamily"
             :vehicle-class="v.vehicleClass"
             :color="v.color"
+            :photo-url="v.photoSrc"
             :alt="v.modelLabel"
             class="h-full w-full p-1"
           />
@@ -252,15 +302,40 @@ async function remove(v: Vehicle) {
           </ul>
         </div>
 
-        <div v-if="hasModel" class="flex h-32 items-center justify-center rounded-xl bg-slate-50">
+        <div v-if="hasModel || photoPreview" class="flex h-32 items-center justify-center overflow-hidden rounded-xl bg-slate-50">
           <VehicleImage
             :make="form.make"
             :model-family="form.modelFamily"
             :vehicle-class="form.vehicleClass"
             :color="form.color"
-            :alt="form.modelLabel"
+            :photo-url="photoPreview"
+            :alt="form.modelLabel || 'Véhicule'"
             class="h-full w-full p-2"
           />
+        </div>
+
+        <!-- Photo personnelle : importée depuis la pellicule / l'appareil photo,
+             prioritaire sur l'image du modèle partout où le véhicule apparaît. -->
+        <div>
+          <label class="label">Photo de mon véhicule <span class="font-normal text-slate-400">(optionnel)</span></label>
+          <div class="flex flex-wrap items-center gap-2">
+            <label class="btn-ghost inline-flex cursor-pointer items-center gap-2 !py-2.5 text-sm">
+              {{ photoBusy ? 'Import…' : photoPreview ? '📷 Changer la photo' : '📷 Ajouter une photo' }}
+              <!-- accept="image/*" ouvre directement la pellicule / l'appareil sur mobile -->
+              <input type="file" accept="image/*" class="hidden" :disabled="photoBusy" @change="onPhotoSelected" />
+            </label>
+            <button
+              v-if="photoPreview"
+              type="button"
+              class="rounded-lg px-2.5 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+              @click="removePhoto"
+            >
+              Retirer
+            </button>
+          </div>
+          <p class="mt-1 text-xs text-slate-400">
+            Affichée à vos clients à la place de l'image générique du modèle.
+          </p>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
