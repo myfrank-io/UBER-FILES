@@ -2,7 +2,14 @@
 // Bouton flottant « Partager ma page » (espace chauffeur). Permet, en un clic,
 // d'enregistrer un client (ex : présent dans la voiture) et de lui envoyer le
 // lien de la page publique de réservation par SMS, WhatsApp ou email.
+import { buildShareMessage } from '~/lib/share-message'
+
 type Channel = 'SMS' | 'WHATSAPP' | 'EMAIL'
+
+// Fournis par le layout dashboard (déjà chargés via /api/dashboard/me) : ils
+// permettent de construire le message CÔTÉ CLIENT et donc d'ouvrir WhatsApp/SMS
+// dans le geste de clic, sans dépendre d'un aller-retour réseau (fiabilité Android).
+const props = defineProps<{ publicUrl: string; driverName: string }>()
 
 const open = ref(false)
 const busy = ref(false)
@@ -45,53 +52,67 @@ function normalizePhone(phone: string): string {
   return d
 }
 
+// Enregistre / met à jour le client côté serveur. `keepalive` : la requête
+// survit à une navigation (cas du lien sms: qui peut décharger la page).
+function saveCustomer(channel: Channel) {
+  return $fetch('/api/dashboard/share-page', {
+    method: 'POST',
+    keepalive: true,
+    body: {
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim() || undefined,
+      channel,
+    },
+  })
+}
+
 async function submit() {
   if (!canSubmit.value || busy.value) return
-  busy.value = true
   errorMsg.value = ''
 
-  // WhatsApp s'ouvre dans un nouvel onglet : on l'ouvre MAINTENANT (dans le geste
-  // de clic) — sinon le navigateur bloque la popup car elle surviendrait après
-  // l'appel réseau (perte de l'« activation utilisateur »). On le redirige ensuite.
-  let waWindow: Window | null = null
-  if (form.channel === 'WHATSAPP') {
-    waWindow = window.open('', '_blank')
-  }
-
-  try {
-    const res = await $fetch<{ message: string; publicUrl: string; sent: boolean }>(
-      '/api/dashboard/share-page',
-      {
-        method: 'POST',
-        body: {
-          name: form.name.trim(),
-          phone: form.phone.trim(),
-          email: form.email.trim() || undefined,
-          channel: form.channel,
-        },
-      },
-    )
-
-    if (form.channel === 'EMAIL') {
+  // EMAIL : l'envoi est fait par le serveur → on attend la confirmation.
+  if (form.channel === 'EMAIL') {
+    busy.value = true
+    try {
+      await saveCustomer('EMAIL')
       done.value = true
-    } else if (form.channel === 'WHATSAPP') {
-      const digits = normalizePhone(form.phone)
-      const url = `https://wa.me/${digits}?text=${encodeURIComponent(res.message)}`
-      if (waWindow) waWindow.location.href = url
-      else window.location.href = url // repli si l'onglet n'a pas pu s'ouvrir
-      done.value = true
-    } else {
-      // SMS : lien natif tel/sms avec corps pré-rempli.
-      const tel = form.phone.replace(/[^+\d]/g, '')
-      window.location.href = `sms:${tel}?body=${encodeURIComponent(res.message)}`
-      done.value = true
+    } catch (e) {
+      errorMsg.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.'
+    } finally {
+      busy.value = false
     }
-  } catch (e) {
-    if (waWindow) waWindow.close()
-    errorMsg.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.'
-  } finally {
-    busy.value = false
+    return
   }
+
+  // SMS / WhatsApp : on OUVRE l'app immédiatement, dans le geste de clic, avec un
+  // message construit côté client. Ne JAMAIS attendre le réseau avant d'ouvrir —
+  // c'est ce délai qui fait échouer l'ouverture (onglet blanc / popup bloquée) sur
+  // Android. L'enregistrement du client part ensuite en tâche de fond.
+  const message = buildShareMessage({
+    customerName: form.name.trim(),
+    driverName: props.driverName,
+    publicUrl: props.publicUrl,
+  })
+
+  if (form.channel === 'WHATSAPP') {
+    const digits = normalizePhone(form.phone)
+    const url = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+    // Nouvel onglet (ne décharge pas l'espace chauffeur) ; repli sur la navigation
+    // directe si le navigateur bloque l'ouverture.
+    const win = window.open(url, '_blank')
+    if (!win) window.location.href = url
+  } else {
+    // SMS : lien natif avec corps pré-rempli (ouvre l'app Messages sans décharger).
+    const tel = form.phone.replace(/[^+\d]/g, '')
+    window.location.href = `sms:${tel}?body=${encodeURIComponent(message)}`
+  }
+
+  // Enregistrement en tâche de fond : l'ouverture de l'app ne dépend pas du réseau.
+  saveCustomer(form.channel).catch(() => {
+    /* silencieux : le message est déjà parti, l'enregistrement est secondaire */
+  })
+  done.value = true
 }
 </script>
 

@@ -22,6 +22,12 @@ const { data: me } = await useFetch('/api/dashboard/me')
 const status = computed(() => (me.value as { status?: string } | null)?.status ?? null)
 const publicSlug = computed(() => (me.value as { slug?: string } | null)?.slug ?? '')
 
+// Page publique + nom d'affichage : passés au bouton « Partager ma page » pour
+// construire le message côté client (ouverture WhatsApp/SMS dans le geste de clic).
+const appBaseUrl = useRuntimeConfig().public.appBaseUrl
+const publicUrl = computed(() => `${appBaseUrl}/${publicSlug.value}`)
+const driverName = computed(() => (me.value as { displayName?: string } | null)?.displayName ?? '')
+
 // Bannière de confirmation d'email (tant que l'adresse n'est pas vérifiée).
 const emailVerified = computed(() => (me.value as { emailVerified?: boolean } | null)?.emailVerified ?? true)
 const { success: toastSuccess, error: toastError } = useToast()
@@ -160,7 +166,7 @@ async function logout() {
     <AppToast />
 
     <!-- Bouton flottant « Partager ma page » (hors profil suspendu : page publique hors-ligne) -->
-    <DashboardShare v-if="status !== 'SUSPENDED'" />
+    <DashboardShare v-if="status !== 'SUSPENDED'" :public-url="publicUrl" :driver-name="driverName" />
 
     <!-- Barre de navigation mobile : grandes zones tactiles + safe area iOS -->
     <nav class="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] sm:hidden">

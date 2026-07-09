@@ -43,6 +43,7 @@ interface DriverPublic {
   vehicles: PublicVehicle[]
   services: string | null
   serviceArea: string | null
+  reviewUrl: string | null
   currency: string
   minimumFareCents: number
   minLeadTimeMinutes: number
@@ -86,6 +87,24 @@ useHead(() => {
       ? d.photoUrl
       : `${appBase}${d.photoUrl}`
     : `${appBase}/og-default.jpg`
+  // Données structurées schema.org (JSON-LD) : aident Google à comprendre qu'il
+  // s'agit d'une entreprise de transport locale (nom, zone, contact, image) et à
+  // faire ressortir la fiche dans les résultats. Pas de note/avis simulés ici —
+  // Google pénalise les `aggregateRating` non vérifiables.
+  const jsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'LocalBusiness',
+    '@id': url,
+    name: d.displayName,
+    url,
+    image,
+    description,
+    priceRange: '€€',
+    ...(d.phone ? { telephone: d.phone } : {}),
+    ...(d.serviceArea ? { areaServed: d.serviceArea } : {}),
+    // Fiche d'avis publique du chauffeur (Google, Trustpilot…) rattachée à l'entité.
+    ...(d.reviewUrl ? { sameAs: [d.reviewUrl] } : {}),
+  }
   return {
     title: t('public.metaTitle', { name: d.displayName }),
     meta: [
@@ -102,6 +121,11 @@ useHead(() => {
       { name: 'twitter:description', content: description },
     ],
     link: [{ rel: 'canonical', href: url }],
+    script: [
+      // On échappe « < » (→ <) pour empêcher qu'un champ saisi par le
+      // chauffeur (nom, bio…) contenant une balise script fermante ne casse la page.
+      { type: 'application/ld+json', innerHTML: JSON.stringify(jsonLd).replace(/</g, '\\u003c') },
+    ],
   }
 })
 
@@ -389,6 +413,17 @@ function goToContact() {
           {{ driver.serviceArea }}
         </span>
       </div>
+      <!-- Lien d'avis : invite les clients satisfaits à noter le chauffeur (fiche
+           Google, Trustpilot…). Affiché seulement s'il est renseigné dans le profil. -->
+      <a
+        v-if="driver.reviewUrl"
+        :href="driver.reviewUrl"
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        class="mt-4 inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
+      >
+        ⭐ {{ $t('public.leaveReview') }}
+      </a>
     </div>
 
     <!-- Véhicules (compact, intégré) -->

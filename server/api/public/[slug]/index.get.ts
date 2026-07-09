@@ -61,6 +61,9 @@ export default defineEventHandler(async (event) => {
     vehicles,
     services: driver.services,
     serviceArea: driver.serviceArea,
+    // Lien où le client peut laisser un avis (fiche Google, Trustpilot…). Affiché
+    // en bouton sur la page publique quand il est renseigné.
+    reviewUrl: driver.reviewUrl,
     currency: driver.currency,
     minimumFareCents: driver.minimumFareCents,
     minLeadTimeMinutes: driver.minLeadTimeMinutes,

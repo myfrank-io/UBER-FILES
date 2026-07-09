@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { requireDriverId } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
+import { buildShareMessage } from '~/lib/share-message'
 
 // Bouton « Partager ma page » (espace chauffeur) : le chauffeur enregistre un
 // client (téléphone obligatoire, email optionnel) et lui envoie le lien de sa
@@ -43,7 +44,7 @@ export default defineEventHandler(async (event) => {
   await upsertCustomerByPhone(driverId, { name, phone, email })
 
   const publicUrl = `${config.public.appBaseUrl}/${driver.slug}`
-  const message = `Bonjour ${name}, réservez votre course directement ici : ${publicUrl}`
+  const message = buildShareMessage({ customerName: name, driverName: driver.displayName, publicUrl })
 
   if (channel === 'EMAIL') {
     const tpl = emailTemplates.shareBookingPage({ driverName: driver.displayName, customerName: name, publicUrl })
