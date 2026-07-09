@@ -7,6 +7,8 @@ const schema = z.object({
   kind: z.enum(['FIXED', 'PERCENT']),
   amount: z.number().int().positive(),
   autoApply: z.boolean().default(false),
+  // Fenêtre « dernière minute » en minutes (max 30 jours). null = toujours.
+  maxLeadTimeMinutes: z.number().int().min(1).max(43_200).optional().nullable(),
 })
 
 export default defineEventHandler(async (event) => {

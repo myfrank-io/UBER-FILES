@@ -20,9 +20,20 @@ export interface QuoteComputation {
   estimatedRoute?: boolean
 }
 
-function mapSurcharges(surcharges: Surcharge[]): SurchargeInput[] {
+/**
+ * Majorations automatiques applicables à une demande. Celles portant une fenêtre
+ * « dernière minute » (maxLeadTimeMinutes) ne s'appliquent que si la course est
+ * réservée moins de X minutes avant la prise en charge. Le délai est évalué au
+ * moment de la demande — sens de « commande passée moins de 2 h à l'avance » —
+ * et n'est pas recalculé à la validation ni au paiement.
+ */
+export function applicableSurcharges(
+  surcharges: Surcharge[],
+  leadTimeMinutes: number,
+): SurchargeInput[] {
   return surcharges
     .filter((s) => s.autoApply)
+    .filter((s) => s.maxLeadTimeMinutes == null || leadTimeMinutes < s.maxLeadTimeMinutes)
     .map((s) => ({ name: s.name, kind: s.kind, amount: s.amount }))
 }
 
@@ -47,6 +58,9 @@ export interface ComputeArgs {
   roundTrip?: boolean
   durationHours?: number
   apiKey?: string
+  // Instant de la demande (injectable pour les tests) — sert au calcul du délai
+  // de réservation pour les majorations « dernière minute ».
+  now?: Date
 }
 
 /** Calcule un devis à partir d'une demande et de la configuration du chauffeur. */
@@ -57,7 +71,9 @@ export async function computeQuote(args: ComputeArgs): Promise<QuoteComputation>
     minimumFareCents: driver.minimumFareCents,
     timezone: driver.timezone,
   }
-  const surcharges = mapSurcharges(driver.surcharges)
+  const now = args.now ?? new Date()
+  const leadTimeMinutes = (scheduledAt.getTime() - now.getTime()) / 60_000
+  const surcharges = applicableSurcharges(driver.surcharges, leadTimeMinutes)
 
   if (type === 'TRANSFER') {
     if (!args.pickup || !args.dropoff) {

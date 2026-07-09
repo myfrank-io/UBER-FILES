@@ -526,14 +526,27 @@ async function deleteTier(id: string) {
 
 // ─── Suppléments ──────────────────────────────────────────────────────────
 
-const newSurcharge = reactive({ name: '', kind: 'FIXED' as 'FIXED' | 'PERCENT', amountDisplay: '', autoApply: false })
+const newSurcharge = reactive({ name: '', kind: 'FIXED' as 'FIXED' | 'PERCENT', amountDisplay: '', autoApply: false, leadTimeHoursDisplay: '' })
 const addingSurcharge = ref(false)
 const editingSurcharge = ref<string | null>(null)
-const editSurchargeForm = reactive({ name: '', kind: 'FIXED' as 'FIXED' | 'PERCENT', amountDisplay: '', autoApply: false })
+const editSurchargeForm = reactive({ name: '', kind: 'FIXED' as 'FIXED' | 'PERCENT', amountDisplay: '', autoApply: false, leadTimeHoursDisplay: '' })
 
 function surchargeAmount(s: Record<string, unknown>): string {
   if (s.kind === 'PERCENT') return `+ ${((s.amount as number) / 100).toFixed(1).replace('.0', '')} %`
   return `+ ${formatMoney(s.amount as number, currency.value)}`
+}
+
+// Fenêtre « dernière minute » : saisie en heures dans l'UI, stockée en minutes.
+function parseLeadTimeMinutes(display: string): number | null {
+  const hours = parseFloat(display.replace(',', '.'))
+  if (!Number.isFinite(hours) || hours <= 0) return null
+  return Math.round(hours * 60)
+}
+
+function formatLeadTime(minutes: number): string {
+  if (minutes % 60 === 0) return `${minutes / 60} h`
+  if (minutes < 60) return `${minutes} min`
+  return `${Math.floor(minutes / 60)} h ${minutes % 60}`
 }
 
 function startEditSurcharge(s: Record<string, unknown>) {
@@ -542,6 +555,8 @@ function startEditSurcharge(s: Record<string, unknown>) {
   editSurchargeForm.kind = s.kind as 'FIXED' | 'PERCENT'
   editSurchargeForm.amountDisplay = ((s.amount as number) / 100).toFixed(s.kind === 'PERCENT' ? 1 : 2)
   editSurchargeForm.autoApply = s.autoApply as boolean
+  const lead = s.maxLeadTimeMinutes as number | null | undefined
+  editSurchargeForm.leadTimeHoursDisplay = lead ? String(lead / 60) : ''
 }
 
 function parseSurchargeAmount(display: string): number {
@@ -557,9 +572,10 @@ async function addSurcharge() {
         kind: newSurcharge.kind,
         amount: parseSurchargeAmount(newSurcharge.amountDisplay),
         autoApply: newSurcharge.autoApply,
+        maxLeadTimeMinutes: parseLeadTimeMinutes(newSurcharge.leadTimeHoursDisplay),
       },
     })
-    Object.assign(newSurcharge, { name: '', amountDisplay: '', autoApply: false })
+    Object.assign(newSurcharge, { name: '', amountDisplay: '', autoApply: false, leadTimeHoursDisplay: '' })
     addingSurcharge.value = false
   })
 }
@@ -573,6 +589,7 @@ async function updateSurcharge(id: string) {
         kind: editSurchargeForm.kind,
         amount: parseSurchargeAmount(editSurchargeForm.amountDisplay),
         autoApply: editSurchargeForm.autoApply,
+        maxLeadTimeMinutes: parseLeadTimeMinutes(editSurchargeForm.leadTimeHoursDisplay),
       },
     })
     editingSurcharge.value = null
@@ -1038,6 +1055,16 @@ async function call(key: string, fn: () => Promise<unknown>) {
                 </div>
               </div>
             </div>
+            <div>
+              <label class="label">
+                Seulement si la course est réservée moins de … heures à l'avance
+                <span class="font-normal text-slate-400">(optionnel)</span>
+              </label>
+              <input v-model="editSurchargeForm.leadTimeHoursDisplay" type="number" step="0.5" min="0.5" class="field" placeholder="Ex : 2" />
+              <p v-if="editSurchargeForm.leadTimeHoursDisplay && !editSurchargeForm.autoApply" class="mt-1 text-xs text-amber-600">
+                Cochez « Inclure automatiquement » pour que cette condition prenne effet.
+              </p>
+            </div>
             <label class="flex items-center gap-2.5 py-1 text-sm text-slate-600">
               <input v-model="editSurchargeForm.autoApply" type="checkbox" class="h-5 w-5 shrink-0 rounded accent-brand-600" />
               Inclure automatiquement dans chaque devis
@@ -1054,7 +1081,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
             <div class="min-w-0">
               <p class="font-semibold text-slate-900">{{ s.name }}</p>
               <p class="mt-0.5 text-xs text-slate-500">
-                {{ (s.autoApply as boolean) ? 'Inclus dans chaque devis' : 'À ajouter à la demande' }}
+                {{ (s.autoApply as boolean) ? 'Inclus dans chaque devis' : 'À ajouter à la demande' }}<template v-if="s.maxLeadTimeMinutes"> · si réservé moins de {{ formatLeadTime(s.maxLeadTimeMinutes as number) }} à l'avance</template>
               </p>
             </div>
             <div class="shrink-0 text-right">
@@ -1087,6 +1114,16 @@ async function call(key: string, fn: () => Promise<unknown>) {
                   </select>
                 </div>
               </div>
+            </div>
+            <div>
+              <label class="label">
+                Seulement si la course est réservée moins de … heures à l'avance
+                <span class="font-normal text-slate-400">(optionnel)</span>
+              </label>
+              <input v-model="newSurcharge.leadTimeHoursDisplay" type="number" step="0.5" min="0.5" class="field" placeholder="Ex : 2" />
+              <p v-if="newSurcharge.leadTimeHoursDisplay && !newSurcharge.autoApply" class="mt-1 text-xs text-amber-600">
+                Cochez « Inclure automatiquement » pour que cette condition prenne effet.
+              </p>
             </div>
             <label class="flex items-center gap-2.5 py-1 text-sm text-slate-600">
               <input v-model="newSurcharge.autoApply" type="checkbox" class="h-5 w-5 shrink-0 rounded accent-brand-600" />
