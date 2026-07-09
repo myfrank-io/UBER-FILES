@@ -1,0 +1,118 @@
+<script setup lang="ts">
+// Carte « Finalisez votre configuration » (accueil du dashboard). Guide le
+// chauffeur étape par étape avec une barre de progression. Disparaît une fois
+// toutes les étapes OBLIGATOIRES faites (les optionnelles, ex. Telegram, ne
+// bloquent pas le 100 %). La logique de complétion vit dans lib/onboarding.ts.
+import { computeOnboarding, type OnboardingStepKey } from '~/lib/onboarding'
+import type { PaymentMethod } from '~/lib/payment-methods'
+
+interface Me {
+  photoUrl: string | null
+  bio: string | null
+  tagline: string | null
+  vehicleCount: number
+  phone: string | null
+  serviceArea: string | null
+  transferBands: unknown[]
+  hourlyTiers: unknown[]
+  paymentMethods: PaymentMethod[]
+  stripe: { connected: boolean }
+  sumup: { connected: boolean }
+  telegramLinked: boolean
+}
+
+// Partage la clé de /api/dashboard/me avec le layout → pas de requête en double.
+const { data: me } = await useFetch<Me>('/api/dashboard/me')
+
+const STEP_META: Record<OnboardingStepKey, { label: string; hint: string; href: string; icon: string }> = {
+  profil: { label: 'Compléter mon profil', hint: 'Photo et présentation', href: '/dashboard/profil', icon: '👤' },
+  vehicule: { label: 'Ajouter mon véhicule', hint: 'Marque, modèle, places', href: '/dashboard/profil', icon: '🚗' },
+  zone: { label: 'Zone et contact', hint: 'Téléphone et zone desservie', href: '/dashboard/profil', icon: '📍' },
+  tarifs: { label: 'Définir mes tarifs', hint: 'Au moins une grille (transfert ou horaire)', href: '/dashboard/parametres', icon: '💶' },
+  paiement: { label: 'Choisir mes moyens de paiement', hint: 'En ligne et/ou sur place', href: '/dashboard/parametres', icon: '💳' },
+  encaissement: { label: 'Activer l’encaissement', hint: 'Connecter SumUp ou Stripe', href: '/dashboard/parametres', icon: '🏦' },
+  telegram: { label: 'Lier Telegram', hint: 'Notifications et validation en un tap', href: '/dashboard/parametres', icon: '💬' },
+}
+
+const onboarding = computed(() => {
+  const m = me.value
+  if (!m) return null
+  return computeOnboarding({
+    hasPhoto: Boolean(m.photoUrl),
+    hasIntro: Boolean(m.bio || m.tagline),
+    vehicleCount: m.vehicleCount ?? 0,
+    hasPhone: Boolean(m.phone),
+    hasServiceArea: Boolean(m.serviceArea),
+    hasRates: (m.transferBands?.length ?? 0) > 0 || (m.hourlyTiers?.length ?? 0) > 0,
+    paymentMethods: m.paymentMethods ?? [],
+    onlinePayoutReady: Boolean(m.stripe?.connected || m.sumup?.connected),
+    telegramLinked: Boolean(m.telegramLinked),
+  })
+})
+
+// Le bandeau s'efface dès que tout l'obligatoire est fait.
+const visible = computed(() => Boolean(onboarding.value) && !onboarding.value!.complete)
+</script>
+
+<template>
+  <div
+    v-if="visible && onboarding"
+    class="card border-brand-100 bg-gradient-to-br from-brand-50/70 to-white"
+  >
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h2 class="font-serif text-lg font-medium text-slate-900">Finalisez votre configuration</h2>
+        <p class="mt-0.5 text-sm text-slate-500">
+          Encore quelques étapes avant de recevoir vos premières réservations.
+        </p>
+      </div>
+      <span class="shrink-0 rounded-full bg-brand-600 px-3 py-1 text-sm font-semibold text-white">
+        {{ onboarding.percent }}%
+      </span>
+    </div>
+
+    <!-- Barre de progression -->
+    <div class="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+      <div
+        class="h-full rounded-full bg-brand-600 transition-all duration-500"
+        :style="{ width: `${onboarding.percent}%` }"
+      />
+    </div>
+    <p class="mt-1.5 text-xs text-slate-400">
+      {{ onboarding.requiredDone }} / {{ onboarding.requiredTotal }} étapes obligatoires
+    </p>
+
+    <!-- Checklist -->
+    <ul class="mt-4 space-y-1.5">
+      <li v-for="step in onboarding.steps" :key="step.key">
+        <NuxtLink
+          :to="STEP_META[step.key].href"
+          class="flex items-center gap-3 rounded-xl border px-3 py-2.5 transition"
+          :class="step.done
+            ? 'border-transparent bg-slate-50/60'
+            : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-brand-50/40'"
+        >
+          <!-- Pastille d'état -->
+          <span
+            class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm"
+            :class="step.done ? 'bg-green-100 text-green-700' : 'bg-slate-100'"
+          >
+            <template v-if="step.done">✓</template>
+            <template v-else>{{ STEP_META[step.key].icon }}</template>
+          </span>
+          <span class="min-w-0 flex-1">
+            <span
+              class="block text-sm font-medium"
+              :class="step.done ? 'text-slate-400 line-through' : 'text-slate-800'"
+            >
+              {{ STEP_META[step.key].label }}
+              <span v-if="step.optional" class="font-normal text-slate-400">(optionnel)</span>
+            </span>
+            <span v-if="!step.done" class="block text-xs text-slate-400">{{ STEP_META[step.key].hint }}</span>
+          </span>
+          <span v-if="!step.done" class="shrink-0 text-slate-300">→</span>
+        </NuxtLink>
+      </li>
+    </ul>
+  </div>
+</template>

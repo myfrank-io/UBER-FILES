@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'Accès réservé aux chauffeurs.' })
   }
   const driverId = sessionUser.driverId
-  const [driver, account] = await Promise.all([
+  const [driver, account, vehicleCount] = await Promise.all([
     prisma.driver.findUniqueOrThrow({
       where: { id: driverId },
       include: { transferBands: true, hourlyTiers: true, cancellationPolicy: true, surcharges: true },
@@ -18,6 +18,7 @@ export default defineEventHandler(async (event) => {
       where: { id: sessionUser.id },
       select: { email: true, emailVerified: true },
     }),
+    prisma.vehicle.count({ where: { driverId } }),
   ])
   return {
     id: driver.id,
@@ -33,6 +34,8 @@ export default defineEventHandler(async (event) => {
     vehicleModel: driver.vehicleModel,
     vehicleClass: driver.vehicleClass,
     vehicleSeats: driver.vehicleSeats,
+    // Nombre de véhicules enregistrés (étape « Véhicule » de l'onboarding).
+    vehicleCount,
     services: driver.services,
     serviceArea: driver.serviceArea,
     phone: driver.phone,
