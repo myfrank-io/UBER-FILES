@@ -83,3 +83,30 @@ export function searchCatalog(query: string, limit = 8): VehicleCatalogEntry[] {
   if (!q) return VEHICLE_CATALOG.slice(0, limit)
   return VEHICLE_CATALOG.filter((e) => norm(e.label).includes(q) || norm(e.modelFamily).includes(q)).slice(0, limit)
 }
+
+/**
+ * Entrée « saisie libre » : le chauffeur tape un modèle absent du catalogue.
+ * On dérive make/modelFamily en slug best-effort pour tenter quand même une
+ * image sur le CDN (« Hyundai Ioniq 6 » → make "hyundai", modelFamily
+ * "ioniq-6") ; si le CDN ne connaît pas le modèle, VehicleImage bascule déjà
+ * sur l'illustration de catégorie. Le libellé affiché reste le texte saisi.
+ */
+export function customCatalogEntry(text: string): {
+  make: string
+  modelFamily: string
+  modelLabel: string
+} {
+  const modelLabel = text.trim().replace(/\s+/g, ' ')
+  const slug = modelLabel
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  const [make = '', ...rest] = slug.split('-')
+  return {
+    make: make || 'inconnu',
+    modelFamily: rest.length ? rest.join('-') : make || 'inconnu',
+    modelLabel,
+  }
+}

@@ -122,12 +122,13 @@ async function submit() {
          z-20 : sous les panneaux et modales (z-40/z-50) pour ne jamais intercepter
          leurs taps ; le padding bas du layout dégage le contenu en fin de scroll. -->
     <button
-      class="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-2xl text-white shadow-lg transition hover:scale-105 hover:bg-brand-700 sm:bottom-6 sm:right-6"
+      class="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 flex min-h-[52px] items-center gap-2 rounded-full bg-brand-600 px-5 text-sm font-semibold text-white shadow-lg transition hover:scale-105 hover:bg-brand-700 sm:bottom-6 sm:right-6"
       title="Partager ma page de réservation"
       aria-label="Partager ma page de réservation"
       @click="open = true"
     >
-      🔗
+      <span aria-hidden="true" class="text-lg">🔗</span>
+      Partagez votre profil
     </button>
 
     <AppModal v-if="open" @close="close">
