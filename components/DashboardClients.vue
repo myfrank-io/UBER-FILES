@@ -53,6 +53,12 @@ function exportCsv() {
             <span class="text-xs font-normal text-slate-500">· {{ c.ridesCount }} course(s)</span>
           </p>
         </div>
+        <!-- Coordonnées en clair (sélectionnables pour copier), en plus des
+             boutons d'action ci-dessous. -->
+        <div class="mt-1 text-sm text-slate-600">
+          <p v-if="c.phone" class="select-all">{{ c.phone }}</p>
+          <p v-if="c.email" class="select-all break-all">{{ c.email }}</p>
+        </div>
         <ContactActions class="mt-1.5" :phone="c.phone" :email="c.email" />
         <p v-if="c.lastRideAt" class="mt-1.5 text-xs text-slate-400">
           Dernière course : {{ formatDateTime(c.lastRideAt) }}

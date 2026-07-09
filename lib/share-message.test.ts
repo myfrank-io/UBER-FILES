@@ -9,9 +9,10 @@ describe('buildShareMessage', () => {
       publicUrl: 'https://ridewiz.fr/karim-paris',
     })
     expect(msg).toContain('Bonjour Marie,')
-    expect(msg).toContain('Karim VTC')
+    expect(msg).toContain('chauffeur privé Karim VTC')
     expect(msg).toContain('https://ridewiz.fr/karim-paris')
     expect(msg).toContain('réservez votre prochaine course')
+    expect(msg).toContain('dès maintenant sur :')
   })
 
   it('reste correct sans nom de client', () => {

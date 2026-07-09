@@ -11,5 +11,5 @@ export function buildShareMessage(opts: {
 }): string {
   const name = opts.customerName.trim()
   const greeting = name ? `Bonjour ${name}, ` : 'Bonjour, '
-  return `${greeting}réservez votre prochaine course dès maintenant avec ${opts.driverName} 🚗\n${opts.publicUrl}`
+  return `${greeting}réservez votre prochaine course avec votre chauffeur privé ${opts.driverName} dès maintenant sur :\n${opts.publicUrl}`
 }
