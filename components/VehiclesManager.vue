@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Gestion compacte de la flotte du chauffeur, intégrée dans la page Profil.
-import { searchCatalog, type VehicleCatalogEntry } from '~/lib/vehicle-catalog'
+import { customCatalogEntry, searchCatalog, type VehicleCatalogEntry } from '~/lib/vehicle-catalog'
 
 interface Vehicle {
   id: string
@@ -35,6 +35,25 @@ const modelQuery = ref('')
 const showResults = ref(false)
 const results = computed(() => searchCatalog(modelQuery.value))
 const hasModel = computed(() => Boolean(form.make && form.modelFamily && form.modelLabel))
+
+// Le texte tapé correspond-il exactement à une entrée du catalogue ? Sinon on
+// propose la saisie libre (« Utiliser "…" ») dans la liste de suggestions.
+const exactMatch = computed(() => {
+  const q = modelQuery.value.trim().toLowerCase()
+  return Boolean(q) && results.value.some((r) => r.label.toLowerCase() === q)
+})
+
+// Saisie libre : le modèle tapé devient le véhicule, même hors catalogue. Le CDN
+// d'images est tenté en best-effort ; à défaut, l'illustration de catégorie s'affiche.
+function useCustomModel() {
+  const custom = customCatalogEntry(modelQuery.value)
+  if (!custom.modelLabel) return
+  form.make = custom.make
+  form.modelFamily = custom.modelFamily
+  form.modelLabel = custom.modelLabel
+  modelQuery.value = custom.modelLabel
+  showResults.value = false
+}
 
 function resetForm() {
   form.make = ''
@@ -81,9 +100,15 @@ function pickModel(entry: VehicleCatalogEntry) {
 }
 
 async function save() {
-  if (!hasModel.value) {
-    errorMsg.value = 'Recherchez et sélectionnez un modèle dans la liste.'
+  const typed = modelQuery.value.trim()
+  if (!typed) {
+    errorMsg.value = 'Indiquez le modèle du véhicule.'
     return
+  }
+  // Rien de sélectionné dans le catalogue, ou texte modifié après une sélection :
+  // on enregistre la saisie libre telle quelle (jamais bloquant).
+  if (!hasModel.value || typed !== form.modelLabel) {
+    useCustomModel()
   }
   saving.value = true
   errorMsg.value = ''
@@ -197,13 +222,13 @@ async function remove(v: Vehicle) {
             v-model="modelQuery"
             type="text"
             class="field"
-            placeholder="Rechercher : Mercedes Classe V, Tesla Model 3…"
+            placeholder="Rechercher ou saisir : Mercedes Classe V, Tesla Model 3…"
             autocomplete="off"
             @focus="showResults = true"
             @input="showResults = true"
           />
           <ul
-            v-if="showResults && results.length > 0"
+            v-if="showResults && (results.length > 0 || modelQuery.trim())"
             class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg"
           >
             <li
@@ -214,6 +239,15 @@ async function remove(v: Vehicle) {
             >
               <span>{{ entry.label }}</span>
               <span class="text-xs text-slate-400">{{ entry.vehicleClass }}</span>
+            </li>
+            <!-- Saisie libre : jamais bloqué par le catalogue. -->
+            <li
+              v-if="modelQuery.trim() && !exactMatch"
+              class="flex cursor-pointer items-center justify-between border-t border-slate-100 px-4 py-2.5 text-sm hover:bg-brand-50"
+              @mousedown.prevent="useCustomModel()"
+            >
+              <span>➕ Utiliser « {{ modelQuery.trim() }} »</span>
+              <span class="text-xs text-slate-400">Saisie libre</span>
             </li>
           </ul>
         </div>
