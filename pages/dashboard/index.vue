@@ -112,6 +112,8 @@ async function resend(quoteId: string) {
 
     <!-- Onglet Vue d'ensemble -->
     <div v-else class="mt-6">
+    <!-- Onboarding guidé : disparaît une fois la configuration obligatoire faite. -->
+    <DashboardOnboarding class="mb-5" />
     <p v-if="pending && !data" class="mt-4 text-sm text-slate-400">Chargement…</p>
 
     <!-- Stats -->
