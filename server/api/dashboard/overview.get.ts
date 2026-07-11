@@ -41,8 +41,10 @@ export default defineEventHandler(async (event) => {
         stripeChargesEnabled: true,
       },
     }),
+    // Demandes à valider : uniquement des courses encore à venir — une demande
+    // dont la date est passée n'est plus actionnable (archivée ci-dessous).
     prisma.quote.findMany({
-      where: { driverId, status: 'DRAFT' },
+      where: { driverId, status: 'DRAFT', rideRequest: { scheduledAt: { gte: now } } },
       include: { rideRequest: true },
       orderBy: { createdAt: 'desc' },
     }),
@@ -58,13 +60,20 @@ export default defineEventHandler(async (event) => {
       include: { rideRequest: true },
       orderBy: { expiresAt: 'asc' },
     }),
-    // Archivés automatiquement : délai de validité dépassé OU date de la course
-    // déjà passée (le client n'a pas réglé à temps).
+    // Archivés automatiquement :
+    //  - SENT : délai de validité dépassé OU course passée (client n'a pas réglé
+    //    à temps) ;
+    //  - DRAFT : le chauffeur n'a pas validé avant la date de la course.
     prisma.quote.findMany({
       where: {
         driverId,
-        status: 'SENT',
-        OR: [{ expiresAt: { lt: now } }, { rideRequest: { scheduledAt: { lt: now } } }],
+        OR: [
+          {
+            status: 'SENT',
+            OR: [{ expiresAt: { lt: now } }, { rideRequest: { scheduledAt: { lt: now } } }],
+          },
+          { status: 'DRAFT', rideRequest: { scheduledAt: { lt: now } } },
+        ],
       },
       include: { rideRequest: true },
       orderBy: { expiresAt: 'desc' },
