@@ -15,6 +15,8 @@ const RULES: RateRule[] = [
   { pattern: /^\/api\/public\/[^/]+\/request$/, limit: 5, windowMs: 60 * 60 * 1000 },
   // Estimation de prix : 30 / minute par IP
   { pattern: /^\/api\/public\/[^/]+\/estimate$/, limit: 30, windowMs: 60 * 1000 },
+  // Retour d'avis privé : 5 / heure par IP (public, déclenche un email chauffeur)
+  { pattern: /^\/api\/public\/[^/]+\/review-feedback$/, limit: 5, windowMs: 60 * 60 * 1000 },
   // Autocomplete / geocode : 60 / minute par IP
   { pattern: /^\/api\/public\/(autocomplete|geocode)$/, limit: 60, windowMs: 60 * 1000 },
   // Login : 10 tentatives / 15 minutes par IP

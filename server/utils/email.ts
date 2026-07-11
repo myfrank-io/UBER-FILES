@@ -824,6 +824,29 @@ export const emailTemplates = {
       ),
     }
   },
+  // Retour privé laissé par un client sur la page de notation /avis/{slug}
+  // (note 1 à 4) : envoyé au chauffeur uniquement, jamais publié en ligne.
+  internalReviewFeedback(opts: {
+    driverFirstName?: string
+    rating: number // 1-4 (les 5★ sont redirigées vers le lien d'avis public)
+    comment: string
+    customerName?: string | null
+    bookingRef?: string | null
+  }) {
+    const stars = '★'.repeat(opts.rating) + '☆'.repeat(5 - opts.rating)
+    return {
+      subject: `Retour client ${opts.rating}/5 sur une course`,
+      html: wrap(
+        'Retour privé d’un client',
+        `${helloDriver(opts.driverFirstName)}
+         <p>${opts.customerName ? `<strong>${esc(opts.customerName)}</strong>` : 'Un client'} a noté sa course${opts.bookingRef ? ` (réf. ${esc(opts.bookingRef)})` : ''} :</p>
+         <p style="font-size:26px;letter-spacing:3px;color:#B5793F;margin:6px 0 2px">${stars} <span style="font-size:15px;letter-spacing:0;color:#6C7889">${opts.rating}/5</span></p>
+         <div style="margin:14px 0;padding:14px 16px;background:#FBF7F0;border:1px solid #EFE7D8;border-radius:12px;color:#16283D;white-space:pre-line">${esc(opts.comment)}</div>
+         <p style="font-size:13px;color:#6C7889">Ce retour est <strong>privé</strong> : il n'est publié ni sur votre fiche Google ni sur votre page Ridewiz.
+          Les clients qui donnent 5 étoiles sont, eux, redirigés directement vers votre page d'avis publique.</p>`,
+      ),
+    }
+  },
   // Notice au client quand son devis a expiré sans paiement : le créneau est
   // libéré, on l'invite à refaire une demande depuis la page publique du chauffeur.
   quoteExpiredNotice(opts: {

@@ -110,5 +110,22 @@
     "cancelling": "Annulation…",
     "cancelError": "Annulation impossible.",
     "alreadyCancelled": "Cette course a été annulée."
+  },
+  "review": {
+    "metaTitle": "Votre avis — {name}",
+    "title": "Merci d'avoir voyagé avec {name} !",
+    "subtitle": "Comment s'est passée votre course ? Notez-la en un clic.",
+    "starAria": "{n} étoile(s)",
+    "redirecting": "Merci ! Redirection vers la page d'avis…",
+    "formTitle": "Qu'est-ce qui aurait pu être mieux ?",
+    "formHint": "Votre retour est envoyé directement à {name} pour l'aider à s'améliorer. Il ne sera pas publié en ligne.",
+    "commentPlaceholder": "Dites-nous ce qui n'a pas été parfait…",
+    "nameLabel": "Votre nom (facultatif)",
+    "submit": "Envoyer mon retour",
+    "sending": "Envoi…",
+    "sentTitle": "Merci pour votre retour",
+    "sentBody": "Il a été transmis à {name}, qui en tiendra compte pour ses prochaines courses.",
+    "sentFiveTitle": "Merci beaucoup !",
+    "sentFiveBody": "Votre note lui fera très plaisir."
   }
 }

@@ -413,17 +413,16 @@ function goToContact() {
           {{ driver.serviceArea }}
         </span>
       </div>
-      <!-- Lien d'avis : invite les clients satisfaits à noter le chauffeur (fiche
-           Google, Trustpilot…). Affiché seulement s'il est renseigné dans le profil. -->
-      <a
+      <!-- Lien d'avis : passe par la page de notation Ridewiz (5★ → dépôt public
+           sur la fiche du chauffeur, note inférieure → retour privé). Affiché
+           seulement si un lien d'avis est configuré. -->
+      <NuxtLink
         v-if="driver.reviewUrl"
-        :href="driver.reviewUrl"
-        target="_blank"
-        rel="noopener noreferrer nofollow"
+        :to="`/avis/${driver.slug}`"
         class="mt-4 inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
       >
         ⭐ {{ $t('public.leaveReview') }}
-      </a>
+      </NuxtLink>
     </div>
 
     <!-- Véhicules (compact, intégré) -->

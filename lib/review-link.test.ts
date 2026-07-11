@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { googleReviewUrl, driverReviewUrl } from './review-link'
+import { googleReviewUrl, driverReviewUrl, reviewFunnelPath } from './review-link'
 
 describe('googleReviewUrl', () => {
   it('construit le lien de dépôt d’avis à partir du placeId', () => {
@@ -38,5 +38,15 @@ describe('driverReviewUrl', () => {
     expect(
       driverReviewUrl({ reviewUrl: 'https://exemple.fr/avis', googlePlaceId: 'ChIJxxx' }),
     ).toBe('https://exemple.fr/avis')
+  })
+})
+
+describe('reviewFunnelPath', () => {
+  it('pointe vers la page de notation du chauffeur', () => {
+    expect(reviewFunnelPath('karim-paris')).toBe('/avis/karim-paris')
+  })
+
+  it('échappe un slug inattendu', () => {
+    expect(reviewFunnelPath('a/b c')).toBe('/avis/a%2Fb%20c')
   })
 })

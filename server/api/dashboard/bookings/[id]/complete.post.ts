@@ -2,7 +2,7 @@ import { requireDriverId } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { PAYMENT_METHOD_SHORT_LABELS, isOnSiteMethod, type PaymentMethod } from '~/lib/payment-methods'
-import { driverReviewUrl } from '~/lib/review-link'
+import { driverReviewUrl, reviewFunnelPath } from '~/lib/review-link'
 
 // Le chauffeur marque une course comme terminée. Le client reçoit alors son
 // reçu détaillé (récapitulatif, détail du prix, mentions légales du prestataire).
@@ -53,6 +53,15 @@ export default defineEventHandler(async (event) => {
       ? (booking.quote.breakdown as { label: string; amountCents: number; detail?: string }[])
       : []
 
+    const bookingRef = booking.id.slice(-8).toUpperCase()
+    // Bouton « Laisser un avis » : pointe sur la page de notation Ridewiz (5★ →
+    // dépôt public, 1-4★ → retour privé), jamais sur le lien externe en direct.
+    // La référence de course permet au retour privé d'identifier la course.
+    const config = useRuntimeConfig()
+    const reviewUrl = driverReviewUrl(booking.driver)
+      ? `${config.public.appBaseUrl}${reviewFunnelPath(booking.driver.slug)}?ref=${bookingRef}`
+      : null
+
     const tpl = emailTemplates.paymentReceipt({
       driverName: booking.driver.displayName,
       companyName: booking.driver.companyName,
@@ -64,8 +73,8 @@ export default defineEventHandler(async (event) => {
       amountCents: booking.amountCents,
       currency: booking.quote.currency,
       paymentLabel,
-      bookingRef: booking.id.slice(-8).toUpperCase(),
-      reviewUrl: driverReviewUrl(booking.driver),
+      bookingRef,
+      reviewUrl,
     })
     await sendEmail({ to: req.customerEmail, ...tpl })
   } catch (err) {
