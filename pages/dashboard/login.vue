@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// Connexion au back-office (chauffeur ou admin).
-definePageMeta({ layout: 'default' })
+// Connexion au back-office (chauffeur ou admin). Le middleware `guest`
+// renvoie un utilisateur déjà connecté directement vers son espace.
+definePageMeta({ layout: 'default', middleware: 'guest' })
 useHead({ title: 'Connexion — Espace chauffeur' })
 
 const email = ref('')
