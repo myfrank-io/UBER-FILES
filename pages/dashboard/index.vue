@@ -1,29 +1,11 @@
 <script setup lang="ts">
-// Tableau de bord chauffeur : devis à valider + courses à venir + statistiques.
-// Les anciens onglets « Gains » et « Clients » sont désormais intégrés ici en
-// sous-onglets pour épurer la navigation principale.
+// Accueil chauffeur, recentré sur l'actionnable : demandes à valider, relances,
+// courses du jour. Le planning complet et l'historique vivent dans l'onglet
+// « Courses » ; les anciens sous-onglets Gains/Clients ont été retirés (Clients
+// est désormais une vue de l'onglet Courses).
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
-useHead({ title: 'Tableau de bord' })
+useHead({ title: 'Accueil' })
 const { formatMoney, formatDateTime } = useFormat()
-
-// Onglets internes, synchronisés avec l'URL (?tab=) pour être partageables et
-// résister au rafraîchissement.
-const tabs = [
-  { key: 'overview', label: 'Vue d’ensemble' },
-  { key: 'gains', label: 'Gains' },
-  { key: 'clients', label: 'Clients' },
-] as const
-type TabKey = (typeof tabs)[number]['key']
-
-const route = useRoute()
-const router = useRouter()
-const tab = computed<TabKey>(() => {
-  const q = route.query.tab
-  return tabs.some((t) => t.key === q) ? (q as TabKey) : 'overview'
-})
-function selectTab(key: TabKey) {
-  router.replace({ query: key === 'overview' ? {} : { tab: key } })
-}
 
 // lazy : la navigation s'affiche immédiatement, les données arrivent ensuite.
 const { data, refresh, pending } = await useFetch('/api/dashboard/overview', { lazy: true })
@@ -39,6 +21,34 @@ const showExpired = ref(false)
 // Les devis en attente de paiement restent discrets : section repliée par
 // défaut (le compteur reste visible), dépliable d'un clic.
 const showSent = ref(false)
+
+// ─── Courses du jour ─────────────────────────────────────────────────────────
+// L'accueil ne montre que les courses d'aujourd'hui ; le reste du planning est
+// dans l'onglet Courses (une seule source de vérité, plus de liste en doublon).
+
+function isToday(iso: string): boolean {
+  const d = new Date(iso)
+  const now = new Date()
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  )
+}
+
+const todayRides = computed(() =>
+  (data.value?.upcomingBookings ?? []).filter((b) => isToday(b.scheduledAt)),
+)
+// Prochaine course (hors aujourd'hui) : affichée quand la journée est vide,
+// pour ne jamais laisser l'accueil muet sur la suite.
+const nextRide = computed(() =>
+  (data.value?.upcomingBookings ?? []).find((b) => !isToday(b.scheduledAt)) ?? null,
+)
+
+// Fiche course partagée (mêmes actions que dans l'onglet Courses).
+const selectedBookingId = ref<string | null>(null)
+
+// ─── Actions sur les devis ───────────────────────────────────────────────────
 
 async function validate(quoteId: string, custom = false) {
   busyId.value = quoteId
@@ -87,56 +97,15 @@ async function resend(quoteId: string) {
 
 <template>
   <div>
-    <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Tableau de bord</h1>
+    <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Accueil</h1>
 
-    <!-- Onglets internes -->
-    <div class="mt-4 flex gap-1 border-b border-slate-200">
-      <button
-        v-for="t in tabs"
-        :key="t.key"
-        class="-mb-px min-h-[44px] border-b-2 px-4 py-2 text-sm font-medium transition-colors"
-        :class="tab === t.key
-          ? 'border-brand-600 text-brand-700'
-          : 'border-transparent text-slate-500 hover:text-slate-700'"
-        @click="selectTab(t.key)"
-      >
-        {{ t.label }}
-      </button>
-    </div>
-
-    <!-- Onglet Gains -->
-    <DashboardGains v-if="tab === 'gains'" class="mt-6" />
-
-    <!-- Onglet Clients -->
-    <DashboardClients v-else-if="tab === 'clients'" class="mt-6" />
-
-    <!-- Onglet Vue d'ensemble -->
-    <div v-else class="mt-6">
     <!-- Onboarding guidé : disparaît une fois la configuration obligatoire faite. -->
-    <DashboardOnboarding class="mb-5" />
+    <DashboardOnboarding class="mt-5" />
+
     <p v-if="pending && !data" class="mt-4 text-sm text-slate-400">Chargement…</p>
 
-    <!-- Stats -->
-    <!-- Libellés courts + chiffres alignés en pied de carte (mt-auto) sur 390px. -->
-    <div v-if="data" class="mt-5 grid grid-cols-3 gap-3">
-      <div class="card flex flex-col !p-4">
-        <p class="text-xs text-slate-500">Confirmées</p>
-        <p class="mt-auto pt-1 font-serif text-2xl font-medium tracking-tight text-slate-900">{{ data.stats.confirmed }}</p>
-      </div>
-      <div class="card flex flex-col !p-4">
-        <p class="text-xs text-slate-500">Annulées</p>
-        <p class="mt-auto pt-1 font-serif text-2xl font-medium tracking-tight text-slate-900">{{ data.stats.cancelled }}</p>
-      </div>
-      <div class="card flex flex-col !p-4">
-        <p class="text-xs text-slate-500">Encaissé</p>
-        <p class="mt-auto pt-1 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
-          {{ formatMoney(data.stats.totalRevenueCents) }}
-        </p>
-      </div>
-    </div>
-
     <!-- Devis en attente -->
-    <section class="mt-8">
+    <section class="mt-6">
       <h2 class="text-lg font-semibold text-slate-900">
         Demandes à valider
         <span v-if="data?.pendingQuotes.length" class="ml-1 rounded-full bg-brand-600 px-2 py-0.5 text-xs text-white">
@@ -211,6 +180,74 @@ async function resend(quoteId: string) {
       </div>
     </section>
 
+    <!-- Aujourd'hui : les courses du jour, fiche complète au tap. Le planning
+         entier vit dans l'onglet Courses. -->
+    <section class="mt-8">
+      <div class="flex items-baseline justify-between gap-3">
+        <h2 class="text-lg font-semibold text-slate-900">Aujourd'hui</h2>
+        <NuxtLink to="/dashboard/courses" class="text-sm font-medium text-brand-700 hover:text-brand-800">
+          Tout le planning →
+        </NuxtLink>
+      </div>
+
+      <p v-if="data && !todayRides.length" class="mt-3 text-sm text-slate-500">
+        Aucune course aujourd'hui.
+      </p>
+
+      <!-- Nom + prix sur la première ligne, le trajet en pleine largeur dessous. -->
+      <button
+        v-for="b in todayRides"
+        :key="b.id"
+        class="card mt-3 block w-full cursor-pointer text-left transition-colors hover:border-brand-200"
+        @click="selectedBookingId = b.id"
+      >
+        <div class="flex items-baseline justify-between gap-3">
+          <p class="min-w-0 truncate font-semibold text-slate-900">{{ b.customerName }}</p>
+          <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</span>
+        </div>
+        <p class="text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
+        <RideRoute
+          v-if="b.type === 'TRANSFER'"
+          class="mt-1 text-xs text-slate-500"
+          :pickup="b.pickupAddress"
+          :dropoff="b.dropoffAddress"
+        />
+        <p v-else class="mt-1 text-xs text-slate-500">
+          Mise à disposition — {{ b.durationHours }} h
+        </p>
+        <!-- Règlement de la course, en un coup d'œil -->
+        <PaymentBadge
+          v-if="b.payment"
+          class="mt-1.5"
+          :method="b.payment.method"
+          :status="b.payment.status"
+        />
+      </button>
+
+      <!-- Journée vide : on montre quand même la prochaine course planifiée. -->
+      <button
+        v-if="data && !todayRides.length && nextRide"
+        class="card mt-3 block w-full cursor-pointer text-left transition-colors hover:border-brand-200"
+        @click="selectedBookingId = nextRide.id"
+      >
+        <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Prochaine course</p>
+        <div class="mt-1 flex items-baseline justify-between gap-3">
+          <p class="min-w-0 truncate font-semibold text-slate-900">{{ nextRide.customerName }}</p>
+          <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(nextRide.amountCents, nextRide.currency) }}</span>
+        </div>
+        <p class="text-sm text-slate-600">{{ formatDateTime(nextRide.scheduledAt) }}</p>
+        <RideRoute
+          v-if="nextRide.type === 'TRANSFER'"
+          class="mt-1 text-xs text-slate-500"
+          :pickup="nextRide.pickupAddress"
+          :dropoff="nextRide.dropoffAddress"
+        />
+        <p v-else class="mt-1 text-xs text-slate-500">
+          Mise à disposition — {{ nextRide.durationHours }} h
+        </p>
+      </button>
+    </section>
+
     <!-- Devis envoyés : en attente de paiement/confirmation du client.
          Repliés par défaut pour rester discrets (compteur toujours visible). -->
     <section v-if="data?.sentQuotes.length" class="mt-8">
@@ -263,37 +300,22 @@ async function resend(quoteId: string) {
       </div>
     </section>
 
-    <!-- Courses à venir -->
-    <section class="mt-8">
-      <h2 class="text-lg font-semibold text-slate-900">Courses à venir</h2>
-      <p v-if="data && !data.upcomingBookings.length" class="mt-3 text-sm text-slate-500">
-        Aucune course planifiée.
-      </p>
-      <!-- Nom + prix sur la première ligne, le trajet en pleine largeur dessous. -->
-      <div v-for="b in data?.upcomingBookings" :key="b.id" class="card mt-3">
-        <div class="flex items-baseline justify-between gap-3">
-          <p class="min-w-0 truncate font-semibold text-slate-900">{{ b.customerName }}</p>
-          <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</span>
+    <!-- Ce mois-ci : l'essentiel des chiffres, sans onglet dédié. -->
+    <section v-if="data" class="mt-8">
+      <h2 class="text-lg font-semibold text-slate-900">Ce mois-ci</h2>
+      <div class="mt-3 grid grid-cols-2 gap-3">
+        <div class="card flex flex-col !p-4">
+          <p class="text-xs text-slate-500">Encaissé</p>
+          <p class="mt-auto pt-1 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
+            {{ formatMoney(data.stats.monthRevenueCents) }}
+          </p>
         </div>
-        <p class="text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
-        <RideRoute
-          v-if="b.type === 'TRANSFER'"
-          nav
-          class="mt-1 text-xs text-slate-500"
-          :pickup="b.pickupAddress"
-          :dropoff="b.dropoffAddress"
-        />
-        <p v-else class="mt-1 text-xs text-slate-500">
-          Mise à disposition — {{ b.durationHours }} h<template v-if="b.pickupAddress"> · <NavAddress :address="b.pickupAddress" /></template>
-        </p>
-        <!-- Règlement de la course, en un coup d'œil -->
-        <PaymentBadge
-          v-if="b.payment"
-          class="mt-1.5"
-          :method="b.payment.method"
-          :status="b.payment.status"
-        />
-        <ContactActions class="mt-2" :phone="b.customerPhone" :show-phone="false" />
+        <div class="card flex flex-col !p-4">
+          <p class="text-xs text-slate-500">Courses</p>
+          <p class="mt-auto pt-1 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
+            {{ data.stats.monthRides }}
+          </p>
+        </div>
       </div>
     </section>
 
@@ -337,6 +359,13 @@ async function resend(quoteId: string) {
     </section>
 
     <p v-if="pending" class="mt-4 text-sm text-slate-400">Chargement…</p>
-    </div>
+
+    <!-- Fiche course partagée (courses du jour / prochaine course) -->
+    <BookingDetail
+      v-if="selectedBookingId"
+      :booking-id="selectedBookingId"
+      @close="selectedBookingId = null"
+      @changed="refresh()"
+    />
   </div>
 </template>

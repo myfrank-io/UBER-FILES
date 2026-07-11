@@ -18,12 +18,17 @@ function requestPayment(mode: BookingMode, preferred: PaymentMethod | null) {
   return { kind: 'UNDECIDED' as const, label: 'À définir avec le client' }
 }
 
-// Tableau de bord chauffeur : devis en attente, courses à venir, statistiques.
+// Accueil chauffeur : devis en attente, courses à venir, chiffres du mois.
 export default defineEventHandler(async (event) => {
   const driverId = await requireDriverId(event)
   const now = new Date()
 
-  const [driver, pendingQuotes, sentQuotes, expiredQuotes, upcomingBookings, stats, paidSum] = await Promise.all([
+  // Chiffres « ce mois-ci » : plus parlants pour un accueil que des cumuls
+  // depuis toujours (l'historique détaillé reste consultable dans Courses).
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+
+  const [driver, pendingQuotes, sentQuotes, expiredQuotes, upcomingBookings, monthRides, monthPaid] = await Promise.all([
     // Seuls les champs nécessaires au mode de réservation : évite de rapatrier
     // la ligne complète (bio, textes…) à chaque affichage du tableau de bord.
     prisma.driver.findUniqueOrThrow({
@@ -75,13 +80,17 @@ export default defineEventHandler(async (event) => {
       orderBy: { scheduledAt: 'asc' },
       take: 20,
     }),
-    prisma.booking.groupBy({
-      by: ['status'],
-      where: { driverId },
-      _count: true,
+    // Courses du mois (planifiées ce mois-ci, confirmées ou terminées).
+    prisma.booking.count({
+      where: {
+        driverId,
+        status: { in: ['CONFIRMED', 'COMPLETED'] },
+        scheduledAt: { gte: monthStart, lt: nextMonthStart },
+      },
     }),
+    // Encaissé du mois (paiements réglés ce mois-ci, en ligne ou sur place).
     prisma.payment.aggregate({
-      where: { driverId, status: 'PAID' },
+      where: { driverId, status: 'PAID', createdAt: { gte: monthStart, lt: nextMonthStart } },
       _sum: { amountCents: true },
     }),
   ])
@@ -171,9 +180,8 @@ export default defineEventHandler(async (event) => {
         : null,
     })),
     stats: {
-      confirmed: stats.find((s) => s.status === 'CONFIRMED')?._count ?? 0,
-      cancelled: stats.find((s) => s.status === 'CANCELLED')?._count ?? 0,
-      totalRevenueCents: paidSum._sum.amountCents ?? 0,
+      monthRides,
+      monthRevenueCents: monthPaid._sum.amountCents ?? 0,
     },
   }
 })

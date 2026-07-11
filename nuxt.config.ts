@@ -67,10 +67,13 @@ export default defineNuxtConfig({
   // simples (DATABASE_URL, STRIPE_SECRET_KEY…) sans préfixe NUXT_.
   runtimeConfig: {
     databaseUrl: process.env.DATABASE_URL || '',
-    // Session scellée (nuxt-auth-utils). Le cookie n'est `Secure` qu'en production :
+    // Session scellée (nuxt-auth-utils). Sans `maxAge`, le cookie serait un cookie
+    // de session navigateur, supprimé à sa fermeture → reconnexion à chaque visite.
+    // Le cookie n'est `Secure` qu'en production :
     // en local (http://localhost), `Secure` empêcherait les navigateurs (Safari) de le stocker.
     session: {
       password: process.env.NUXT_SESSION_PASSWORD || '',
+      maxAge: 60 * 60 * 24 * 30, // 30 jours
       cookie: {
         secure: process.env.NODE_ENV === 'production',
       },
