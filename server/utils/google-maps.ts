@@ -189,6 +189,19 @@ export interface PlaceSummary {
   address: string
 }
 
+// Biais géographique France métropolitaine pour les recherches d'établissement :
+// sans lui, l'API pondère les résultats par l'IP de l'appelant — or nos fonctions
+// Vercel tournent à Francfort, ce qui enterre les petites fiches françaises
+// (surtout celles en zone de chalandise, sans adresse visible). C'est un biais,
+// pas un filtre : rien n'est exclu hors du rectangle (DOM-TOM incluables via
+// regionCode FR conservé).
+const FRANCE_LOCATION_BIAS = {
+  rectangle: {
+    low: { latitude: 41.3, longitude: -5.2 },
+    high: { latitude: 51.1, longitude: 9.6 },
+  },
+}
+
 /**
  * Recherche d'ÉTABLISSEMENTS par nom (Places Text Search) — utilisée par le
  * chauffeur pour retrouver sa fiche Google et en dériver le lien d'avis.
@@ -210,6 +223,7 @@ export async function searchPlaces(
       textQuery: query,
       languageCode: 'fr',
       regionCode: 'FR',
+      locationBias: FRANCE_LOCATION_BIAS,
       pageSize: 5,
     }),
   })
@@ -221,6 +235,55 @@ export async function searchPlaces(
   return (data.places ?? [])
     .filter((p): p is NonNullable<typeof p> => Boolean(p?.id && p?.displayName?.text))
     .map((p) => ({ placeId: p.id!, name: p.displayName!.text!, address: p.formattedAddress ?? '' }))
+}
+
+/**
+ * Second filet de la recherche d'établissement : l'AUTOCOMPLÉTION Places. Son
+ * algorithme de correspondance (préfixes, tolérance aux variantes de nom) est
+ * différent de Text Search et retrouve souvent les fiches « zone de
+ * chalandise » (sans adresse visible) que Text Search rate. Appelée par
+ * l'endpoint de recherche quand Text Search ne renvoie rien.
+ */
+export async function autocompleteEstablishments(
+  query: string,
+  apiKey: string,
+): Promise<PlaceSummary[]> {
+  const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+    },
+    body: JSON.stringify({
+      input: query,
+      languageCode: 'fr',
+      regionCode: 'FR',
+      locationBias: FRANCE_LOCATION_BIAS,
+    }),
+  })
+  if (!res.ok) return []
+
+  const data = (await res.json()) as {
+    suggestions?: {
+      placePrediction?: {
+        placeId?: string
+        text?: { text?: string }
+        structuredFormat?: { mainText?: { text?: string }; secondaryText?: { text?: string } }
+      }
+    }[]
+  }
+  return (data.suggestions ?? [])
+    .map((s) => s.placePrediction)
+    .filter((p): p is NonNullable<typeof p> => Boolean(p?.placeId))
+    .map((p) => ({
+      placeId: p.placeId!,
+      // mainText = nom de la fiche, secondaryText = localité ; repli sur le
+      // libellé complet si le format structuré manque.
+      name: p.structuredFormat?.mainText?.text ?? p.text?.text ?? '',
+      address: p.structuredFormat?.secondaryText?.text ?? '',
+    }))
+    .filter((p) => p.name)
+    .slice(0, 5)
 }
 
 /**
