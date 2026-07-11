@@ -37,6 +37,15 @@ export async function sendQuoteToClient(
   if (quote.status !== 'DRAFT') {
     throw createError({ statusCode: 409, statusMessage: 'Ce devis a déjà été traité.' })
   }
+  // Course déjà passée : la demande n'est plus validable (l'accueil l'archive
+  // dans « Demandes expirées », mais on protège aussi les clients obsolètes :
+  // onglet resté ouvert, bouton Telegram tardif…).
+  if (quote.rideRequest.scheduledAt.getTime() <= Date.now()) {
+    throw createError({
+      statusCode: 410,
+      statusMessage: 'La date de cette course est déjà passée — demande expirée.',
+    })
+  }
 
   // Re-vérifier le conflit calendrier au moment de la validation.
   const serviceDurationSeconds =
@@ -137,6 +146,14 @@ export async function acceptQuote(quoteId: string, driverId: string): Promise<Ac
   if (!quote) throw createError({ statusCode: 404, statusMessage: 'Devis introuvable.' })
   if (quote.status !== 'DRAFT') {
     throw createError({ statusCode: 409, statusMessage: 'Ce devis a déjà été traité.' })
+  }
+  // Même garde que sendQuoteToClient : une course passée ne se confirme plus
+  // (la voie « sur place » créerait sinon une réservation dans le passé).
+  if (quote.rideRequest.scheduledAt.getTime() <= Date.now()) {
+    throw createError({
+      statusCode: 410,
+      statusMessage: 'La date de cette course est déjà passée — demande expirée.',
+    })
   }
 
   const mode = driverBookingMode(quote.driver)

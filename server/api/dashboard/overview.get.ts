@@ -36,8 +36,11 @@ export default defineEventHandler(async (event) => {
         stripeChargesEnabled: true,
       },
     }),
+    // Demandes à valider : uniquement des courses encore à venir — une demande
+    // dont la date est passée n'est plus actionnable (la validation est de
+    // toute façon refusée côté serveur, cf. quote-actions).
     prisma.quote.findMany({
-      where: { driverId, status: 'DRAFT' },
+      where: { driverId, status: 'DRAFT', rideRequest: { scheduledAt: { gte: now } } },
       include: { rideRequest: true },
       orderBy: { createdAt: 'desc' },
     }),
