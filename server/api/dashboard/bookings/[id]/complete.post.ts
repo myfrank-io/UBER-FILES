@@ -2,6 +2,7 @@ import { requireDriverId } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { PAYMENT_METHOD_SHORT_LABELS, isOnSiteMethod, type PaymentMethod } from '~/lib/payment-methods'
+import { driverReviewUrl } from '~/lib/review-link'
 
 // Le chauffeur marque une course comme terminée. Le client reçoit alors son
 // reçu détaillé (récapitulatif, détail du prix, mentions légales du prestataire).
@@ -64,7 +65,7 @@ export default defineEventHandler(async (event) => {
       currency: booking.quote.currency,
       paymentLabel,
       bookingRef: booking.id.slice(-8).toUpperCase(),
-      reviewUrl: booking.driver.reviewUrl,
+      reviewUrl: driverReviewUrl(booking.driver),
     })
     await sendEmail({ to: req.customerEmail, ...tpl })
   } catch (err) {

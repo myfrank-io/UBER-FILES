@@ -183,6 +183,75 @@ export async function geocodeAddress(
   return { lat: coords[1], lng: coords[0], formatted: r.properties?.label ?? address }
 }
 
+export interface PlaceSummary {
+  placeId: string
+  name: string
+  address: string
+}
+
+/**
+ * Recherche d'ÉTABLISSEMENTS par nom (Places Text Search) — utilisée par le
+ * chauffeur pour retrouver sa fiche Google et en dériver le lien d'avis.
+ * Contrairement à l'autocomplétion d'adresses, pas de repli sans clé : la BAN
+ * ne connaît pas les établissements (l'appelant gère l'absence de clé).
+ */
+export async function searchPlaces(
+  query: string,
+  apiKey: string,
+): Promise<PlaceSummary[]> {
+  const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress',
+    },
+    body: JSON.stringify({
+      textQuery: query,
+      languageCode: 'fr',
+      regionCode: 'FR',
+      pageSize: 5,
+    }),
+  })
+  if (!res.ok) return []
+
+  const data = (await res.json()) as {
+    places?: { id?: string; displayName?: { text?: string }; formattedAddress?: string }[]
+  }
+  return (data.places ?? [])
+    .filter((p): p is NonNullable<typeof p> => Boolean(p?.id && p?.displayName?.text))
+    .map((p) => ({ placeId: p.id!, name: p.displayName!.text!, address: p.formattedAddress ?? '' }))
+}
+
+/**
+ * Nom + adresse canoniques d'une fiche via Place Details. Sert à valider un
+ * placeId soumis par le client et à stocker des instantanés d'affichage sûrs
+ * (on ne fait jamais confiance au libellé envoyé par le navigateur).
+ */
+export async function getPlaceSummary(
+  placeId: string,
+  apiKey: string,
+): Promise<PlaceSummary | null> {
+  const res = await fetch(
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+    {
+      headers: {
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'id,displayName,formattedAddress',
+        'Accept-Language': 'fr',
+      },
+    },
+  )
+  if (!res.ok) return null
+  const data = (await res.json()) as {
+    id?: string
+    displayName?: { text?: string }
+    formattedAddress?: string
+  }
+  if (!data.id || !data.displayName?.text) return null
+  return { placeId: data.id, name: data.displayName.text, address: data.formattedAddress ?? '' }
+}
+
 /** Récupère les coordonnées d'un placeId via Place Details. */
 export async function geocodePlace(
   placeId: string,

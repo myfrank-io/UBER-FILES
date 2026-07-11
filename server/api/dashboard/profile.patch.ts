@@ -46,7 +46,14 @@ export default defineEventHandler(async (event) => {
 
   const driver = await prisma.driver.update({
     where: { id: driverId },
-    data,
+    data: {
+      ...data,
+      // Modes exclusifs : un lien d'avis manuel remplace la fiche Google connectée
+      // (et inversement, connecter une fiche efface le lien manuel — cf. google-place).
+      ...(data.reviewUrl
+        ? { googlePlaceId: null, googlePlaceName: null, googlePlaceAddress: null }
+        : {}),
+    },
   })
 
   return { ok: true, displayName: driver.displayName }

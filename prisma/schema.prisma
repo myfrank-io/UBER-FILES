@@ -93,9 +93,17 @@ model Driver {
   phone        String?
   contactEmail String?
 
-  // Lien où inviter le client à laisser un avis (fiche Google, page Trustpilot…).
-  // Ajouté au reçu de fin de course quand il est renseigné.
+  // Lien d'avis manuel (échappatoire : fiche introuvable, Trustpilot…). Exclusif
+  // avec la fiche Google connectée ci-dessous : renseigner l'un efface l'autre.
+  // Le lien effectif est calculé par driverReviewUrl() (lib/review-link.ts).
   reviewUrl    String?
+
+  // Fiche d'établissement Google connectée via la recherche Places : le lien
+  // « laisser un avis » est dérivé du placeId au moment de l'envoi (jamais stocké).
+  // Nom et adresse sont des instantanés purement d'affichage (état « connecté »).
+  googlePlaceId      String?
+  googlePlaceName    String?
+  googlePlaceAddress String?
 
   // Identité légale
   siren         String?
