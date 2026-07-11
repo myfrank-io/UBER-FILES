@@ -33,14 +33,8 @@ useHead({
     },
     { name: 'twitter:image', content: `${appBase}/og-default.jpg` },
   ],
-  link: [
-    { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-    { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
-    {
-      rel: 'stylesheet',
-      href: 'https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600&display=swap',
-    },
-  ],
+  // Les typographies de la charte sont auto-hébergées via @nuxt/fonts
+  // (plus de feuille de style Google Fonts bloquante).
 })
 
 // Parcours chauffeur : de l'inscription aux courses encaissées.

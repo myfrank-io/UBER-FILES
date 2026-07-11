@@ -1,0 +1,33 @@
+name: Keep-alive base Neon
+
+# La base Postgres (Neon, plan Free) suspend son compute après ~5 min sans
+# requête : le visiteur suivant paie 2 à 5 s de réveil. Ce ping régulier de
+# /api/health (qui exécute un `SELECT 1`) la garde éveillée aux heures
+# d'activité, sans consommer le quota gratuit la nuit.
+#
+# Budget compute Neon (plan Free : 191,9 CU-h/mois) : 0,25 CU × ~17 h/jour
+# ≈ 130 CU-h/mois — large marge. Note : GitHub désactive les workflows
+# planifiés après 60 jours sans commit sur le dépôt (email de préavis).
+
+on:
+  schedule:
+    # Toutes les 5 min (intervalle minimal GitHub), de 5 h à 21 h UTC
+    # ≈ 7 h → 23 h à Paris l'été (6 h → 22 h l'hiver).
+    - cron: '*/5 5-21 * * *'
+  workflow_dispatch: # déclenchement manuel possible
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /api/health (SELECT 1 → maintient la base éveillée)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            "${{ vars.APP_BASE_URL || 'https://www.ridewiz.fr' }}/api/health")
+          echo "HTTP status: $STATUS"
+          # 200 = base ok ; 503 = base injoignable (le ping l'aura réveillée) :
+          # on n'échoue que sur une réponse inattendue.
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "503" ]; then
+            echo "Erreur : statut HTTP $STATUS"
+            exit 1
+          fi

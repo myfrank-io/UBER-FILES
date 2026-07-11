@@ -7,7 +7,9 @@ import {
 } from '~/lib/pricing'
 import { computeRoute, type LatLng } from './google-maps'
 
-export interface DriverWithPricing extends Driver {
+// `photoUrl` est omis globalement par le client Prisma (blob base64 jamais
+// rapatrié) : le type reflète la forme réellement retournée par les requêtes.
+export interface DriverWithPricing extends Omit<Driver, 'photoUrl'> {
   transferBands: TransferRateBand[]
   hourlyTiers: HourlyRateTier[]
   surcharges: Surcharge[]

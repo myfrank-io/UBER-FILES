@@ -6,6 +6,8 @@ generator client {
   provider      = "prisma-client-js"
   // "native" pour le dev local ; "rhel-openssl-3.0.x" pour l'environnement Vercel (Amazon Linux).
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
+  // `omit` : exclut les colonnes lourdes (photos base64) des requêtes qui n'en ont pas besoin.
+  previewFeatures = ["omitApi"]
 }
 
 datasource db {

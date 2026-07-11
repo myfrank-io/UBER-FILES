@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'Accès réservé aux chauffeurs.' })
   }
   const driverId = sessionUser.driverId
-  const [driver, account, vehicleCount] = await Promise.all([
+  const [driver, account, vehicleCount, photoCount] = await Promise.all([
     prisma.driver.findUniqueOrThrow({
       where: { id: driverId },
       include: { transferBands: true, hourlyTiers: true, cancellationPolicy: true, surcharges: true },
@@ -19,6 +19,8 @@ export default defineEventHandler(async (event) => {
       select: { email: true, emailVerified: true },
     }),
     prisma.vehicle.count({ where: { driverId } }),
+    // Présence de la photo de profil sans rapatrier le blob base64.
+    prisma.driver.count({ where: { id: driverId, photoUrl: { not: null } } }),
   ])
   return {
     id: driver.id,
@@ -29,7 +31,7 @@ export default defineEventHandler(async (event) => {
     displayName: driver.displayName,
     tagline: driver.tagline,
     bio: driver.bio,
-    photoUrl: publicPhotoUrl(driver),
+    photoUrl: publicPhotoUrl(driver, photoCount > 0),
     vehicleMake: driver.vehicleMake,
     vehicleModel: driver.vehicleModel,
     vehicleClass: driver.vehicleClass,

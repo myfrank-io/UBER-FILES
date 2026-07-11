@@ -31,7 +31,11 @@ export default defineEventHandler(async (event) => {
   )
 
   const [driver, events, sentQuotes] = await Promise.all([
-    prisma.driver.findUniqueOrThrow({ where: { id: driverId } }),
+    // Seul champ utilisé ici (bookingSlot) : pas besoin de la ligne complète.
+    prisma.driver.findUniqueOrThrow({
+      where: { id: driverId },
+      select: { approachBufferMinutes: true },
+    }),
     prisma.calendarEvent.findMany({
       where: { driverId, startAt: { lt: to }, endAt: { gt: from } },
       include: {

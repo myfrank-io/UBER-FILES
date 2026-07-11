@@ -24,7 +24,18 @@ export default defineEventHandler(async (event) => {
   const now = new Date()
 
   const [driver, pendingQuotes, sentQuotes, expiredQuotes, upcomingBookings, stats, paidSum] = await Promise.all([
-    prisma.driver.findUniqueOrThrow({ where: { id: driverId } }),
+    // Seuls les champs nécessaires au mode de réservation : évite de rapatrier
+    // la ligne complète (bio, textes…) à chaque affichage du tableau de bord.
+    prisma.driver.findUniqueOrThrow({
+      where: { id: driverId },
+      select: {
+        paymentMethods: true,
+        autoAcceptQuotes: true,
+        paymentProvider: true,
+        sumupConnected: true,
+        stripeChargesEnabled: true,
+      },
+    }),
     prisma.quote.findMany({
       where: { driverId, status: 'DRAFT' },
       include: { rideRequest: true },

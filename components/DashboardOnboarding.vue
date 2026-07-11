@@ -4,25 +4,10 @@
 // toutes les étapes OBLIGATOIRES faites (les optionnelles, ex. Telegram, ne
 // bloquent pas le 100 %). La logique de complétion vit dans lib/onboarding.ts.
 import { computeOnboarding, type OnboardingStepKey } from '~/lib/onboarding'
-import type { PaymentMethod } from '~/lib/payment-methods'
 
-interface Me {
-  photoUrl: string | null
-  bio: string | null
-  tagline: string | null
-  vehicleCount: number
-  phone: string | null
-  serviceArea: string | null
-  transferBands: unknown[]
-  hourlyTiers: unknown[]
-  paymentMethods: PaymentMethod[]
-  stripe: { connected: boolean }
-  sumup: { connected: boolean }
-  telegramLinked: boolean
-}
-
-// Partage la clé de /api/dashboard/me avec le layout → pas de requête en double.
-const { data: me } = await useFetch<Me>('/api/dashboard/me')
+// useMe : clé partagée avec le layout (pas de requête en double) + cache de
+// navigation (pas de rechargement à chaque retour sur l'accueil).
+const { data: me } = await useMe()
 
 const STEP_META: Record<OnboardingStepKey, { label: string; hint: string; href: string; icon: string }> = {
   profil: { label: 'Compléter mon profil', hint: 'Photo et présentation', href: '/dashboard/profil', icon: '👤' },

@@ -11,10 +11,20 @@ export default defineEventHandler(async (event) => {
   // les visites suivantes ne repaient ni le démarrage serverless ni la requête SQL.
   setResponseHeader(event, 'Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
 
-  const vehicleRows = await prisma.vehicle.findMany({
-    where: { driverId: driver.id },
-    orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }, { createdAt: 'asc' }],
-  })
+  // Les blobs base64 sont omis globalement : la présence des photos est testée
+  // par des requêtes légères (ids filtrés / count), sans transférer les images.
+  const [vehicleRows, vehiclesWithPhoto, driverPhotoCount] = await Promise.all([
+    prisma.vehicle.findMany({
+      where: { driverId: driver.id },
+      orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }, { createdAt: 'asc' }],
+    }),
+    prisma.vehicle.findMany({
+      where: { driverId: driver.id, photoUrl: { not: null } },
+      select: { id: true },
+    }),
+    prisma.driver.count({ where: { id: driver.id, photoUrl: { not: null } } }),
+  ])
+  const photoIds = new Set(vehiclesWithPhoto.map((v) => v.id))
   const vehicles = vehicleRows.map((v) => ({
     id: v.id,
     make: v.make,
@@ -26,7 +36,7 @@ export default defineEventHandler(async (event) => {
     isPrimary: v.isPrimary,
     // Photo personnelle du chauffeur (prioritaire sur l'image CDN), servie en
     // vraie image HTTP avec URL versionnée — jamais le blob base64 en JSON.
-    photoSrc: v.photoUrl
+    photoSrc: photoIds.has(v.id)
       ? `/api/public/${driver.slug}/vehicles/${v.id}/photo?v=${v.updatedAt.getTime()}`
       : null,
   }))
@@ -56,7 +66,7 @@ export default defineEventHandler(async (event) => {
     displayName: driver.displayName,
     tagline: driver.tagline,
     bio: driver.bio,
-    photoUrl: publicPhotoUrl(driver),
+    photoUrl: publicPhotoUrl(driver, driverPhotoCount > 0),
     vehicle: {
       make: driver.vehicleMake,
       model: driver.vehicleModel,
