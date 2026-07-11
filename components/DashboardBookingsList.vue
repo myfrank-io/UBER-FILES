@@ -110,24 +110,26 @@ async function markPaid(id: string) {
       </div>
     </div>
 
-    <!-- Plage de dates (optionnelle) -->
-    <div class="mt-3 flex items-end gap-3">
-      <div class="flex-1">
+    <!-- Plage de dates (optionnelle). Grille 2 colonnes + min-w-0 : les champs
+         date (largeur intrinsèque iOS) ne peuvent ni déborder ni se chevaucher. -->
+    <div class="mt-3 grid grid-cols-2 gap-3">
+      <div class="min-w-0">
         <label class="label" for="bookings-from">Du</label>
         <input id="bookings-from" v-model="filterFrom" type="date" class="field !py-2.5" />
       </div>
-      <div class="flex-1">
+      <div class="min-w-0">
         <label class="label" for="bookings-to">Au</label>
         <input id="bookings-to" v-model="filterTo" type="date" class="field !py-2.5" />
       </div>
-      <button
-        v-if="hasFilters"
-        class="btn-ghost shrink-0 !py-2.5 text-sm"
-        @click="resetFilters"
-      >
-        Réinitialiser
-      </button>
     </div>
+    <!-- Rangée dédiée (jamais en concurrence avec les champs sur mobile) -->
+    <button
+      v-if="hasFilters"
+      class="mt-1 flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-700"
+      @click="resetFilters"
+    >
+      ✕ Réinitialiser les filtres
+    </button>
 
     <!-- Compteur -->
     <p v-if="data" class="mt-4 text-sm text-slate-500">
