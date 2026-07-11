@@ -48,6 +48,7 @@
     "durationLabel": "Desired duration (hours)",
     "datetimeLabel": "Pickup date and time",
     "leadTime": "Book at least {hours}h in advance.",
+    "lastMinuteNotice": "Pickup in less than {window}: a {amount} last-minute surcharge is added to the price.",
     "estimateButton": "Estimate the price",
     "estimating": "Calculating…",
     "estimateLabel": "Estimate",

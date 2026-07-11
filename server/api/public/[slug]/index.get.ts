@@ -56,6 +56,13 @@ export default defineEventHandler(async (event) => {
     ...mode.onSiteMethods,
   ]
 
+  // Majoration « dernière minute » (réservation faite moins de X minutes avant
+  // le départ) : annoncée au client dès qu'il choisit un horaire dans la fenêtre,
+  // avant même l'estimation. Même règle de sélection que l'écran Mes tarifs.
+  const lastMinute = driver.surcharges.find(
+    (s) => s.autoApply && s.maxLeadTimeMinutes != null && s.kind === 'FIXED',
+  )
+
   return {
     phone: driver.phone,
     contactEmail: driver.contactEmail,
@@ -84,6 +91,9 @@ export default defineEventHandler(async (event) => {
     // première heure (le tarif heure supplémentaire, plus bas, n'est qu'un
     // complément au-delà du seuil).
     fromHourCents: driver.hourlyRateCents,
+    lastMinuteSurcharge: lastMinute
+      ? { maxLeadTimeMinutes: lastMinute.maxLeadTimeMinutes!, amountCents: lastMinute.amount }
+      : null,
     bookingEnabled: acceptedPaymentMethods.length > 0,
     // Mode de réservation, pour adapter le formulaire et les messages du client :
     // badge « réservation instantanée », choix du règlement, écrans de succès.

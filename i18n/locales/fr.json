@@ -48,6 +48,7 @@
     "durationLabel": "Durée souhaitée (heures)",
     "datetimeLabel": "Date et heure de prise en charge",
     "leadTime": "Réservation au plus tôt {hours}h à l'avance.",
+    "lastMinuteNotice": "Départ dans moins de {window} : une majoration de {amount} est ajoutée au prix.",
     "estimateButton": "Estimer le prix",
     "estimating": "Calcul…",
     "estimateLabel": "Estimation",

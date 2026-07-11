@@ -560,8 +560,10 @@ watchEffect(() => {
   hourly.overtimeRateEuros = otRate != null ? (otRate / 100).toFixed(2) : ''
 })
 
-function eurosToCents(v: string): number | null {
-  const n = parseFloat(v)
+// `v` peut être un nombre : v-model sur un input type="number" caste
+// automatiquement la valeur en Vue 3 (parseFloat convertit lui-même en chaîne).
+function eurosToCents(v: string | number): number | null {
+  const n = parseFloat(String(v))
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null
 }
 
@@ -618,21 +620,50 @@ async function saveHourly() {
   )
 }
 
-// ─── Suppléments ──────────────────────────────────────────────────────────
+// ─── Majoration dernière minute ───────────────────────────────────────────
+// Une seule règle, simple : « course réservée moins de X heures avant le départ
+// → +Y € ». Stockée comme un supplément automatique borné par une fenêtre
+// (maxLeadTimeMinutes) : le moteur de devis l'applique déjà, et la page publique
+// prévient le client dès que son horaire tombe dans la fenêtre.
 
-const newSurcharge = reactive({ name: '', kind: 'FIXED' as 'FIXED' | 'PERCENT', amountDisplay: '', autoApply: false, leadTimeHoursDisplay: '' })
-const addingSurcharge = ref(false)
-const editingSurcharge = ref<string | null>(null)
-const editSurchargeForm = reactive({ name: '', kind: 'FIXED' as 'FIXED' | 'PERCENT', amountDisplay: '', autoApply: false, leadTimeHoursDisplay: '' })
+const lastMinute = reactive({ enabled: false, hoursDisplay: '2', amountEuros: '' })
 
-function surchargeAmount(s: Record<string, unknown>): string {
-  if (s.kind === 'PERCENT') return `+ ${((s.amount as number) / 100).toFixed(1).replace('.0', '')} %`
-  return `+ ${formatMoney(s.amount as number, currency.value)}`
-}
+// La règle en vigueur : premier supplément automatique à fenêtre, en euros.
+const lastMinuteRow = computed(
+  () =>
+    surcharges.value.find(
+      (s) => (s.autoApply as boolean) && s.maxLeadTimeMinutes != null && s.kind === 'FIXED',
+    ) ?? null,
+)
+
+// Suppléments créés avec l'ancien réglage « Suppléments » : plus éditables, mais
+// listés tant qu'ils existent — ceux « auto » s'ajoutent encore à chaque devis,
+// les laisser invisibles fausserait les prix.
+const legacySurcharges = computed(() => surcharges.value.filter((s) => s !== lastMinuteRow.value))
+
+// Synchronise le formulaire depuis la règle stockée — uniquement quand elle
+// change réellement (chargement, enregistrement, suppression). Un watchEffect
+// écraserait le toggle pendant que le chauffeur l'active, `me` étant chargé en
+// lazy et rafraîchi après chaque enregistrement de la page.
+watch(
+  lastMinuteRow,
+  (row) => {
+    if (!row) {
+      lastMinute.enabled = false
+      return
+    }
+    lastMinute.enabled = true
+    lastMinute.hoursDisplay = String((row.maxLeadTimeMinutes as number) / 60)
+    lastMinute.amountEuros = ((row.amount as number) / 100).toFixed(2)
+  },
+  { immediate: true },
+)
 
 // Fenêtre « dernière minute » : saisie en heures dans l'UI, stockée en minutes.
-function parseLeadTimeMinutes(display: string): number | null {
-  const hours = parseFloat(display.replace(',', '.'))
+// `display` peut être un nombre : v-model sur un input type="number" caste
+// automatiquement la valeur en Vue 3.
+function parseLeadTimeMinutes(display: string | number): number | null {
+  const hours = parseFloat(String(display).replace(',', '.'))
   if (!Number.isFinite(hours) || hours <= 0) return null
   return Math.round(hours * 60)
 }
@@ -643,51 +674,51 @@ function formatLeadTime(minutes: number): string {
   return `${Math.floor(minutes / 60)} h ${minutes % 60}`
 }
 
-function startEditSurcharge(s: Record<string, unknown>) {
-  editingSurcharge.value = s.id as string
-  editSurchargeForm.name = s.name as string
-  editSurchargeForm.kind = s.kind as 'FIXED' | 'PERCENT'
-  editSurchargeForm.amountDisplay = ((s.amount as number) / 100).toFixed(s.kind === 'PERCENT' ? 1 : 2)
-  editSurchargeForm.autoApply = s.autoApply as boolean
-  const lead = s.maxLeadTimeMinutes as number | null | undefined
-  editSurchargeForm.leadTimeHoursDisplay = lead ? String(lead / 60) : ''
-}
+const lastMinuteMinutes = computed(() => parseLeadTimeMinutes(lastMinute.hoursDisplay))
+const lastMinuteCents = computed(() => eurosToCents(lastMinute.amountEuros))
+const lastMinuteValid = computed(() => lastMinuteMinutes.value != null && lastMinuteCents.value != null)
 
-function parseSurchargeAmount(display: string): number {
-  return Math.round(parseFloat(display) * 100)
-}
+const lastMinuteRecap = computed(() => {
+  if (!lastMinute.enabled || !lastMinuteValid.value) return ''
+  return `Une course réservée moins de ${formatLeadTime(lastMinuteMinutes.value!)} avant le départ est majorée de ${formatMoney(lastMinuteCents.value!, currency.value)}.`
+})
 
-async function addSurcharge() {
-  await call('surcharge-add', async () => {
-    await $fetch('/api/dashboard/surcharges', {
-      method: 'POST',
-      body: {
-        name: newSurcharge.name,
-        kind: newSurcharge.kind,
-        amount: parseSurchargeAmount(newSurcharge.amountDisplay),
-        autoApply: newSurcharge.autoApply,
-        maxLeadTimeMinutes: parseLeadTimeMinutes(newSurcharge.leadTimeHoursDisplay),
-      },
-    })
-    Object.assign(newSurcharge, { name: '', amountDisplay: '', autoApply: false, leadTimeHoursDisplay: '' })
-    addingSurcharge.value = false
+// Fenêtre ≤ délai minimum de réservation = majoration inatteignable (les
+// demandes plus tardives que le délai minimum sont refusées d'office).
+const lastMinuteUnreachable = computed(
+  () =>
+    lastMinute.enabled &&
+    lastMinuteMinutes.value != null &&
+    lastMinuteMinutes.value <= settings.minLeadTimeMinutes,
+)
+
+const lastMinuteSaveDisabled = computed(
+  () => saving.value === 'last-minute' || (lastMinute.enabled && !lastMinuteValid.value),
+)
+
+async function saveLastMinute() {
+  const row = lastMinuteRow.value
+  await call('last-minute', async () => {
+    if (!lastMinute.enabled) {
+      if (row) await $fetch(`/api/dashboard/surcharges/${row.id}`, { method: 'DELETE' })
+      return
+    }
+    const body = {
+      name: 'Majoration dernière minute',
+      kind: 'FIXED' as const,
+      amount: lastMinuteCents.value!,
+      autoApply: true,
+      maxLeadTimeMinutes: lastMinuteMinutes.value!,
+    }
+    if (row) await $fetch(`/api/dashboard/surcharges/${row.id}`, { method: 'PATCH', body })
+    else await $fetch('/api/dashboard/surcharges', { method: 'POST', body })
   })
 }
 
-async function updateSurcharge(id: string) {
-  await call(`surcharge-edit-${id}`, async () => {
-    await $fetch(`/api/dashboard/surcharges/${id}`, {
-      method: 'PATCH',
-      body: {
-        name: editSurchargeForm.name,
-        kind: editSurchargeForm.kind,
-        amount: parseSurchargeAmount(editSurchargeForm.amountDisplay),
-        autoApply: editSurchargeForm.autoApply,
-        maxLeadTimeMinutes: parseLeadTimeMinutes(editSurchargeForm.leadTimeHoursDisplay),
-      },
-    })
-    editingSurcharge.value = null
-  })
+// Montant d'un ancien supplément (« + 10 € », « + 5 % »).
+function surchargeAmount(s: Record<string, unknown>): string {
+  if (s.kind === 'PERCENT') return `+ ${((s.amount as number) / 100).toFixed(1).replace('.0', '')} %`
+  return `+ ${formatMoney(s.amount as number, currency.value)}`
 }
 
 async function deleteSurcharge(id: string) {
@@ -977,125 +1008,84 @@ async function call(key: string, fn: () => Promise<unknown>) {
         </div>
       </form>
 
-      <!-- Suppléments -->
-      <div class="card space-y-3">
+      <!-- Majoration dernière minute -->
+      <form class="card space-y-4" @submit.prevent="saveLastMinute">
         <div>
-          <h2 class="font-semibold text-slate-900">Suppléments</h2>
+          <h2 class="font-semibold text-slate-900">Majoration dernière minute</h2>
           <p class="mt-1 text-sm text-slate-600">
-            Frais additionnels (bagage, animal, siège bébé…). Ceux marqués « dans chaque devis »
-            s'ajoutent automatiquement à tous les prix.
+            Ajoutez automatiquement un supplément quand un client réserve peu de temps
+            avant le départ. Il est prévenu sur votre page et la majoration apparaît
+            dans le détail de son prix.
           </p>
         </div>
 
-        <div v-for="s in surcharges" :key="(s as Record<string, unknown>).id as string" class="rounded-xl border border-slate-200 p-4">
-          <div v-if="editingSurcharge === (s.id as string)" class="space-y-3">
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label class="label">Nom</label>
-                <input v-model="editSurchargeForm.name" type="text" class="field" />
-              </div>
-              <div>
-                <label class="label">{{ editSurchargeForm.kind === 'PERCENT' ? 'Majoration (%)' : 'Montant (€)' }}</label>
-                <div class="flex gap-2">
-                  <input v-model="editSurchargeForm.amountDisplay" type="number" step="0.01" min="0.01" class="field" />
-                  <select v-model="editSurchargeForm.kind" class="field !w-20 !px-2">
-                    <option value="FIXED">€</option>
-                    <option value="PERCENT">%</option>
-                  </select>
-                </div>
-              </div>
+        <label class="flex items-center gap-2.5 py-1 text-sm text-slate-600">
+          <input v-model="lastMinute.enabled" type="checkbox" class="h-5 w-5 shrink-0 rounded accent-brand-600" />
+          Majorer les réservations de dernière minute
+        </label>
+
+        <template v-if="lastMinute.enabled">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="label" for="lm-hours">Si réservé moins de … heures avant</label>
+              <input id="lm-hours" v-model="lastMinute.hoursDisplay" type="number" step="0.5" min="0.5" class="field" placeholder="2" />
             </div>
             <div>
-              <label class="label">
-                Seulement si la course est réservée moins de … heures à l'avance
-                <span class="font-normal text-slate-400">(optionnel)</span>
-              </label>
-              <input v-model="editSurchargeForm.leadTimeHoursDisplay" type="number" step="0.5" min="0.5" class="field" placeholder="Ex : 2" />
-              <p v-if="editSurchargeForm.leadTimeHoursDisplay && !editSurchargeForm.autoApply" class="mt-1 text-xs text-amber-600">
-                Cochez « Inclure automatiquement » pour que cette condition prenne effet.
-              </p>
-            </div>
-            <label class="flex items-center gap-2.5 py-1 text-sm text-slate-600">
-              <input v-model="editSurchargeForm.autoApply" type="checkbox" class="h-5 w-5 shrink-0 rounded accent-brand-600" />
-              Inclure automatiquement dans chaque devis
-            </label>
-            <div class="flex gap-2">
-              <button type="button" class="btn-primary !py-2.5 text-sm" :disabled="saving === `surcharge-edit-${s.id}`" @click="updateSurcharge(s.id as string)">
-                {{ saving === `surcharge-edit-${s.id}` ? '…' : 'Enregistrer' }}
-              </button>
-              <button type="button" class="btn-ghost !py-2.5 text-sm" @click="editingSurcharge = null">Annuler</button>
+              <label class="label" for="lm-amount">Majoration (€)</label>
+              <input id="lm-amount" v-model="lastMinute.amountEuros" type="number" step="0.01" min="0.01" class="field" placeholder="20,00" />
             </div>
           </div>
 
-          <div v-else class="flex items-center justify-between gap-3">
-            <div class="min-w-0">
-              <p class="font-semibold text-slate-900">{{ s.name }}</p>
-              <p class="mt-0.5 text-xs text-slate-500">
-                {{ (s.autoApply as boolean) ? 'Inclus dans chaque devis' : 'À ajouter à la demande' }}<template v-if="s.maxLeadTimeMinutes"> · si réservé moins de {{ formatLeadTime(s.maxLeadTimeMinutes as number) }} à l'avance</template>
-              </p>
-            </div>
-            <div class="shrink-0 text-right">
-              <p class="font-serif text-lg font-medium text-slate-950">{{ surchargeAmount(s) }}</p>
-              <p class="-mr-2.5 mt-0.5 flex justify-end gap-1 text-xs">
-                <button type="button" class="rounded-lg px-2.5 py-2 font-semibold text-brand-700 hover:bg-brand-50" @click="startEditSurcharge(s)">Modifier</button>
-                <button type="button" class="rounded-lg px-2.5 py-2 font-semibold text-red-600 hover:bg-red-50" @click="deleteSurcharge(s.id as string)">Supprimer</button>
-              </p>
-            </div>
+          <div v-if="lastMinuteRecap" class="rounded-xl bg-brand-50 px-4 py-3">
+            <p class="text-sm font-medium text-slate-900">{{ lastMinuteRecap }}</p>
+            <p class="mt-1 text-xs text-slate-500">
+              Le client est prévenu dès qu'il choisit un horaire dans la fenêtre, avant de réserver.
+            </p>
           </div>
-        </div>
 
-        <div v-if="addingSurcharge" class="rounded-xl border border-dashed border-brand-300 p-4">
-          <p class="mb-3 text-sm font-semibold text-slate-900">Nouveau supplément</p>
-          <div class="space-y-3">
-            <!-- Nom en pleine largeur sur mobile : en demi-colonne, montant et
-                 placeholders étaient tronqués. -->
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label class="label">Nom</label>
-                <input v-model="newSurcharge.name" type="text" class="field" placeholder="Bagage volumineux" />
-              </div>
-              <div>
-                <label class="label">{{ newSurcharge.kind === 'PERCENT' ? 'Majoration (%)' : 'Montant (€)' }}</label>
-                <div class="flex gap-2">
-                  <input v-model="newSurcharge.amountDisplay" type="number" step="0.01" min="0.01" class="field" placeholder="10,00" />
-                  <select v-model="newSurcharge.kind" class="field !w-20 !px-2">
-                    <option value="FIXED">€</option>
-                    <option value="PERCENT">%</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div>
-              <label class="label">
-                Seulement si la course est réservée moins de … heures à l'avance
-                <span class="font-normal text-slate-400">(optionnel)</span>
-              </label>
-              <input v-model="newSurcharge.leadTimeHoursDisplay" type="number" step="0.5" min="0.5" class="field" placeholder="Ex : 2" />
-              <p v-if="newSurcharge.leadTimeHoursDisplay && !newSurcharge.autoApply" class="mt-1 text-xs text-amber-600">
-                Cochez « Inclure automatiquement » pour que cette condition prenne effet.
-              </p>
-            </div>
-            <label class="flex items-center gap-2.5 py-1 text-sm text-slate-600">
-              <input v-model="newSurcharge.autoApply" type="checkbox" class="h-5 w-5 shrink-0 rounded accent-brand-600" />
-              Inclure automatiquement dans chaque devis
-            </label>
-            <div class="flex gap-2">
-              <button type="button" class="btn-primary !py-2.5 text-sm" :disabled="saving === 'surcharge-add' || !newSurcharge.name || !newSurcharge.amountDisplay" @click="addSurcharge">
-                {{ saving === 'surcharge-add' ? '…' : 'Ajouter' }}
-              </button>
-              <button type="button" class="btn-ghost !py-2.5 text-sm" @click="addingSurcharge = false">Annuler</button>
-            </div>
-          </div>
-        </div>
-        <button
-          v-else
-          type="button"
-          class="w-full rounded-xl border border-dashed border-slate-300 px-3 py-3 text-sm font-medium text-slate-500 transition-colors hover:border-brand-400 hover:text-brand-700"
-          @click="addingSurcharge = true"
-        >
-          ＋ Ajouter un supplément
+          <p v-if="lastMinuteUnreachable" class="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            Votre délai minimum de réservation est de
+            {{ formatLeadTime(settings.minLeadTimeMinutes) }} (onglet Général) : aucune
+            course ne peut être réservée moins de
+            {{ formatLeadTime(lastMinuteMinutes ?? 0) }} avant le départ, la majoration ne
+            s'appliquerait donc jamais. Élargissez la fenêtre ou réduisez le délai minimum.
+          </p>
+        </template>
+        <p v-else class="text-sm text-slate-500">
+          Aucune majoration : le prix est le même quel que soit le moment de la réservation.
+        </p>
+
+        <button type="submit" class="btn-primary !py-2.5 text-sm" :disabled="lastMinuteSaveDisabled">
+          {{ saving === 'last-minute' ? '…' : 'Enregistrer' }}
         </button>
-      </div>
+
+        <!-- Suppléments créés avec l'ancien réglage : visibles tant qu'ils existent
+             (les « auto » s'ajoutent encore aux devis), puis ce bloc disparaît. -->
+        <div v-if="legacySurcharges.length" class="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p class="text-sm font-semibold text-amber-900">Anciens suppléments</p>
+          <p class="mt-1 text-xs text-amber-800">
+            Créés avec l'ancien réglage « Suppléments ». Ceux marqués « auto » s'ajoutent
+            encore automatiquement à chaque devis : supprimez-les s'ils ne sont plus souhaités.
+          </p>
+          <div
+            v-for="s in legacySurcharges"
+            :key="(s as Record<string, unknown>).id as string"
+            class="mt-2 flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2"
+          >
+            <p class="min-w-0 truncate text-sm text-slate-800">
+              {{ s.name }} · {{ surchargeAmount(s) }}<template v-if="s.autoApply"> · auto</template><template v-if="s.maxLeadTimeMinutes"> · si réservé moins de {{ formatLeadTime(s.maxLeadTimeMinutes as number) }} avant</template>
+            </p>
+            <button
+              type="button"
+              class="shrink-0 rounded-lg px-2.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-100"
+              :disabled="saving === `surcharge-del-${s.id}`"
+              @click="deleteSurcharge(s.id as string)"
+            >
+              Supprimer
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
 
     <!-- ═══════════════════ Onglet Paiement & réservations ═══════════════════ -->
