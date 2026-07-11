@@ -5,7 +5,6 @@ import { prisma } from '~/server/utils/prisma'
 const schema = z.object({
   displayName: z.string().min(2).max(120).optional(),
   tagline: z.string().max(200).optional().nullable(),
-  bio: z.string().max(2000).optional().nullable(),
   // Accepte une URL http(s) classique OU une image importée depuis l'appareil,
   // encodée en data URL (data:image/...;base64,…). ~8 Mo de marge en base64.
   photoUrl: z

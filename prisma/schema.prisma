@@ -82,7 +82,7 @@ model Driver {
   // Présentation publique (marque blanche)
   displayName  String
   tagline      String?
-  bio          String? @db.Text
+  bio          String? @db.Text // plus exposé (champ Biographie retiré de l'interface) ; colonne conservée
   photoUrl     String?
   vehicleMake  String?
   vehicleModel String?

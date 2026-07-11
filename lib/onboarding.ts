@@ -17,7 +17,7 @@ export type OnboardingStepKey =
 
 export interface OnboardingInput {
   hasPhoto: boolean
-  // Présentation renseignée : accroche (tagline) ou bio.
+  // Présentation renseignée : accroche (tagline).
   hasIntro: boolean
   vehicleCount: number
   hasPhone: boolean
