@@ -24,6 +24,11 @@ export default defineEventHandler(async (event) => {
     seats: v.seats,
     color: v.color,
     isPrimary: v.isPrimary,
+    // Photo personnelle du chauffeur (prioritaire sur l'image CDN), servie en
+    // vraie image HTTP avec URL versionnée — jamais le blob base64 en JSON.
+    photoSrc: v.photoUrl
+      ? `/api/public/${driver.slug}/vehicles/${v.id}/photo?v=${v.updatedAt.getTime()}`
+      : null,
   }))
 
   const cheapestKm = driver.transferBands.length

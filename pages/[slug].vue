@@ -20,6 +20,8 @@ interface PublicVehicle {
   seats: number | null
   color: string | null
   isPrimary: boolean
+  // Photo personnelle du chauffeur (prioritaire sur l'image CDN du modèle).
+  photoSrc: string | null
 }
 
 interface BookingModePublic {
@@ -445,6 +447,7 @@ function goToContact() {
               :model-family="v.modelFamily"
               :vehicle-class="v.vehicleClass"
               :color="v.color"
+              :photo-url="v.photoSrc"
               :alt="v.modelLabel"
               class="h-full w-full transition group-hover:scale-105"
             />
@@ -468,6 +471,7 @@ function goToContact() {
           :model-family="zoomedVehicle.modelFamily"
           :vehicle-class="zoomedVehicle.vehicleClass"
           :color="zoomedVehicle.color"
+          :photo-url="zoomedVehicle.photoSrc"
           :alt="zoomedVehicle.modelLabel"
           class="h-full w-full p-2"
         />

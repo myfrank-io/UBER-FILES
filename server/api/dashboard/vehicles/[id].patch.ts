@@ -10,6 +10,13 @@ const schema = z.object({
   seats: z.number().int().min(1).max(20).optional().nullable(),
   color: z.string().max(40).optional().nullable(),
   isPrimary: z.boolean().optional(),
+  // Photo personnelle (data URL compressée côté client). null = retirer la photo.
+  photoUrl: z
+    .string()
+    .max(8_000_000)
+    .refine((v) => /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(v), 'Photo invalide.')
+    .optional()
+    .nullable(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -38,5 +45,7 @@ export default defineEventHandler(async (event) => {
     return tx.vehicle.update({ where: { id }, data })
   })
 
-  return vehicle
+  // Le blob base64 ne sort jamais en JSON (il est servi en vraie image HTTP).
+  const { photoUrl: _photo, ...rest } = vehicle
+  return rest
 })
