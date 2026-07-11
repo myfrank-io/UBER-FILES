@@ -23,10 +23,6 @@ const { error: toastError, success: toastSuccess } = useToast()
 const busyId = ref<string | null>(null)
 const adjustValue = reactive<Record<string, number>>({})
 
-// Les demandes expirées sont « archivées » : repliées par défaut pour épurer le
-// tableau de bord, mais toujours accessibles d'un clic.
-const showExpired = ref(false)
-
 // Les devis en attente de paiement restent discrets : section repliée par
 // défaut (le compteur reste visible), dépliable d'un clic.
 const showSent = ref(false)
@@ -321,64 +317,6 @@ async function resend(quoteId: string) {
           <button class="btn-ghost shrink-0 whitespace-nowrap text-sm" :disabled="busyId === q.id" @click="resend(q.id)">
             {{ busyId === q.id ? '…' : '↩ Relancer' }}
           </button>
-        </div>
-      </div>
-      </div>
-    </section>
-
-    <!-- Ce mois-ci : l'essentiel des chiffres, sans onglet dédié. -->
-    <section v-if="data" class="mt-8">
-      <h2 class="text-lg font-semibold text-slate-900">Ce mois-ci</h2>
-      <div class="mt-3 grid grid-cols-2 gap-3">
-        <div class="card flex flex-col !p-4">
-          <p class="text-xs text-slate-500">Encaissé</p>
-          <p class="mt-auto pt-1 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
-            {{ formatMoney(data.stats.monthRevenueCents) }}
-          </p>
-        </div>
-        <div class="card flex flex-col !p-4">
-          <p class="text-xs text-slate-500">Courses</p>
-          <p class="mt-auto pt-1 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
-            {{ data.stats.monthRides }}
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Demandes expirées (archivées) : repliées par défaut, discrètes, en fin de page -->
-    <section v-if="data?.expiredQuotes.length" class="mt-8">
-      <button
-        class="flex min-h-[44px] w-full items-center gap-2 text-sm font-medium text-slate-400 hover:text-slate-600"
-        :aria-expanded="showExpired"
-        @click="showExpired = !showExpired"
-      >
-        <span class="transition-transform" :class="showExpired ? 'rotate-90' : ''">›</span>
-        <span>Demandes expirées</span>
-        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-          {{ data.expiredQuotes.length }}
-        </span>
-      </button>
-
-      <div v-show="showExpired" class="mt-3 space-y-3">
-      <div v-for="q in data.expiredQuotes" :key="q.id" class="card opacity-75 hover:opacity-100">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <p class="font-semibold text-slate-900">{{ q.ride.customerName }}</p>
-            <ContactActions class="mt-1" :email="q.ride.customerEmail" />
-          </div>
-          <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">Expiré</span>
-        </div>
-        <div class="mt-2 space-y-1 text-sm text-slate-600">
-          <p>📅 {{ formatDateTime(q.ride.scheduledAt) }}</p>
-          <div v-if="q.ride.type === 'TRANSFER'">
-            <RideRoute nav wrap :pickup="q.ride.pickupAddress" :dropoff="q.ride.dropoffAddress" />
-            <span v-if="q.ride.roundTrip" class="mt-0.5 inline-block text-xs text-slate-400">Aller-retour</span>
-          </div>
-          <p v-else>⏱️ {{ q.ride.durationHours }} h</p>
-        </div>
-        <div class="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-slate-100 pt-3">
-          <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(q.amountCents, q.currency) }}</span>
-          <span class="text-xs text-slate-400">Expirée — le client peut refaire une demande</span>
         </div>
       </div>
       </div>
