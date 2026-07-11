@@ -53,6 +53,23 @@ const nextRide = computed(() =>
 // Fiche course partagée (mêmes actions que dans l'onglet Courses).
 const selectedBookingId = ref<string | null>(null)
 
+// ─── CTA « Partagez votre page » ─────────────────────────────────────────────
+// Accueil vide (aucune demande à valider, aucune course aujourd'hui) : le bon
+// réflexe est d'aller chercher des réservations → on met en avant le partage de
+// la page publique. Le bouton ouvre la modale du bouton flottant (DashboardShare,
+// rendue par le layout — absente si profil suspendu, donc CTA masqué aussi).
+const shareOpen = useShareModal()
+const showShareCta = computed(() => {
+  const status = (me.value as { status?: string } | null)?.status
+  return Boolean(
+    data.value &&
+    !data.value.pendingQuotes.length &&
+    !todayRides.value.length &&
+    status &&
+    status !== 'SUSPENDED',
+  )
+})
+
 // ─── Actions sur les devis ───────────────────────────────────────────────────
 
 async function validate(quoteId: string, custom = false) {
@@ -268,6 +285,26 @@ async function resend(quoteId: string) {
           Mise à disposition — {{ nextRide.durationHours }} h
         </p>
       </button>
+    </section>
+
+    <!-- Accueil vide : CTA central pour partager sa page de réservation.
+         Ouvre la même modale que le bouton flottant (enregistrement du client
+         + envoi du lien par WhatsApp / SMS / email). -->
+    <section v-if="showShareCta" class="mt-8">
+      <div class="card flex flex-col items-center border-brand-100 bg-gradient-to-br from-brand-50/70 to-white px-6 py-8 text-center">
+        <p class="text-3xl" aria-hidden="true">📲</p>
+        <h2 class="mt-3 text-lg font-semibold text-slate-900">
+          Partagez votre page pour recevoir des réservations
+        </h2>
+        <p class="mt-2 max-w-md text-sm text-slate-600">
+          Pensez à envoyer votre lien de réservation à tous les clients que vous
+          avez dans votre voiture grâce aux applis : la prochaine fois, ils
+          réserveront en direct avec vous.
+        </p>
+        <button class="btn-primary mt-5" @click="shareOpen = true">
+          <span aria-hidden="true">🔗</span> Partager ma page de réservation
+        </button>
+      </div>
     </section>
 
     <!-- Devis envoyés : en attente de paiement/confirmation du client.
