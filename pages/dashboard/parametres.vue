@@ -5,7 +5,7 @@ import {
   type PaymentMethod,
 } from '~/lib/payment-methods'
 import { onlinePaymentPolicy, onSitePaymentMethods } from '~/lib/booking-policy'
-import { googleReviewUrl } from '~/lib/review-link'
+import { reviewFunnelPath } from '~/lib/review-link'
 
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Réglages' })
@@ -183,6 +183,12 @@ interface GooglePlace {
 const googlePlace = computed(
   () => ((me.value as Record<string, unknown>)?.googlePlace as GooglePlace | null) ?? null,
 )
+// Lien « Tester » : ouvre la page de notation publique — exactement le parcours
+// vécu par le client (5★ → dépôt public, note inférieure → retour privé).
+const reviewTestPath = computed(() => {
+  const slug = (me.value as Record<string, unknown>)?.slug as string | undefined
+  return slug ? reviewFunnelPath(slug) : '#'
+})
 // Échappatoire : lien d'avis collé à la main (fiche introuvable, Trustpilot…).
 const manualReviewUrl = computed(
   () => ((me.value as Record<string, unknown>)?.reviewUrl as string | null) ?? null,
@@ -1233,12 +1239,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
         <template v-if="googlePlace">
           <p v-if="googlePlace.address" class="mt-2 text-xs text-slate-500">{{ googlePlace.address }}</p>
           <div class="mt-4 flex flex-wrap gap-2">
-            <a
-              :href="googlePlace ? googleReviewUrl(googlePlace.placeId) : '#'"
-              target="_blank"
-              rel="noopener"
-              class="btn-primary"
-            >
+            <a :href="reviewTestPath" target="_blank" rel="noopener" class="btn-primary">
               Tester le lien d'avis
             </a>
             <button class="btn-ghost" :disabled="saving === 'place-disconnect'" @click="disconnectPlace">
@@ -1246,7 +1247,8 @@ async function call(key: string, fn: () => Promise<unknown>) {
             </button>
           </div>
           <p class="mt-2 text-xs text-slate-500">
-            Le test ouvre la fenêtre « laisser un avis » de votre fiche : vérifiez que c'est bien la vôtre.
+            Le test ouvre votre page de notation, comme vos clients : 5 étoiles vous redirige vers
+            votre fiche — vérifiez que c'est bien la vôtre.
           </p>
         </template>
 
@@ -1254,7 +1256,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
         <template v-else-if="manualReviewUrl">
           <p class="mt-2 break-all text-xs text-slate-500">{{ manualReviewUrl }}</p>
           <div class="mt-4 flex flex-wrap gap-2">
-            <a :href="manualReviewUrl" target="_blank" rel="noopener" class="btn-primary">
+            <a :href="reviewTestPath" target="_blank" rel="noopener" class="btn-primary">
               Tester le lien d'avis
             </a>
             <button class="btn-ghost" :disabled="saving === 'review-url-clear'" @click="clearManualUrl">

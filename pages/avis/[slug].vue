@@ -146,9 +146,6 @@ async function submit() {
             <label class="label" for="review-name">{{ $t('review.nameLabel') }}</label>
             <input id="review-name" v-model="customerName" type="text" class="field" maxlength="120" />
           </div>
-          <p class="text-xs text-slate-500">
-            {{ $t('review.formHint', { name: driver.displayName }) }}
-          </p>
           <p v-if="errorMsg" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ errorMsg }}</p>
           <button type="submit" class="btn-primary w-full" :disabled="sending || comment.trim().length < 3">
             {{ sending ? $t('review.sending') : $t('review.submit') }}
