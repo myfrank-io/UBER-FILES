@@ -18,17 +18,12 @@ function requestPayment(mode: BookingMode, preferred: PaymentMethod | null) {
   return { kind: 'UNDECIDED' as const, label: 'À définir avec le client' }
 }
 
-// Accueil chauffeur : devis en attente, courses à venir, chiffres du mois.
+// Accueil chauffeur : devis en attente, courses à venir.
 export default defineEventHandler(async (event) => {
   const driverId = await requireDriverId(event)
   const now = new Date()
 
-  // Chiffres « ce mois-ci » : plus parlants pour un accueil que des cumuls
-  // depuis toujours (l'historique détaillé reste consultable dans Courses).
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-
-  const [driver, pendingQuotes, sentQuotes, expiredQuotes, upcomingBookings, monthRides, monthPaid] = await Promise.all([
+  const [driver, pendingQuotes, sentQuotes, upcomingBookings] = await Promise.all([
     // Seuls les champs nécessaires au mode de réservation : évite de rapatrier
     // la ligne complète (bio, textes…) à chaque affichage du tableau de bord.
     prisma.driver.findUniqueOrThrow({
@@ -58,18 +53,6 @@ export default defineEventHandler(async (event) => {
       include: { rideRequest: true },
       orderBy: { expiresAt: 'asc' },
     }),
-    // Archivés automatiquement : délai de validité dépassé OU date de la course
-    // déjà passée (le client n'a pas réglé à temps).
-    prisma.quote.findMany({
-      where: {
-        driverId,
-        status: 'SENT',
-        OR: [{ expiresAt: { lt: now } }, { rideRequest: { scheduledAt: { lt: now } } }],
-      },
-      include: { rideRequest: true },
-      orderBy: { expiresAt: 'desc' },
-      take: 10,
-    }),
     prisma.booking.findMany({
       where: { driverId, status: 'CONFIRMED', scheduledAt: { gte: now } },
       include: {
@@ -79,19 +62,6 @@ export default defineEventHandler(async (event) => {
       },
       orderBy: { scheduledAt: 'asc' },
       take: 20,
-    }),
-    // Courses du mois (planifiées ce mois-ci, confirmées ou terminées).
-    prisma.booking.count({
-      where: {
-        driverId,
-        status: { in: ['CONFIRMED', 'COMPLETED'] },
-        scheduledAt: { gte: monthStart, lt: nextMonthStart },
-      },
-    }),
-    // Encaissé du mois (paiements réglés ce mois-ci, en ligne ou sur place).
-    prisma.payment.aggregate({
-      where: { driverId, status: 'PAID', createdAt: { gte: monthStart, lt: nextMonthStart } },
-      _sum: { amountCents: true },
     }),
   ])
 
@@ -147,22 +117,6 @@ export default defineEventHandler(async (event) => {
         durationHours: q.rideRequest.durationHours,
       },
     })),
-    expiredQuotes: expiredQuotes.map((q) => ({
-      id: q.id,
-      amountCents: q.amountCents,
-      currency: q.currency,
-      expiresAt: q.expiresAt,
-      ride: {
-        type: q.rideRequest.type,
-        customerName: q.rideRequest.customerName,
-        customerEmail: q.rideRequest.customerEmail,
-        scheduledAt: q.rideRequest.scheduledAt,
-        pickupAddress: q.rideRequest.pickupAddress,
-        dropoffAddress: q.rideRequest.dropoffAddress,
-        roundTrip: q.rideRequest.roundTrip,
-        durationHours: q.rideRequest.durationHours,
-      },
-    })),
     upcomingBookings: upcomingBookings.map((b) => ({
       id: b.id,
       scheduledAt: b.scheduledAt,
@@ -179,9 +133,5 @@ export default defineEventHandler(async (event) => {
         ? { method: b.payments[0].method, status: b.payments[0].status }
         : null,
     })),
-    stats: {
-      monthRides,
-      monthRevenueCents: monthPaid._sum.amountCents ?? 0,
-    },
   }
 })
