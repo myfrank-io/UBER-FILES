@@ -61,23 +61,22 @@ const expanded = ref(false)
 <template>
   <div
     v-if="visible && onboarding"
-    class="card border-brand-100 bg-gradient-to-br from-brand-50/70 to-white"
+    class="card border-brand-100 bg-gradient-to-br from-brand-50/70 to-white !p-4"
   >
-    <!-- En-tête cliquable : replie / déplie la checklist détaillée. -->
+    <!-- En-tête cliquable une seule ligne : replie / déplie la checklist.
+         Replié, la carte tient en ~70px sur mobile (titre + barre). -->
     <button
       type="button"
-      class="flex w-full items-start justify-between gap-4 text-left"
+      class="flex w-full items-center justify-between gap-3 text-left"
       :aria-expanded="expanded"
       @click="expanded = !expanded"
     >
-      <div>
-        <h2 class="font-serif text-lg font-medium text-slate-900">Finalisez votre configuration</h2>
-        <p class="mt-0.5 text-sm text-slate-500">
-          Encore quelques étapes avant de recevoir vos premières réservations.
-        </p>
-      </div>
-      <div class="flex shrink-0 items-center gap-2">
-        <span class="rounded-full bg-brand-600 px-3 py-1 text-sm font-semibold text-white">
+      <h2 class="min-w-0 truncate text-sm font-semibold text-slate-900">
+        Finalisez votre configuration
+      </h2>
+      <div class="flex shrink-0 items-center gap-1.5">
+        <span class="text-xs text-slate-400">{{ onboarding.requiredDone }}/{{ onboarding.requiredTotal }}</span>
+        <span class="rounded-full bg-brand-600 px-2.5 py-0.5 text-xs font-semibold text-white">
           {{ onboarding.percent }}%
         </span>
         <svg
@@ -97,18 +96,19 @@ const expanded = ref(false)
     </button>
 
     <!-- Barre de progression : reste visible même replié (résumé compact). -->
-    <div class="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+    <div class="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
       <div
         class="h-full rounded-full bg-brand-600 transition-all duration-500"
         :style="{ width: `${onboarding.percent}%` }"
       />
     </div>
-    <p class="mt-1.5 text-xs text-slate-400">
-      {{ onboarding.requiredDone }} / {{ onboarding.requiredTotal }} étapes obligatoires
-    </p>
 
-    <!-- Checklist : masquée par défaut, affichée une fois déplié. -->
-    <ul v-if="expanded" class="mt-4 space-y-1.5">
+    <!-- Détail : masqué par défaut, affiché une fois déplié. -->
+    <p v-if="expanded" class="mt-3 text-sm text-slate-500">
+      Encore quelques étapes avant de recevoir vos premières réservations
+      ({{ onboarding.requiredDone }} / {{ onboarding.requiredTotal }} étapes obligatoires).
+    </p>
+    <ul v-if="expanded" class="mt-3 space-y-1.5">
       <li v-for="step in onboarding.steps" :key="step.key">
         <NuxtLink
           :to="STEP_META[step.key].href"
