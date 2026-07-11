@@ -360,15 +360,13 @@ function goToContact() {
 
 <template>
   <!-- Tout doit tenir dans l'écran (pas de scroll) : en-tête compact, formulaire
-       dense sur mobile ; sur desktop, profil et formulaire côte à côte. -->
-  <div
-    v-if="driver"
-    class="mx-auto w-full max-w-lg px-4 py-3 sm:py-5 lg:flex lg:min-h-dvh lg:max-w-4xl lg:flex-col lg:justify-center lg:py-8"
-  >
-    <div class="lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start lg:gap-5">
+       dense. Une seule colonne partout — sur ordinateur, la page garde la même
+       mise en page que sur mobile, simplement centrée. -->
+  <div v-if="driver" class="mx-auto w-full max-w-lg px-4 py-3 sm:py-5 lg:py-8">
+    <div>
       <!-- Bloc chauffeur : identité, repères et véhicules réunis dans une seule
            carte compacte, pour laisser l'écran au formulaire de réservation. -->
-      <div class="card !p-4 lg:!p-5">
+      <div class="card !p-4">
         <div class="flex items-center gap-3">
           <img
             v-if="driver.photoUrl"
@@ -439,7 +437,7 @@ function goToContact() {
       </div>
 
       <!-- Colonne réservation : confirmation, demande envoyée ou formulaire. -->
-      <div class="mt-3 lg:mt-0">
+      <div class="mt-3">
         <!-- Course confirmée immédiatement (règlement sur place, créneau libre) -->
         <div v-if="confirmedBooking" class="card border-green-200 bg-green-50 text-center">
           <p class="text-3xl">✅</p>
@@ -466,7 +464,7 @@ function goToContact() {
         </div>
 
         <!-- Formulaire (toujours disponible, même si le paiement en ligne n'est pas activé) -->
-        <form v-else class="card space-y-3.5 !p-4 lg:!p-5" @submit.prevent="submit">
+        <form v-else class="card space-y-3.5 !p-4" @submit.prevent="submit">
           <!-- Étape 1 : course + estimation (les coordonnées ne sont pas encore demandées) -->
           <template v-if="step === 'details'">
             <!-- Type de prestation — transfert d'abord ; sélecteur masqué quand le
