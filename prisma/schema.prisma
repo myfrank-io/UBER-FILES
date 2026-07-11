@@ -105,6 +105,10 @@ model Driver {
   googlePlaceName    String?
   googlePlaceAddress String?
 
+  // Modèle personnalisé du message « Partager ma page » (variables {client},
+  // {chauffeur}, {lien_avis}, {lien_reservation}) ; NULL = modèle par défaut.
+  shareMessageTemplate String? @db.Text
+
   // Identité légale
   siren         String?
   sirenVerified Boolean @default(false)
