@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { priceHourly, selectHourlyTier } from './hourly'
+import { priceHourly } from './hourly'
 import { PricingError } from './transfer'
-import type { DriverPricingParams, HourlyRateTierInput } from './types'
+import type { DriverPricingParams, HourlyRateInput } from './types'
 
 const params: DriverPricingParams = {
   currency: 'eur',
@@ -9,72 +9,79 @@ const params: DriverPricingParams = {
   timezone: 'Europe/Paris',
 }
 
-// Grille dégressive : 1h = 60 €/h, 4h = 55 €/h, 8h = 50 €/h.
-const tiers: HourlyRateTierInput[] = [
-  { minHours: 1, pricePerHourCents: 6000 },
-  { minHours: 4, pricePerHourCents: 5500 },
-  { minHours: 8, pricePerHourCents: 5000 },
-]
+// Les 8 premières heures à 50 €/h, puis 40 €/h par heure supplémentaire.
+const rate: HourlyRateInput = {
+  pricePerHourCents: 5000,
+  overtimeAfterHours: 8,
+  overtimePricePerHourCents: 4000,
+}
 
-describe('selectHourlyTier', () => {
-  it('choisit le palier exact', () => {
-    expect(selectHourlyTier(tiers, 4)?.pricePerHourCents).toBe(5500)
-  })
-  it('choisit le palier inférieur le plus proche', () => {
-    expect(selectHourlyTier(tiers, 6)?.pricePerHourCents).toBe(5500)
-    expect(selectHourlyTier(tiers, 10)?.pricePerHourCents).toBe(5000)
-  })
-  it('renvoie null sous le plus petit palier', () => {
-    expect(selectHourlyTier(tiers, 0.5)).toBeNull()
-  })
-})
+// Tarif unique, sans heures supplémentaires.
+const flatRate: HourlyRateInput = { pricePerHourCents: 6000 }
 
 describe('priceHourly', () => {
-  it('calcule le prix au palier 1h', () => {
-    const r = priceHourly({ durationHours: 1, tiers, surcharges: [], params })
-    expect(r.amountCents).toBe(6000)
+  it('facture au tarif de base sous le seuil', () => {
+    const r = priceHourly({ durationHours: 5, rate, surcharges: [], params })
+    expect(r.amountCents).toBe(25000) // 5 × 50 €
+    expect(r.breakdown).toHaveLength(1)
   })
 
-  it('applique le tarif dégressif à 4h', () => {
-    const r = priceHourly({ durationHours: 4, tiers, surcharges: [], params })
-    expect(r.amountCents).toBe(22000) // 4 × 55 €
-  })
-
-  it('applique le tarif dégressif à 8h', () => {
-    const r = priceHourly({ durationHours: 8, tiers, surcharges: [], params })
+  it('facture au tarif de base au seuil exact', () => {
+    const r = priceHourly({ durationHours: 8, rate, surcharges: [], params })
     expect(r.amountCents).toBe(40000) // 8 × 50 €
+    expect(r.breakdown).toHaveLength(1)
   })
 
-  it('utilise le palier inférieur pour une durée intermédiaire', () => {
-    const r = priceHourly({ durationHours: 5, tiers, surcharges: [], params })
-    expect(r.amountCents).toBe(27500) // 5 × 55 €
+  it('facture les heures au-delà du seuil au tarif heure supplémentaire', () => {
+    const r = priceHourly({ durationHours: 10, rate, surcharges: [], params })
+    expect(r.amountCents).toBe(48000) // 8 × 50 € + 2 × 40 €
+    expect(r.breakdown).toHaveLength(2)
+    expect(r.breakdown[0]).toMatchObject({ label: 'Mise à disposition', amountCents: 40000 })
+    expect(r.breakdown[1]).toMatchObject({ label: 'Heures supplémentaires', amountCents: 8000 })
   })
 
-  it('applique une majoration', () => {
+  it('ne facture jamais moins pour une durée plus longue', () => {
+    const at8 = priceHourly({ durationHours: 8, rate, surcharges: [], params })
+    const at9 = priceHourly({ durationHours: 9, rate, surcharges: [], params })
+    expect(at9.amountCents).toBeGreaterThan(at8.amountCents)
+  })
+
+  it('applique le tarif unique sans configuration heures supplémentaires', () => {
+    const r = priceHourly({ durationHours: 12, rate: flatRate, surcharges: [], params })
+    expect(r.amountCents).toBe(72000) // 12 × 60 €
+    expect(r.breakdown).toHaveLength(1)
+  })
+
+  it('remonte au minimum de course', () => {
     const r = priceHourly({
-      durationHours: 2,
-      tiers,
+      durationHours: 1,
+      rate: { pricePerHourCents: 2000 },
+      surcharges: [],
+      params,
+    })
+    expect(r.amountCents).toBe(2500)
+    expect(r.breakdown[1]!.label).toBe('Ajustement au minimum de course')
+  })
+
+  it('applique une majoration après le calcul horaire', () => {
+    const r = priceHourly({
+      durationHours: 10,
+      rate,
       surcharges: [{ name: 'Bagages', kind: 'FIXED', amount: 1000 }],
       params,
     })
-    expect(r.amountCents).toBe(13000) // 2 × 60 € + 10 €
+    expect(r.amountCents).toBe(49000) // 8 × 50 € + 2 × 40 € + 10 €
   })
 
   it('rejette une durée nulle', () => {
-    expect(() => priceHourly({ durationHours: 0, tiers, surcharges: [], params })).toThrow(
+    expect(() => priceHourly({ durationHours: 0, rate, surcharges: [], params })).toThrow(
       PricingError,
     )
   })
 
-  it('rejette une durée sous le plus petit palier', () => {
+  it('rejette une configuration sans tarif horaire', () => {
     expect(() =>
-      priceHourly({ durationHours: 0.5, tiers, surcharges: [], params }),
-    ).toThrow(PricingError)
-  })
-
-  it('rejette une grille vide', () => {
-    expect(() =>
-      priceHourly({ durationHours: 2, tiers: [], surcharges: [], params }),
+      priceHourly({ durationHours: 2, rate: { pricePerHourCents: 0 }, surcharges: [], params }),
     ).toThrow(PricingError)
   })
 })

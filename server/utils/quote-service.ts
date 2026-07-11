@@ -1,4 +1,4 @@
-import type { Driver, HourlyRateTier, Surcharge, TransferRateBand } from '@prisma/client'
+import type { Driver, Surcharge, TransferRateBand } from '@prisma/client'
 import {
   priceHourly,
   priceTransfer,
@@ -11,7 +11,6 @@ import { computeRoute, type LatLng } from './google-maps'
 // rapatrié) : le type reflète la forme réellement retournée par les requêtes.
 export interface DriverWithPricing extends Omit<Driver, 'photoUrl'> {
   transferBands: TransferRateBand[]
-  hourlyTiers: HourlyRateTier[]
   surcharges: Surcharge[]
 }
 
@@ -114,10 +113,11 @@ export async function computeQuote(args: ComputeArgs): Promise<QuoteComputation>
   if (!args.durationHours) throw new Error('Durée requise pour une mise à disposition.')
   const price = priceHourly({
     durationHours: args.durationHours,
-    tiers: driver.hourlyTiers.map((t) => ({
-      minHours: t.minHours,
-      pricePerHourCents: t.pricePerHourCents,
-    })),
+    rate: {
+      pricePerHourCents: driver.hourlyRateCents ?? 0,
+      overtimeAfterHours: driver.hourlyOvertimeAfterHours,
+      overtimePricePerHourCents: driver.hourlyOvertimeRateCents,
+    },
     surcharges,
     params,
   })

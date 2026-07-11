@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   const [driver, account, vehicleCount, photoCount] = await Promise.all([
     prisma.driver.findUniqueOrThrow({
       where: { id: driverId },
-      include: { transferBands: true, hourlyTiers: true, cancellationPolicy: true, surcharges: true },
+      include: { transferBands: true, cancellationPolicy: true, surcharges: true },
     }),
     prisma.user.findUnique({
       where: { id: sessionUser.id },
@@ -65,7 +65,9 @@ export default defineEventHandler(async (event) => {
     },
     telegramLinked: Boolean(driver.telegramChatId),
     transferBands: driver.transferBands,
-    hourlyTiers: driver.hourlyTiers,
+    hourlyRateCents: driver.hourlyRateCents,
+    hourlyOvertimeAfterHours: driver.hourlyOvertimeAfterHours,
+    hourlyOvertimeRateCents: driver.hourlyOvertimeRateCents,
     cancellationPolicy: driver.cancellationPolicy,
     surcharges: driver.surcharges,
   }

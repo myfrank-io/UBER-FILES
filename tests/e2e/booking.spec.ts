@@ -17,8 +17,8 @@ test.describe('Page de réservation publique', () => {
     // Estimation
     await page.getByRole('button', { name: 'Estimer le prix' }).click()
     await expect(page.getByText('Estimation')).toBeVisible({ timeout: 10_000 })
-    // 4h × 55 € = 220 € (grille de démo)
-    await expect(page.getByText(/220,00/)).toBeVisible()
+    // 4 h × 60 € = 240 € (tarif de démo : 60 €/h, puis 50 €/h au-delà de 8 h)
+    await expect(page.getByText(/240,00/)).toBeVisible()
   })
 
   test('renvoie une 404 pour un chauffeur inconnu', async ({ page }) => {
