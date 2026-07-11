@@ -47,12 +47,11 @@ async function resendVerification() {
   }
 }
 
-// « Gains » et « Clients » ont été intégrés à l'accueil (sous-onglets) pour
-// épurer la navigation.
+// Navigation resserrée à 4 onglets : « Courses » regroupe l'ex-Calendrier,
+// l'ex-Réservations et les Clients (vues internes) ; « Gains » a été supprimé.
 const nav = [
   { to: '/dashboard', label: 'Accueil', icon: '🏠' },
-  { to: '/dashboard/reservations', label: 'Réservations', icon: '🗂️' },
-  { to: '/dashboard/calendrier', label: 'Calendrier', icon: '📅' },
+  { to: '/dashboard/courses', label: 'Courses', icon: '🚗' },
   { to: '/dashboard/profil', label: 'Profil', icon: '👤' },
   { to: '/dashboard/parametres', label: 'Réglages', icon: '⚙️' },
 ]

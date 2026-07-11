@@ -128,7 +128,7 @@ export async function confirmBookingFromQuote(quote: QuoteWithRelations, payment
         currency: quote.currency,
         paidOnline: true,
         conflictWarning: Boolean(conflict),
-        dashboardUrl: `${config.public.appBaseUrl}/dashboard/reservations`,
+        dashboardUrl: `${config.public.appBaseUrl}/dashboard/courses`,
       }),
       telegram: bookingConfirmedMessage({
         driverDisplayName: quote.driver.displayName,

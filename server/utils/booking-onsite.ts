@@ -169,7 +169,7 @@ export async function confirmQuoteOnSite(
         method,
         autoConfirmed: opts.autoConfirmed,
         acceptedByDriver: opts.acceptedByDriver,
-        dashboardUrl: `${config.public.appBaseUrl}/dashboard/reservations`,
+        dashboardUrl: `${config.public.appBaseUrl}/dashboard/courses`,
       }),
       telegram: bookingConfirmedMessage({
         driverDisplayName: quote.driver.displayName,
