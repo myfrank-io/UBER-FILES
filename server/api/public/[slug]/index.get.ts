@@ -1,5 +1,6 @@
 import { loadActiveDriverBySlug, driverBookingMode, publicPhotoUrl } from '~/server/utils/driver'
 import type { PaymentMethod } from '~/lib/payment-methods'
+import { driverReviewUrl } from '~/lib/review-link'
 import { prisma } from '~/server/utils/prisma'
 
 // Profil public d'un chauffeur + résumé tarifaire (pour la page de réservation).
@@ -73,9 +74,9 @@ export default defineEventHandler(async (event) => {
     vehicles,
     services: driver.services,
     serviceArea: driver.serviceArea,
-    // Lien où le client peut laisser un avis (fiche Google, Trustpilot…). Affiché
-    // en bouton sur la page publique quand il est renseigné.
-    reviewUrl: driver.reviewUrl,
+    // Lien où le client peut laisser un avis — fiche Google connectée ou lien
+    // manuel (Trustpilot…). Affiché en bouton sur la page publique s'il existe.
+    reviewUrl: driverReviewUrl(driver),
     currency: driver.currency,
     minimumFareCents: driver.minimumFareCents,
     minLeadTimeMinutes: driver.minLeadTimeMinutes,

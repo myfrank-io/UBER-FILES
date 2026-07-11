@@ -5,6 +5,7 @@ import {
   type PaymentMethod,
 } from '~/lib/payment-methods'
 import { onlinePaymentPolicy, onSitePaymentMethods } from '~/lib/booking-policy'
+import { googleReviewUrl } from '~/lib/review-link'
 
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Réglages' })
@@ -170,6 +171,84 @@ async function disconnectTelegram() {
 }
 
 onBeforeUnmount(stopTelegramPoll)
+
+// ─── Fiche Google (lien d'avis) ────────────────────────────────────────────
+
+interface GooglePlace {
+  placeId: string
+  name: string
+  address: string
+}
+
+const googlePlace = computed(
+  () => ((me.value as Record<string, unknown>)?.googlePlace as GooglePlace | null) ?? null,
+)
+// Échappatoire : lien d'avis collé à la main (fiche introuvable, Trustpilot…).
+const manualReviewUrl = computed(
+  () => ((me.value as Record<string, unknown>)?.reviewUrl as string | null) ?? null,
+)
+
+const placeQuery = ref('')
+const placeResults = ref<GooglePlace[] | null>(null) // null = pas encore cherché
+const placeSearching = ref(false)
+
+async function searchPlace() {
+  if (placeQuery.value.trim().length < 2) return
+  placeSearching.value = true
+  errorMsg.value = ''
+  try {
+    const res = await $fetch<{ results: GooglePlace[] }>('/api/dashboard/google-place/search', {
+      method: 'POST',
+      body: { query: placeQuery.value },
+    })
+    placeResults.value = res.results
+  } catch (e) {
+    errorMsg.value =
+      (e as { data?: { statusMessage?: string } })?.data?.statusMessage
+      ?? 'Recherche impossible pour le moment.'
+  } finally {
+    placeSearching.value = false
+  }
+}
+
+async function connectPlace(p: GooglePlace) {
+  await call(`place-connect-${p.placeId}`, () =>
+    $fetch('/api/dashboard/google-place/connect', { method: 'POST', body: { placeId: p.placeId } }),
+  )
+  if (!errorMsg.value) {
+    placeQuery.value = ''
+    placeResults.value = null
+  }
+}
+
+async function disconnectPlace() {
+  if (!confirm('Déconnecter votre fiche Google ? Le lien « laisser un avis » disparaîtra de vos messages automatiques.')) return
+  await call('place-disconnect', () => $fetch('/api/dashboard/google-place/disconnect', { method: 'POST' }))
+}
+
+const manualUrlOpen = ref(false)
+const manualUrlInput = ref('')
+
+async function saveManualUrl() {
+  if (!manualUrlInput.value.trim()) return
+  await call('review-url', () =>
+    $fetch('/api/dashboard/profile', {
+      method: 'PATCH',
+      body: { reviewUrl: manualUrlInput.value.trim() },
+    }),
+  )
+  if (!errorMsg.value) {
+    manualUrlOpen.value = false
+    manualUrlInput.value = ''
+  }
+}
+
+async function clearManualUrl() {
+  if (!confirm('Retirer ce lien d’avis ? Il disparaîtra de vos messages automatiques.')) return
+  await call('review-url-clear', () =>
+    $fetch('/api/dashboard/profile', { method: 'PATCH', body: { reviewUrl: null } }),
+  )
+}
 
 // ─── Réservations & paiement ───────────────────────────────────────────────
 
@@ -1129,6 +1208,125 @@ async function call(key: string, fn: () => Promise<unknown>) {
             <li>C'est lié : cette page passe en « connecté » toute seule.</li>
           </ol>
         </details>
+      </div>
+
+      <!-- Avis Google -->
+      <div class="card">
+        <h2 class="font-semibold text-slate-900">Avis clients (Google)</h2>
+        <p class="mt-1 text-sm text-slate-600">
+          Retrouvez votre fiche d'établissement Google : le lien « laisser un avis » sera ajouté
+          automatiquement au reçu envoyé à vos clients après chaque course, et affiché sur votre
+          page publique.
+        </p>
+
+        <div class="mt-3">
+          <p v-if="googlePlace" class="inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm text-green-800">
+            ✅ Fiche connectée : {{ googlePlace.name }}
+          </p>
+          <p v-else-if="manualReviewUrl" class="inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm text-green-800">
+            ✅ Lien d'avis actif (collé à la main)
+          </p>
+          <p v-else class="text-sm text-slate-500">Aucune fiche connectée.</p>
+        </div>
+
+        <!-- Fiche connectée : vérifier le lien, ou déconnecter -->
+        <template v-if="googlePlace">
+          <p v-if="googlePlace.address" class="mt-2 text-xs text-slate-500">{{ googlePlace.address }}</p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <a
+              :href="googlePlace ? googleReviewUrl(googlePlace.placeId) : '#'"
+              target="_blank"
+              rel="noopener"
+              class="btn-primary"
+            >
+              Tester le lien d'avis
+            </a>
+            <button class="btn-ghost" :disabled="saving === 'place-disconnect'" @click="disconnectPlace">
+              Déconnecter
+            </button>
+          </div>
+          <p class="mt-2 text-xs text-slate-500">
+            Le test ouvre la fenêtre « laisser un avis » de votre fiche : vérifiez que c'est bien la vôtre.
+          </p>
+        </template>
+
+        <!-- Lien manuel actif : tester, retirer, ou remplacer par une fiche -->
+        <template v-else-if="manualReviewUrl">
+          <p class="mt-2 break-all text-xs text-slate-500">{{ manualReviewUrl }}</p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <a :href="manualReviewUrl" target="_blank" rel="noopener" class="btn-primary">
+              Tester le lien d'avis
+            </a>
+            <button class="btn-ghost" :disabled="saving === 'review-url-clear'" @click="clearManualUrl">
+              Retirer
+            </button>
+          </div>
+          <p class="mt-2 text-xs text-slate-500">
+            Vous pouvez aussi le remplacer en connectant votre fiche Google ci-dessous.
+          </p>
+        </template>
+
+        <!-- Recherche de la fiche (tant qu'aucune n'est connectée) -->
+        <div v-if="!googlePlace" class="mt-4">
+          <form class="flex items-end gap-2" @submit.prevent="searchPlace">
+            <div class="min-w-0 flex-1">
+              <label class="label" for="place-query">Nom de votre entreprise + ville</label>
+              <input
+                id="place-query"
+                v-model="placeQuery"
+                type="text"
+                class="field"
+                maxlength="200"
+                placeholder="Ex : Karim VTC Lyon"
+              />
+            </div>
+            <button class="btn-primary whitespace-nowrap" :disabled="placeSearching || placeQuery.trim().length < 2">
+              {{ placeSearching ? 'Recherche…' : 'Rechercher' }}
+            </button>
+          </form>
+
+          <div v-if="placeResults" class="mt-3 space-y-2">
+            <p v-if="placeResults.length === 0" class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              Aucun établissement trouvé. Précisez le nom exact de votre fiche Google et votre
+              ville, ou collez directement votre lien d'avis ci-dessous.
+            </p>
+            <button
+              v-for="p in placeResults"
+              :key="p.placeId"
+              type="button"
+              class="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left transition-colors hover:border-brand-400 hover:bg-brand-50/40"
+              :disabled="saving === `place-connect-${p.placeId}`"
+              @click="connectPlace(p)"
+            >
+              <span class="min-w-0">
+                <span class="block truncate text-sm font-semibold text-slate-900">{{ p.name }}</span>
+                <span class="block truncate text-xs text-slate-500">{{ p.address }}</span>
+              </span>
+              <span class="shrink-0 text-sm font-semibold text-brand-700">
+                {{ saving === `place-connect-${p.placeId}` ? '…' : 'Connecter' }}
+              </span>
+            </button>
+          </div>
+
+          <!-- Échappatoire : fiche introuvable, ou plateforme d'avis tierce -->
+          <details class="mt-4 text-sm text-slate-600" :open="manualUrlOpen">
+            <summary class="cursor-pointer py-2 font-medium text-slate-700" @click.prevent="manualUrlOpen = !manualUrlOpen">
+              {{ manualReviewUrl ? 'Modifier mon lien d’avis' : 'Ma fiche est introuvable ? Collez un lien d’avis' }}
+            </summary>
+            <form class="mt-2 flex gap-2" @submit.prevent="saveManualUrl">
+              <input
+                v-model="manualUrlInput"
+                type="url"
+                class="field min-w-0 flex-1"
+                maxlength="500"
+                placeholder="https://g.page/r/… ou https://fr.trustpilot.com/…"
+              />
+              <button class="btn-primary whitespace-nowrap" :disabled="saving === 'review-url' || !manualUrlInput.trim()">
+                {{ saving === 'review-url' ? '…' : 'Enregistrer' }}
+              </button>
+            </form>
+          </details>
+        </div>
       </div>
 
       <!-- Stripe (alternative — affiché si déjà utilisé) -->

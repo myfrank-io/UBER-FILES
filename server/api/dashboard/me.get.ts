@@ -43,6 +43,14 @@ export default defineEventHandler(async (event) => {
     phone: driver.phone,
     contactEmail: driver.contactEmail,
     reviewUrl: driver.reviewUrl,
+    // Fiche Google connectée (lien d'avis dérivé du placeId) — null sinon.
+    googlePlace: driver.googlePlaceId
+      ? {
+          placeId: driver.googlePlaceId,
+          name: driver.googlePlaceName,
+          address: driver.googlePlaceAddress,
+        }
+      : null,
     status: driver.status,
     currency: driver.currency,
     timezone: driver.timezone,
