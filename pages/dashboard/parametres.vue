@@ -310,7 +310,6 @@ async function saveCancelPolicy() {
 // ─── Données tarifaires ────────────────────────────────────────────────────
 
 const transferBands = computed(() => (me.value as Record<string, unknown>)?.transferBands as Record<string, unknown>[] ?? [])
-const hourlyTiers = computed(() => (me.value as Record<string, unknown>)?.hourlyTiers as Record<string, unknown>[] ?? [])
 const currency = computed(() => ((me.value as Record<string, unknown>)?.currency as string) ?? 'eur')
 const surcharges = computed(() => (me.value as Record<string, unknown>)?.surcharges as Record<string, unknown>[] ?? [])
 
@@ -322,20 +321,6 @@ const sortedBands = computed(() =>
     return (b.priority as number) - (a.priority as number)
   }),
 )
-
-const sortedTiers = computed(() =>
-  [...hourlyTiers.value].sort((a, b) => (a.minHours as number) - (b.minHours as number)),
-)
-
-// « De 1 h à 3 h » / « 4 h et plus » — bien plus parlant que « à partir de ».
-function tierRangeLabel(index: number): string {
-  const tiers = sortedTiers.value
-  const from = tiers[index]!.minHours as number
-  const next = tiers[index + 1]?.minHours as number | undefined
-  if (next == null) return `${from} h et plus`
-  if (next - 1 <= from) return `${from} h`
-  return `De ${from} h à ${next - 1} h`
-}
 
 // ─── Grilles transfert ────────────────────────────────────────────────────
 
@@ -467,51 +452,84 @@ async function deleteBand(id: string) {
   )
 }
 
-// ─── Grilles horaires ─────────────────────────────────────────────────────
+// ─── Mise à disposition : tarif de base + heure supplémentaire ─────────────
 
-const newTier = reactive({ minHours: 1, pricePerHourEuros: '' })
-const addingTier = ref(false)
-const editingTier = ref<string | null>(null)
-const editTierForm = reactive({ minHours: 1, pricePerHourEuros: '' })
+const hourly = reactive({
+  enabled: false,
+  pricePerHourEuros: '',
+  overtimeEnabled: false,
+  overtimeAfterHours: 8,
+  overtimeRateEuros: '',
+})
 
-function startEditTier(t: Record<string, unknown>) {
-  editingTier.value = t.id as string
-  editTierForm.minHours = t.minHours as number
-  editTierForm.pricePerHourEuros = ((t.pricePerHourCents as number) / 100).toFixed(2)
+watchEffect(() => {
+  if (!me.value) return
+  const d = me.value as Record<string, unknown>
+  const rate = d.hourlyRateCents as number | null
+  const otAfter = d.hourlyOvertimeAfterHours as number | null
+  const otRate = d.hourlyOvertimeRateCents as number | null
+  hourly.enabled = rate != null
+  hourly.pricePerHourEuros = rate != null ? (rate / 100).toFixed(2) : ''
+  hourly.overtimeEnabled = otAfter != null && otRate != null
+  hourly.overtimeAfterHours = otAfter ?? 8
+  hourly.overtimeRateEuros = otRate != null ? (otRate / 100).toFixed(2) : ''
+})
+
+function eurosToCents(v: string): number | null {
+  const n = parseFloat(v)
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null
 }
 
-async function addTier() {
-  await call('tier-add', async () => {
-    await $fetch('/api/dashboard/rates/hourly', {
-      method: 'POST',
-      body: {
-        minHours: newTier.minHours,
-        pricePerHourCents: Math.round(parseFloat(newTier.pricePerHourEuros) * 100),
-      },
-    })
-    newTier.minHours = 1
-    newTier.pricePerHourEuros = ''
-    addingTier.value = false
-  })
-}
+const hourlyRateCentsInput = computed(() => eurosToCents(hourly.pricePerHourEuros))
+const hourlyOvertimeCentsInput = computed(() => eurosToCents(hourly.overtimeRateEuros))
+const hourlyOvertimeValid = computed(
+  () =>
+    hourlyOvertimeCentsInput.value != null &&
+    hourly.overtimeAfterHours >= 1 &&
+    hourly.overtimeAfterHours <= 23,
+)
 
-async function updateTier(id: string) {
-  await call(`tier-edit-${id}`, async () => {
-    await $fetch(`/api/dashboard/rates/hourly/${id}`, {
-      method: 'PATCH',
-      body: {
-        minHours: editTierForm.minHours,
-        pricePerHourCents: Math.round(parseFloat(editTierForm.pricePerHourEuros) * 100),
-      },
-    })
-    editingTier.value = null
-  })
-}
+// Phrase récapitulative : le paramétrage se relit d'une traite, impossible à
+// mal interpréter (« Les 8 premières heures à 50 €/h, puis 40 €/h… »).
+const hourlyRecap = computed(() => {
+  const base = hourlyRateCentsInput.value
+  if (!base) return ''
+  if (hourly.overtimeEnabled && hourlyOvertimeValid.value) {
+    return `Les ${hourly.overtimeAfterHours} premières heures à ${formatMoney(base, currency.value)}/h, puis ${formatMoney(hourlyOvertimeCentsInput.value!, currency.value)}/h par heure supplémentaire.`
+  }
+  return `Tarif unique : ${formatMoney(base, currency.value)}/h, quelle que soit la durée.`
+})
 
-async function deleteTier(id: string) {
-  if (!confirm('Supprimer ce palier ?')) return
-  await call(`tier-del-${id}`, () =>
-    $fetch(`/api/dashboard/rates/hourly/${id}`, { method: 'DELETE' }),
+// Exemple chiffré au-delà du seuil : montre le devis en deux lignes.
+const hourlyExample = computed(() => {
+  const base = hourlyRateCentsInput.value
+  if (!base || !hourly.overtimeEnabled || !hourlyOvertimeValid.value) return ''
+  const after = hourly.overtimeAfterHours
+  const ot = hourlyOvertimeCentsInput.value!
+  const total = base * after + ot * 2
+  return `Exemple : ${after + 2} h = ${after} h × ${formatMoney(base, currency.value)} + 2 h × ${formatMoney(ot, currency.value)} = ${formatMoney(total, currency.value)}.`
+})
+
+const hourlySaveDisabled = computed(
+  () =>
+    saving.value === 'hourly' ||
+    (hourly.enabled &&
+      (!hourlyRateCentsInput.value || (hourly.overtimeEnabled && !hourlyOvertimeValid.value))),
+)
+
+async function saveHourly() {
+  await call('hourly', () =>
+    $fetch('/api/dashboard/rates/hourly', {
+      method: 'PUT',
+      body: hourly.enabled
+        ? {
+            enabled: true,
+            pricePerHourCents: hourlyRateCentsInput.value,
+            overtimeAfterHours: hourly.overtimeEnabled ? hourly.overtimeAfterHours : null,
+            overtimeRateCents: hourly.overtimeEnabled ? hourlyOvertimeCentsInput.value : null,
+          }
+        : { enabled: false },
+    }),
   )
 }
 
@@ -797,75 +815,56 @@ async function call(key: string, fn: () => Promise<unknown>) {
         </button>
       </div>
 
-      <!-- Mise à disposition -->
-      <div class="card space-y-3">
+      <!-- Mise à disposition : tarif de base + heure supplémentaire -->
+      <form class="card space-y-4" @submit.prevent="saveHourly">
         <div>
           <h2 class="font-semibold text-slate-900">Mise à disposition — prix à l'heure</h2>
           <p class="mt-1 text-sm text-slate-600">
-            Un prix par heure, dégressif selon la durée réservée.
+            Votre tarif horaire et, si vous le souhaitez, un tarif réduit au-delà d'un
+            certain nombre d'heures.
           </p>
         </div>
 
-        <div v-for="(t, i) in sortedTiers" :key="(t as Record<string, unknown>).id as string" class="rounded-xl border border-slate-200 p-4">
-          <div v-if="editingTier === (t.id as string)" class="space-y-3">
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="label">À partir de (heures)</label>
-                <input v-model.number="editTierForm.minHours" type="number" min="1" max="24" class="field" />
-              </div>
-              <div>
-                <label class="label">Prix par heure (€)</label>
-                <input v-model="editTierForm.pricePerHourEuros" type="number" step="0.01" min="0.01" class="field" />
-              </div>
+        <label class="flex items-center gap-2.5 py-1 text-sm text-slate-600">
+          <input v-model="hourly.enabled" type="checkbox" class="h-5 w-5 shrink-0 rounded accent-brand-600" />
+          Proposer la mise à disposition sur ma page
+        </label>
+
+        <template v-if="hourly.enabled">
+          <div class="w-40">
+            <label class="label" for="hourly-rate">Tarif horaire (€/h)</label>
+            <input id="hourly-rate" v-model="hourly.pricePerHourEuros" type="number" step="0.01" min="0.01" class="field" placeholder="50,00" />
+          </div>
+
+          <label class="flex items-center gap-2.5 py-1 text-sm text-slate-600">
+            <input v-model="hourly.overtimeEnabled" type="checkbox" class="h-5 w-5 shrink-0 rounded accent-brand-600" />
+            Tarif réduit pour les heures supplémentaires
+          </label>
+
+          <div v-if="hourly.overtimeEnabled" class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="label" for="hourly-after">Au-delà de (heures)</label>
+              <input id="hourly-after" v-model.number="hourly.overtimeAfterHours" type="number" min="1" max="23" class="field" />
             </div>
-            <div class="flex gap-2">
-              <button type="button" class="btn-primary !py-2.5 text-sm" :disabled="saving === `tier-edit-${t.id}`" @click="updateTier(t.id as string)">
-                {{ saving === `tier-edit-${t.id}` ? '…' : 'Enregistrer' }}
-              </button>
-              <button type="button" class="btn-ghost !py-2.5 text-sm" @click="editingTier = null">Annuler</button>
+            <div>
+              <label class="label" for="hourly-overtime">Heure supplémentaire (€/h)</label>
+              <input id="hourly-overtime" v-model="hourly.overtimeRateEuros" type="number" step="0.01" min="0.01" class="field" placeholder="40,00" />
             </div>
           </div>
 
-          <div v-else class="flex items-center justify-between gap-3">
-            <p class="font-semibold text-slate-900">{{ tierRangeLabel(i) }}</p>
-            <div class="shrink-0 text-right">
-              <p class="font-serif text-lg font-medium text-slate-950">{{ formatMoney(t.pricePerHourCents as number, currency) }}<span class="font-sans text-xs text-slate-500">/h</span></p>
-              <p class="-mr-2.5 mt-0.5 flex justify-end gap-1 text-xs">
-                <button type="button" class="rounded-lg px-2.5 py-2 font-semibold text-brand-700 hover:bg-brand-50" @click="startEditTier(t)">Modifier</button>
-                <button type="button" class="rounded-lg px-2.5 py-2 font-semibold text-red-600 hover:bg-red-50" @click="deleteTier(t.id as string)">Supprimer</button>
-              </p>
-            </div>
+          <div v-if="hourlyRecap" class="rounded-xl bg-brand-50 px-4 py-3">
+            <p class="text-sm font-medium text-slate-900">{{ hourlyRecap }}</p>
+            <p v-if="hourlyExample" class="mt-1 text-xs text-slate-500">{{ hourlyExample }}</p>
           </div>
-        </div>
+        </template>
+        <p v-else class="text-sm text-slate-500">
+          La mise à disposition n'apparaît pas sur votre page de réservation.
+        </p>
 
-        <div v-if="addingTier" class="rounded-xl border border-dashed border-brand-300 p-4">
-          <p class="mb-3 text-sm font-semibold text-slate-900">Nouveau palier</p>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="label">À partir de (heures)</label>
-              <input v-model.number="newTier.minHours" type="number" min="1" max="24" class="field" />
-            </div>
-            <div>
-              <label class="label">Prix par heure (€)</label>
-              <input v-model="newTier.pricePerHourEuros" type="number" step="0.01" min="0.01" class="field" placeholder="55,00" />
-            </div>
-          </div>
-          <div class="mt-3 flex gap-2">
-            <button type="button" class="btn-primary whitespace-nowrap !py-2.5 text-sm" :disabled="saving === 'tier-add' || !newTier.pricePerHourEuros" @click="addTier">
-              {{ saving === 'tier-add' ? '…' : 'Ajouter' }}
-            </button>
-            <button type="button" class="btn-ghost !py-2.5 text-sm" @click="addingTier = false">Annuler</button>
-          </div>
-        </div>
-        <button
-          v-else
-          type="button"
-          class="w-full rounded-xl border border-dashed border-slate-300 px-3 py-3 text-sm font-medium text-slate-500 transition-colors hover:border-brand-400 hover:text-brand-700"
-          @click="addingTier = true"
-        >
-          ＋ Ajouter un palier dégressif
+        <button type="submit" class="btn-primary !py-2.5 text-sm" :disabled="hourlySaveDisabled">
+          {{ saving === 'hourly' ? '…' : 'Enregistrer' }}
         </button>
-      </div>
+      </form>
 
       <!-- Course minimum -->
       <form class="card" @submit.prevent="saveMinimum">

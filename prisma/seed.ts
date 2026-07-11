@@ -177,14 +177,14 @@ async function main() {
     ],
   })
 
-  // Grille mise à disposition dégressive
-  await prisma.hourlyRateTier.deleteMany({ where: { driverId: driver.id } })
-  await prisma.hourlyRateTier.createMany({
-    data: [
-      { driverId: driver.id, minHours: 1, pricePerHourCents: 6000 },
-      { driverId: driver.id, minHours: 4, pricePerHourCents: 5500 },
-      { driverId: driver.id, minHours: 8, pricePerHourCents: 5000 },
-    ],
+  // Mise à disposition : les 8 premières heures à 60 €/h, puis 50 €/h
+  await prisma.driver.update({
+    where: { id: driver.id },
+    data: {
+      hourlyRateCents: 6000,
+      hourlyOvertimeAfterHours: 8,
+      hourlyOvertimeRateCents: 5000,
+    },
   })
 
   // Politique d'annulation

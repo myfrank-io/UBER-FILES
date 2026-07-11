@@ -41,12 +41,7 @@ export default defineEventHandler(async (event) => {
           { name: 'Nuit', pricePerKmCents: 280, daysOfWeek: [], startMinute: 1320, endMinute: 1800, priority: 2, isDefault: false },
         ],
       },
-      hourlyTiers: {
-        create: [
-          { minHours: 1, pricePerHourCents: 6000 },
-          { minHours: 4, pricePerHourCents: 5500 },
-        ],
-      },
+      hourlyRateCents: 6000,
       cancellationPolicy: { create: { freeUntilHours: 24, retainedPercent: 50 } },
       user: {
         create: { email: data.email.toLowerCase(), passwordHash: hashUserPassword(data.password), role: 'DRIVER' },

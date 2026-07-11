@@ -2,7 +2,7 @@
 import { applyBps } from '../money'
 export * from './types'
 export { priceTransfer, applySurcharges, PricingError } from './transfer'
-export { priceHourly, selectHourlyTier } from './hourly'
+export { priceHourly } from './hourly'
 export { selectBand, localMoment, minuteInRange } from './timeband'
 
 /**

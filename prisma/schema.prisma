@@ -149,10 +149,17 @@ model Driver {
   timezone             String @default("Europe/Paris")
   locale               String @default("fr")
 
+  // Mise à disposition : tarif horaire de base, puis tarif réduit au-delà d'un
+  // seuil (« les 8 premières heures à 50 €/h, ensuite 40 €/h »). Chaque heure
+  // est facturée au tarif de sa tranche. hourlyRateCents null = mise à
+  // disposition non proposée ; seuil/tarif supp null = tarif unique.
+  hourlyRateCents          Int?
+  hourlyOvertimeAfterHours Int? // seuil en heures (les heures au-delà passent au tarif réduit)
+  hourlyOvertimeRateCents  Int?
+
   // Relations
   user             User?
   transferBands    TransferRateBand[]
-  hourlyTiers      HourlyRateTier[]
   surcharges       Surcharge[]
   vehicles         Vehicle[]
   cancellationPolicy CancellationPolicy?
@@ -225,24 +232,6 @@ model TransferRateBand {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([driverId])
-}
-
-/// Mise à disposition : tarif horaire dégressif par paliers de durée.
-/// Ex: minHours=1 -> 6000 c/h ; minHours=4 -> 5500 c/h. On applique le palier
-/// dont `minHours` est le plus grand <= durée demandée.
-model HourlyRateTier {
-  id       String @id @default(cuid())
-  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  driverId String
-
-  minHours        Int // seuil de durée (heures) à partir duquel ce tarif s'applique
-  pricePerHourCents Int
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([driverId, minHours])
   @@index([driverId])
 }
 
