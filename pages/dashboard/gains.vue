@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// L'onglet « Gains » a été intégré à l'accueil. On redirige l'ancienne route
-// vers le sous-onglet correspondant pour préserver les liens existants.
-definePageMeta({ redirect: '/dashboard?tab=gains' })
+// L'onglet « Gains » a été supprimé (l'accueil affiche l'essentiel du mois).
+// On redirige l'ancienne route vers l'accueil pour préserver les liens existants.
+definePageMeta({ redirect: '/dashboard' })
 </script>
