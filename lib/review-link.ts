@@ -23,3 +23,14 @@ export function driverReviewUrl(driver: ReviewLinkSource): string | null {
   if (driver.googlePlaceId) return googleReviewUrl(driver.googlePlaceId)
   return null
 }
+
+/**
+ * Chemin (relatif) de la page de notation Ridewiz d'un chauffeur — l'étape
+ * intermédiaire montrée au client avant le dépôt public : 5★ → redirection
+ * vers le lien d'avis public (fiche Google…), 1-4★ → retour privé envoyé au
+ * chauffeur uniquement. C'est ce chemin que pointent le reçu de fin de course
+ * et le bouton de la page publique, jamais le lien externe directement.
+ */
+export function reviewFunnelPath(slug: string): string {
+  return `/avis/${encodeURIComponent(slug)}`
+}

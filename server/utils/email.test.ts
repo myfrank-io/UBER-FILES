@@ -394,4 +394,28 @@ describe('emailTemplates compte & sécurité', () => {
     const tpl = emailTemplates.passwordChanged({ loginUrl: 'https://app.test/dashboard/login' })
     expect(tpl.html).toContain('notre équipe')
   })
+
+  it('internalReviewFeedback : note, commentaire échappé et mention « privé »', () => {
+    const tpl = emailTemplates.internalReviewFeedback({
+      driverFirstName: 'Karim',
+      rating: 2,
+      comment: 'Retard de 20 min <script>alert(1)</script>',
+      customerName: 'Marie',
+      bookingRef: 'AB12CD34',
+    })
+    expect(tpl.subject).toContain('2/5')
+    expect(tpl.html).toContain('★★☆☆☆')
+    expect(tpl.html).toContain('Marie')
+    expect(tpl.html).toContain('AB12CD34')
+    expect(tpl.html).toContain('privé')
+    expect(tpl.html).not.toContain('<script>')
+    expect(tpl.html).toContain('&lt;script&gt;')
+  })
+
+  it('internalReviewFeedback : repli anonyme sans nom ni référence', () => {
+    const tpl = emailTemplates.internalReviewFeedback({ rating: 4, comment: 'Presque parfait' })
+    expect(tpl.html).toContain('Un client')
+    expect(tpl.html).toContain('★★★★☆')
+    expect(tpl.html).not.toContain('réf.')
+  })
 })
