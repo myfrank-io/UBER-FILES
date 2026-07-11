@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
     return tx.vehicle.update({ where: { id }, data })
   })
 
-  // Le blob base64 ne sort jamais en JSON (il est servi en vraie image HTTP).
-  const { photoUrl: _photo, ...rest } = vehicle
-  return rest
+  // Le blob base64 ne sort jamais en JSON : il est omis globalement par le
+  // client Prisma (servi en vraie image HTTP par l'endpoint photo).
+  return vehicle
 })

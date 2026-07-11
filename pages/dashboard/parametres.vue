@@ -10,7 +10,7 @@ definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Réglages' })
 const { formatMoney } = useFormat()
 
-const { data: me, refresh } = await useFetch('/api/dashboard/me', { lazy: true })
+const { data: me, refresh } = await useMe()
 const connecting = ref(false)
 const saving = ref<string | null>(null)
 const errorMsg = ref('')

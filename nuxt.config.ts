@@ -3,9 +3,41 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
 
-  modules: ['@nuxtjs/tailwindcss', '@nuxtjs/i18n', 'nuxt-auth-utils'],
+  modules: ['@nuxtjs/tailwindcss', '@nuxtjs/i18n', 'nuxt-auth-utils', '@nuxt/fonts'],
 
   css: ['~/assets/css/main.css'],
+
+  // Polices de la charte, téléchargées au build et servies depuis notre domaine
+  // (/_fonts, cache immuable). Remplace la feuille de style Google Fonts qui
+  // bloquait le premier rendu — et que la CSP (`font-src 'self'`) bloquait de
+  // toute façon en production.
+  fonts: {
+    families: [
+      { name: 'DM Serif Display', weights: [400], styles: ['normal', 'italic'] },
+      { name: 'DM Sans', weights: [400, 500, 600, 700] },
+      { name: 'Space Grotesk', weights: [500, 600] },
+    ],
+  },
+
+  // Cache/rendu par route. Objectif : ne payer le duo lambda + SQL que
+  // lorsqu'il apporte quelque chose.
+  routeRules: {
+    // Landing quasi statique : servie depuis le cache CDN, régénérée au plus
+    // toutes les heures en arrière-plan (invalidé à chaque déploiement).
+    '/': { swr: 3600 },
+    // Pages publiques chauffeur /{slug} : cache CDN court + régénération en
+    // arrière-plan, aligné sur le s-maxage de /api/public/[slug]. Les visites
+    // suivantes ne repaient ni le démarrage serverless ni les requêtes SQL.
+    '/*': { swr: 60 },
+    // Back-office : rendu client uniquement (SPA). Le shell HTML statique
+    // arrive instantanément du CDN, les données étaient déjà chargées côté
+    // client — et plus aucune invocation lambda pour le HTML. Pas d'enjeu SEO
+    // derrière un login. (swr désactivé explicitement : hérité de '/*' sinon.)
+    '/dashboard': { ssr: false, swr: false },
+    '/dashboard/**': { ssr: false },
+    '/admin': { ssr: false, swr: false },
+    '/admin/**': { ssr: false },
+  },
 
   typescript: {
     strict: true,
@@ -110,18 +142,12 @@ export default defineNuxtConfig({
         },
         { name: 'theme-color', content: '#0E1B2C' },
       ],
-      // Favicon Ridewiz (picto « itinéraire », variante fond nuit de la charte)
-      // + typographies de la charte (DM Serif Display, DM Sans, Space Grotesk).
+      // Favicon Ridewiz (picto « itinéraire », variante fond nuit de la charte).
+      // Les typographies de la charte sont auto-hébergées via @nuxt/fonts.
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
         { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png' },
         { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
-        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
-        {
-          rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600&display=swap',
-        },
       ],
     },
   },

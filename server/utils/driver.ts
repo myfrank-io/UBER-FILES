@@ -50,12 +50,14 @@ export function driverBookingMode(
  * URL légère de la photo de profil pour les réponses JSON. Les photos importées
  * sont stockées en data URL (base64) : on ne les embarque jamais telles quelles
  * dans une réponse (poids), on renvoie l'endpoint image versionné à la place.
- * Les anciennes URLs http sont renvoyées inchangées.
+ * `hasPhoto` provient d'un test de présence léger (count filtré) : la colonne
+ * n'est pas rapatriée. L'endpoint image gère lui-même la redirection des
+ * anciennes photos hébergées en http.
  */
 export function publicPhotoUrl(
-  driver: Pick<Driver, 'slug' | 'photoUrl' | 'updatedAt'>,
+  driver: Pick<Driver, 'slug' | 'updatedAt'>,
+  hasPhoto: boolean,
 ): string | null {
-  if (!driver.photoUrl) return null
-  if (/^https?:\/\//i.test(driver.photoUrl)) return driver.photoUrl
+  if (!hasPhoto) return null
   return `/api/public/${driver.slug}/photo?v=${driver.updatedAt.getTime()}`
 }

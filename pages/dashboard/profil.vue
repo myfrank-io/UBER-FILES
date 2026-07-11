@@ -2,7 +2,7 @@
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Mon profil' })
 
-const { data: me, refresh } = await useFetch('/api/dashboard/me', { lazy: true })
+const { data: me, refresh } = await useMe()
 
 const saving = ref(false)
 const successMsg = ref('')
