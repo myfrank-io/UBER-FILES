@@ -40,7 +40,11 @@ export function applicableSurcharges(
 }
 
 /** Vérifie le délai minimum de réservation. Lève une Error si trop proche. */
-export function assertLeadTime(driver: Driver, scheduledAt: Date, now = new Date()): void {
+export function assertLeadTime(
+  driver: Pick<Driver, 'minLeadTimeMinutes'>,
+  scheduledAt: Date,
+  now = new Date(),
+): void {
   const minMs = driver.minLeadTimeMinutes * 60_000
   if (scheduledAt.getTime() - now.getTime() < minMs) {
     const err = new Error(
