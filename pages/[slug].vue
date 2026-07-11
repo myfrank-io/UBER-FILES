@@ -1,14 +1,10 @@
 <script setup lang="ts">
 // Page publique de réservation d'un chauffeur (marque blanche, mobile-first).
-import {
-  PAYMENT_METHOD_LABELS,
-  PAYMENT_METHOD_SHORT_LABELS,
-  type PaymentMethod,
-} from '~/lib/payment-methods'
+import { PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
 
 const route = useRoute()
 const slug = route.params.slug as string
-const { formatMoney, formatDateTime } = useFormat()
+const { formatMoney } = useFormat()
 const { t } = useI18n()
 
 interface PublicVehicle {
@@ -51,8 +47,6 @@ interface DriverPublic {
   hasTransfer: boolean
   bookingEnabled: boolean
   hasHourly: boolean
-  fromKmCents: number | null
-  fromHourCents: number | null
   acceptedPaymentMethods: PaymentMethod[]
   bookingMode: BookingModePublic
 }
@@ -65,16 +59,6 @@ const appBase = useRuntimeConfig().public.appBaseUrl
 
 // Véhicule agrandi au clic (lightbox).
 const zoomedVehicle = ref<PublicVehicle | null>(null)
-
-// Libellé de vignette sans la marque (« Classe E » au lieu de « Mercedes Classe E »
-// tronqué) : sur 144px, seul le modèle distingue les véhicules d'une même marque.
-function vehicleShortLabel(v: PublicVehicle): string {
-  const label = v.modelLabel
-  if (label.toLowerCase().startsWith(v.make.toLowerCase())) {
-    return label.slice(v.make.length).trim() || label
-  }
-  return label
-}
 
 useHead(() => {
   const d = driver.value
@@ -131,7 +115,9 @@ useHead(() => {
 })
 
 // ─── État du formulaire ───
-const type = ref<'TRANSFER' | 'HOURLY'>(driver.value?.hasTransfer ? 'TRANSFER' : 'HOURLY')
+// Transfert par défaut — la mise à disposition n'est présélectionnée que si le
+// chauffeur ne propose pas de transfert.
+const type = ref<'TRANSFER' | 'HOURLY'>(driver.value?.hasTransfer === false ? 'HOURLY' : 'TRANSFER')
 const pickup = ref('')
 const dropoff = ref('')
 // Coordonnées exactes résolues à la sélection d'une suggestion (placeId → Place
@@ -285,7 +271,8 @@ async function getEstimate() {
     const payload = await buildPayload()
     estimate.value = await $fetch(`/api/public/${slug}/estimate`, { method: 'POST', body: payload })
     await nextTick()
-    estimateBox.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // 'nearest' : ne défile que si le résultat est réellement hors écran.
+    estimateBox.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   } catch (e) {
     errorMsg.value = errMessage(e)
   } finally {
@@ -375,71 +362,77 @@ function goToContact() {
 </script>
 
 <template>
-  <div v-if="driver" class="mx-auto max-w-lg px-5 pb-24 pt-4">
-    <div class="mb-3 flex justify-end">
-      <LangSwitcher />
-    </div>
-    <!-- En-tête chauffeur -->
-    <div class="card">
-      <div class="flex items-center gap-4">
-        <img
-          v-if="driver.photoUrl"
-          :src="driver.photoUrl"
-          :alt="driver.displayName"
-          class="h-16 w-16 rounded-full object-cover"
-        />
-        <div v-else class="flex h-16 w-16 items-center justify-center rounded-full bg-brand-100 text-2xl font-bold text-brand-700">
-          {{ driver.displayName.charAt(0) }}
+  <!-- Tout doit tenir dans l'écran (pas de scroll) : en-tête compact, formulaire
+       dense sur mobile ; sur desktop, profil et formulaire côte à côte. -->
+  <div
+    v-if="driver"
+    class="mx-auto w-full max-w-lg px-4 py-3 sm:py-5 lg:flex lg:min-h-dvh lg:max-w-4xl lg:flex-col lg:justify-center lg:py-8"
+  >
+    <div class="lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start lg:gap-5">
+      <!-- Bloc chauffeur : identité, repères et véhicules réunis dans une seule
+           carte compacte, pour laisser l'écran au formulaire de réservation. -->
+      <div class="card !p-4 lg:!p-5">
+        <div class="flex items-center gap-3">
+          <img
+            v-if="driver.photoUrl"
+            :src="driver.photoUrl"
+            :alt="driver.displayName"
+            class="h-12 w-12 shrink-0 rounded-full object-cover"
+          />
+          <div
+            v-else
+            class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xl font-bold text-brand-700"
+          >
+            {{ driver.displayName.charAt(0) }}
+          </div>
+          <div class="min-w-0 flex-1">
+            <h1 class="truncate font-serif text-lg font-medium tracking-tight text-slate-900">{{ driver.displayName }}</h1>
+            <p v-if="driver.tagline" class="truncate text-xs text-slate-500">{{ driver.tagline }}</p>
+          </div>
         </div>
-        <div>
-          <h1 class="font-serif text-xl font-medium tracking-tight text-slate-900">{{ driver.displayName }}</h1>
-          <p v-if="driver.tagline" class="text-sm text-slate-500">{{ driver.tagline }}</p>
+        <!-- Le sélecteur de langue vit dans la ligne des badges : il ne rogne
+             pas le nom du chauffeur sur les petits écrans. -->
+        <div class="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
+          <span v-if="driver.bookingMode.instant" class="rounded-full bg-green-100 px-2.5 py-1 text-green-700">
+            ⚡ {{ $t('public.instantBooking') }}
+          </span>
+          <span v-else class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+            ✋ {{ $t('public.driverConfirms') }}
+          </span>
+          <!-- Véhicule du profil, seulement quand la flotte n'est pas renseignée
+               (sinon les vignettes ci-dessous portent déjà l'info). -->
+          <span
+            v-if="!driver.vehicles.length && driver.vehicle.class"
+            class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600"
+          >
+            {{ driver.vehicle.class }}<template v-if="driver.vehicle.seats"> · {{ $t('common.places', { count: driver.vehicle.seats }) }}</template>
+          </span>
+          <span v-if="driver.serviceArea" class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+            {{ driver.serviceArea }}
+          </span>
+          <!-- Lien d'avis (fiche Google, Trustpilot…), affiché s'il est renseigné. -->
+          <a
+            v-if="driver.reviewUrl"
+            :href="driver.reviewUrl"
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            class="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-amber-700 transition hover:bg-amber-100"
+          >
+            ⭐ {{ $t('public.leaveReview') }}
+          </a>
+          <LangSwitcher class="ml-auto shrink-0" />
         </div>
-      </div>
-      <div class="mt-4 flex flex-wrap gap-2 text-xs">
-        <span
-          v-if="driver.bookingMode.instant"
-          class="rounded-full bg-green-100 px-3 py-1 font-medium text-green-700"
-        >
-          ⚡ {{ $t('public.instantBooking') }}
-        </span>
-        <span v-else class="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-          ✋ {{ $t('public.driverConfirms') }}
-        </span>
-        <span v-if="driver.vehicle.class" class="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-          {{ driver.vehicle.class }}<template v-if="driver.vehicle.seats"> · {{ $t('common.places', { count: driver.vehicle.seats }) }}</template>
-        </span>
-        <span v-if="driver.serviceArea" class="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-          {{ driver.serviceArea }}
-        </span>
-      </div>
-      <!-- Lien d'avis : invite les clients satisfaits à noter le chauffeur (fiche
-           Google, Trustpilot…). Affiché seulement s'il est renseigné dans le profil. -->
-      <a
-        v-if="driver.reviewUrl"
-        :href="driver.reviewUrl"
-        target="_blank"
-        rel="noopener noreferrer nofollow"
-        class="mt-4 inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
-      >
-        ⭐ {{ $t('public.leaveReview') }}
-      </a>
-    </div>
-
-    <!-- Véhicules (compact, intégré) -->
-    <div v-if="driver.vehicles && driver.vehicles.length" class="mt-3">
-      <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-        {{ driver.vehicles.length > 1 ? 'Véhicules' : 'Véhicule' }}
-      </p>
-      <div class="flex gap-2.5 overflow-x-auto pb-1">
-        <button
-          v-for="v in driver.vehicles"
-          :key="v.id"
-          type="button"
-          class="group flex w-36 shrink-0 flex-col rounded-xl border border-slate-100 bg-white p-2 transition hover:border-slate-200 hover:shadow-sm"
-          @click="zoomedVehicle = v"
-        >
-          <div class="flex h-16 w-full items-center justify-center overflow-hidden">
+        <!-- Véhicules : simples vignettes cliquables, le détail s'ouvre en grand. -->
+        <div v-if="driver.vehicles && driver.vehicles.length" class="mt-3 flex gap-2 overflow-x-auto">
+          <button
+            v-for="v in driver.vehicles"
+            :key="v.id"
+            type="button"
+            :title="v.modelLabel"
+            :aria-label="v.modelLabel"
+            class="h-14 w-24 shrink-0 overflow-hidden rounded-lg border border-slate-100 bg-white p-1 transition hover:border-slate-300 hover:shadow-sm"
+            @click="zoomedVehicle = v"
+          >
             <VehicleImage
               :make="v.make"
               :model-family="v.modelFamily"
@@ -447,21 +440,229 @@ function goToContact() {
               :color="v.color"
               :photo-url="v.photoSrc"
               :alt="v.modelLabel"
-              class="h-full w-full transition group-hover:scale-105"
             />
-          </div>
-          <!-- Modèle sans la marque (« Classe E ») : lisible sur la vignette,
-               le libellé complet reste visible dans la lightbox. -->
-          <p class="mt-1.5 w-full truncate text-xs font-medium text-slate-700">{{ vehicleShortLabel(v) }}</p>
-          <p class="w-full truncate text-[11px] text-slate-400">
-            <span v-if="v.vehicleClass">{{ v.vehicleClass }}</span>
-            <span v-if="v.seats"> · {{ v.seats }} pl.</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Colonne réservation : confirmation, demande envoyée ou formulaire. -->
+      <div class="mt-3 lg:mt-0">
+        <!-- Course confirmée immédiatement (règlement sur place, créneau libre) -->
+        <div v-if="confirmedBooking" class="card border-green-200 bg-green-50 text-center">
+          <p class="text-3xl">✅</p>
+          <h2 class="mt-2 text-lg font-bold text-green-900">{{ $t('public.confirmedTitle') }}</h2>
+          <p class="mt-2 text-sm text-green-800">
+            {{ $t('public.confirmedBody', { name: driver.displayName, email: customer.email }) }}
           </p>
-        </button>
+          <a v-if="manageUrl" :href="manageUrl" class="btn-primary mt-4 inline-block">
+            {{ $t('public.manageBooking') }}
+          </a>
+        </div>
+
+        <!-- Demande transmise, en attente de validation du chauffeur -->
+        <div v-else-if="submitted" class="card border-green-200 bg-green-50 text-center">
+          <p class="text-3xl">✅</p>
+          <h2 class="mt-2 text-lg font-bold text-green-900">{{ $t('public.submittedTitle') }}</h2>
+          <p class="mt-2 text-sm text-green-800">
+            {{
+              submittedOnSite
+                ? $t('public.submittedBodyOnSite', { name: driver.displayName, email: customer.email })
+                : $t('public.submittedBody', { name: driver.displayName, email: customer.email })
+            }}
+          </p>
+        </div>
+
+        <!-- Formulaire (toujours disponible, même si le paiement en ligne n'est pas activé) -->
+        <form v-else class="card space-y-3.5 !p-4 lg:!p-5" @submit.prevent="submit">
+          <!-- Étape 1 : course + estimation (les coordonnées ne sont pas encore demandées) -->
+          <template v-if="step === 'details'">
+            <!-- Type de prestation — transfert d'abord ; sélecteur masqué quand le
+                 chauffeur ne propose qu'une seule prestation. -->
+            <div
+              v-if="driver.hasTransfer && driver.hasHourly"
+              class="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1"
+            >
+              <!-- text-[13px] sur mobile : « Mise à disposition » doit tenir sur une seule ligne. -->
+              <button
+                type="button"
+                class="whitespace-nowrap rounded-lg px-2 py-2.5 text-[13px] font-semibold transition sm:text-sm"
+                :class="type === 'TRANSFER' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+                :aria-pressed="type === 'TRANSFER'"
+                @click="type = 'TRANSFER'"
+              >
+                {{ $t('public.typeTransfer') }}
+              </button>
+              <button
+                type="button"
+                class="whitespace-nowrap rounded-lg px-2 py-2.5 text-[13px] font-semibold transition sm:text-sm"
+                :class="type === 'HOURLY' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+                :aria-pressed="type === 'HOURLY'"
+                @click="type = 'HOURLY'"
+              >
+                {{ $t('public.typeHourly') }}
+              </button>
+            </div>
+
+            <!-- Transfert -->
+            <template v-if="type === 'TRANSFER'">
+              <div>
+                <label class="label" for="pickup">{{ $t('public.pickupLabel') }}</label>
+                <AddressField id="pickup" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" @resolve="pickupCoords = $event" />
+                <TerminalPicker class="mt-3" :address="pickup" v-model="pickupTerminal" @coords="terminalCoords = $event" />
+              </div>
+              <div>
+                <label class="label" for="dropoff">{{ $t('public.dropoffLabel') }}</label>
+                <AddressField id="dropoff" v-model="dropoff" :placeholder="$t('public.dropoffPlaceholder')" @resolve="dropoffCoords = $event" />
+              </div>
+              <label class="flex items-center gap-2.5 py-1 text-sm text-slate-700">
+                <input v-model="roundTrip" type="checkbox" class="h-5 w-5 shrink-0 rounded border-slate-300" />
+                {{ $t('public.roundTrip') }}
+              </label>
+            </template>
+
+            <!-- Mise à disposition -->
+            <template v-else>
+              <div>
+                <label class="label" for="pickup-hourly">{{ $t('public.pickupLabel') }}</label>
+                <AddressField id="pickup-hourly" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" @resolve="pickupCoords = $event" />
+                <TerminalPicker class="mt-3" :address="pickup" v-model="pickupTerminal" @coords="terminalCoords = $event" />
+              </div>
+              <div>
+                <label class="label" for="duration">{{ $t('public.durationLabel') }}</label>
+                <input id="duration" v-model.number="durationHours" type="number" min="1" max="24" class="field" />
+              </div>
+            </template>
+
+            <div>
+              <label class="label" for="datetime">{{ $t('public.datetimeLabel') }}</label>
+              <input id="datetime" v-model="scheduledAt" type="datetime-local" class="field" :min="minScheduledAt" />
+              <p class="mt-1 text-xs text-slate-500">
+                {{ $t('public.leadTime', { hours: Math.round(driver.minLeadTimeMinutes / 60) }) }}
+              </p>
+            </div>
+
+            <!-- Estimation — masquée dès qu'un prix est affiché (toute modification
+                 de la course le réinitialise et fait réapparaître le bouton). -->
+            <button
+              v-if="!estimate"
+              type="button"
+              class="btn-ghost w-full"
+              :disabled="!canEstimate || estimating"
+              @click="getEstimate"
+            >
+              {{ estimating ? $t('public.estimating') : $t('public.estimateButton') }}
+            </button>
+
+            <p v-if="errorMsg" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
+
+            <template v-if="estimate">
+              <div ref="estimateBox" class="scroll-mt-4 rounded-xl bg-slate-50 p-4">
+                <div class="flex items-baseline justify-between">
+                  <span class="text-sm text-slate-600">{{ $t('public.estimateLabel') }}</span>
+                  <span class="font-serif text-2xl font-medium tracking-tight text-slate-900">
+                    {{ formatMoney(estimate.amountCents, estimate.currency) }}
+                  </span>
+                </div>
+                <ul class="mt-2 space-y-1 text-xs text-slate-500">
+                  <li v-for="(line, i) in estimate.breakdown" :key="i" class="flex justify-between gap-3">
+                    <span>{{ line.label }}<span v-if="line.detail"> — {{ line.detail }}</span></span>
+                    <span class="shrink-0">{{ formatMoney(line.amountCents, estimate.currency) }}</span>
+                  </li>
+                </ul>
+                <p class="mt-2 text-xs text-slate-400">{{ $t('public.estimateIndicative') }}</p>
+              </div>
+
+              <!-- Réserver → passe à la saisie des coordonnées -->
+              <button type="button" class="btn-primary w-full" @click="goToContact">
+                {{ reserveLabel }}
+              </button>
+            </template>
+          </template>
+
+          <!-- Étape 2 : coordonnées du client -->
+          <template v-else>
+            <!-- Rappel de la course estimée -->
+            <div v-if="estimate" class="rounded-xl bg-slate-50 p-4">
+              <div class="flex items-baseline justify-between">
+                <span class="text-sm text-slate-600">{{ $t('public.estimateLabel') }}</span>
+                <span class="font-serif text-2xl font-medium tracking-tight text-slate-900">
+                  {{ formatMoney(estimate.amountCents, estimate.currency) }}
+                </span>
+              </div>
+              <button
+                type="button"
+                class="-mb-2 mt-1 inline-flex min-h-[44px] items-center text-xs font-medium text-brand-700 hover:underline"
+                @click="step = 'details'"
+              >
+                ← {{ $t('public.modifyTrip') }}
+              </button>
+            </div>
+
+            <!-- Coordonnées client -->
+            <div class="space-y-3">
+              <div>
+                <label class="label" for="name">{{ $t('public.nameLabel') }}</label>
+                <input id="name" v-model="customer.name" type="text" class="field" required />
+              </div>
+              <!-- Empilés sur mobile : côte à côte, téléphone et email saisis seraient illisibles. -->
+              <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label class="label" for="phone">{{ $t('public.phoneLabel') }}</label>
+                  <input id="phone" v-model="customer.phone" type="tel" class="field" required />
+                </div>
+                <div>
+                  <label class="label" for="email">{{ $t('public.emailLabel') }}</label>
+                  <input id="email" v-model="customer.email" type="email" class="field" required />
+                </div>
+              </div>
+              <div>
+                <label class="label" for="notes">{{ $t('public.notesLabel') }}</label>
+                <textarea id="notes" v-model="notes" rows="2" class="field" />
+              </div>
+            </div>
+
+            <!-- Règlement : choix quand plusieurs options, simple rappel sinon -->
+            <div v-if="paymentOptions.length > 1" class="space-y-2">
+              <p class="label">{{ $t('public.paymentQuestion') }}</p>
+              <label
+                v-for="opt in paymentOptions"
+                :key="opt.value"
+                class="flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition"
+                :class="selectedPayment === opt.value ? 'border-brand-600 bg-brand-50' : 'border-slate-200 hover:border-brand-200'"
+              >
+                <input v-model="selectedPayment" type="radio" :value="opt.value" class="mt-0.5" name="payment-choice" />
+                <span class="flex-1">
+                  <span class="text-sm font-medium text-slate-800">{{ opt.label }}</span>
+                  <span class="mt-0.5 block text-xs text-slate-500">{{ opt.hint }}</span>
+                </span>
+              </label>
+            </div>
+            <p v-else-if="paymentOptions.length === 1" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              {{ paymentOptions[0]!.label }} · {{ paymentOptions[0]!.hint }}
+            </p>
+
+            <!-- CGV -->
+            <label class="flex items-start gap-2.5 text-xs text-slate-600">
+              <input v-model="cgvAccepted" type="checkbox" class="mt-0.5 h-5 w-5 shrink-0 rounded border-slate-300" />
+              <span>{{ $t('public.cgv') }}</span>
+            </label>
+
+            <p v-if="errorMsg" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
+
+            <button type="submit" class="btn-primary w-full" :disabled="!canSubmit || submitting">
+              {{ submitting ? $t('public.submitting') : reserveLabel }}
+            </button>
+          </template>
+        </form>
       </div>
     </div>
 
-    <!-- Lightbox véhicule -->
+    <!-- Mention paiement sécurisé : uniquement si le paiement en ligne est proposé -->
+    <p v-if="driver.bookingMode.onlineAvailable" class="mt-4 text-center text-xs text-slate-400">
+      {{ $t('common.securePayment') }}
+    </p>
+
+    <!-- Lightbox véhicule (téléportée dans <body>) -->
     <AppModal v-if="zoomedVehicle" @close="zoomedVehicle = null">
       <div class="flex h-64 items-center justify-center rounded-xl bg-slate-50">
         <VehicleImage
@@ -484,228 +685,5 @@ function goToContact() {
         <button class="btn-ghost" @click="zoomedVehicle = null">Fermer</button>
       </div>
     </AppModal>
-
-    <!-- Course confirmée immédiatement (règlement sur place, créneau libre) -->
-    <div v-if="confirmedBooking" class="card mt-5 border-green-200 bg-green-50 text-center">
-      <p class="text-3xl">✅</p>
-      <h2 class="mt-2 text-lg font-bold text-green-900">{{ $t('public.confirmedTitle') }}</h2>
-      <p class="mt-2 text-sm text-green-800">
-        {{ $t('public.confirmedBody', { name: driver.displayName, email: customer.email }) }}
-      </p>
-      <a v-if="manageUrl" :href="manageUrl" class="btn-primary mt-4 inline-block">
-        {{ $t('public.manageBooking') }}
-      </a>
-    </div>
-
-    <!-- Demande transmise, en attente de validation du chauffeur -->
-    <div v-else-if="submitted" class="card mt-5 border-green-200 bg-green-50 text-center">
-      <p class="text-3xl">✅</p>
-      <h2 class="mt-2 text-lg font-bold text-green-900">{{ $t('public.submittedTitle') }}</h2>
-      <p class="mt-2 text-sm text-green-800">
-        {{
-          submittedOnSite
-            ? $t('public.submittedBodyOnSite', { name: driver.displayName, email: customer.email })
-            : $t('public.submittedBody', { name: driver.displayName, email: customer.email })
-        }}
-      </p>
-    </div>
-
-    <!-- Formulaire (toujours disponible, même si le paiement en ligne n'est pas activé) -->
-    <form v-else class="card mt-5 space-y-5" @submit.prevent="submit">
-      <h2 class="text-lg font-bold text-slate-900">{{ $t('public.formTitle') }}</h2>
-
-      <!-- Moyens de paiement acceptés -->
-      <div v-if="driver.acceptedPaymentMethods.length" class="rounded-xl bg-slate-50 p-3">
-        <p class="text-xs font-medium text-slate-500">Moyens de paiement acceptés</p>
-        <div class="mt-2 flex flex-wrap gap-2">
-          <span
-            v-for="m in driver.acceptedPaymentMethods"
-            :key="m"
-            class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
-          >
-            {{ PAYMENT_METHOD_LABELS[m] }}
-          </span>
-        </div>
-      </div>
-
-      <!-- Étape 1 : course + estimation (les coordonnées ne sont pas encore demandées) -->
-      <template v-if="step === 'details'">
-        <!-- Type de prestation -->
-        <div class="grid grid-cols-2 gap-2">
-          <button
-            v-if="driver.hasTransfer"
-            type="button"
-            class="rounded-xl border-2 px-3 py-3 text-sm font-semibold transition"
-            :class="type === 'TRANSFER' ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'"
-            @click="type = 'TRANSFER'"
-          >
-            {{ $t('public.typeTransfer') }}
-            <span v-if="driver.fromKmCents" class="block text-xs font-normal text-slate-500">
-              {{ $t('public.fromPerKm', { price: formatMoney(driver.fromKmCents, driver.currency) }) }}
-            </span>
-          </button>
-          <button
-            v-if="driver.hasHourly"
-            type="button"
-            class="rounded-xl border-2 px-3 py-3 text-sm font-semibold transition"
-            :class="type === 'HOURLY' ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'"
-            @click="type = 'HOURLY'"
-          >
-            {{ $t('public.typeHourly') }}
-            <span v-if="driver.fromHourCents" class="block text-xs font-normal text-slate-500">
-              {{ $t('public.fromPerHour', { price: formatMoney(driver.fromHourCents, driver.currency) }) }}
-            </span>
-          </button>
-        </div>
-
-        <!-- Transfert -->
-        <template v-if="type === 'TRANSFER'">
-          <div>
-            <label class="label" for="pickup">{{ $t('public.pickupLabel') }}</label>
-            <AddressField id="pickup" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" @resolve="pickupCoords = $event" />
-            <TerminalPicker class="mt-3" :address="pickup" v-model="pickupTerminal" @coords="terminalCoords = $event" />
-          </div>
-          <div>
-            <label class="label" for="dropoff">{{ $t('public.dropoffLabel') }}</label>
-            <AddressField id="dropoff" v-model="dropoff" :placeholder="$t('public.dropoffPlaceholder')" @resolve="dropoffCoords = $event" />
-          </div>
-          <label class="flex items-center gap-2.5 py-1 text-sm text-slate-700">
-            <input v-model="roundTrip" type="checkbox" class="h-5 w-5 shrink-0 rounded border-slate-300" />
-            {{ $t('public.roundTrip') }}
-          </label>
-        </template>
-
-        <!-- Mise à disposition -->
-        <template v-else>
-          <div>
-            <label class="label" for="pickup-hourly">{{ $t('public.pickupLabel') }}</label>
-            <AddressField id="pickup-hourly" v-model="pickup" :placeholder="$t('public.pickupPlaceholder')" @resolve="pickupCoords = $event" />
-            <TerminalPicker class="mt-3" :address="pickup" v-model="pickupTerminal" @coords="terminalCoords = $event" />
-          </div>
-          <div>
-            <label class="label" for="duration">{{ $t('public.durationLabel') }}</label>
-            <input id="duration" v-model.number="durationHours" type="number" min="1" max="24" class="field" />
-          </div>
-        </template>
-
-        <div>
-          <label class="label" for="datetime">{{ $t('public.datetimeLabel') }}</label>
-          <input id="datetime" v-model="scheduledAt" type="datetime-local" class="field" :min="minScheduledAt" />
-          <p class="mt-1 text-xs text-slate-500">
-            {{ $t('public.leadTime', { hours: Math.round(driver.minLeadTimeMinutes / 60) }) }}
-          </p>
-        </div>
-
-        <!-- Estimation -->
-        <button type="button" class="btn-ghost w-full" :disabled="!canEstimate || estimating" @click="getEstimate">
-          {{ estimating ? $t('public.estimating') : $t('public.estimateButton') }}
-        </button>
-
-        <p v-if="errorMsg" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
-
-        <template v-if="estimate">
-          <div ref="estimateBox" class="scroll-mt-4 rounded-xl bg-slate-50 p-4">
-            <div class="flex items-baseline justify-between">
-              <span class="text-sm text-slate-600">{{ $t('public.estimateLabel') }}</span>
-              <span class="font-serif text-2xl font-medium tracking-tight text-slate-900">
-                {{ formatMoney(estimate.amountCents, estimate.currency) }}
-              </span>
-            </div>
-            <ul class="mt-2 space-y-1 text-xs text-slate-500">
-              <li v-for="(line, i) in estimate.breakdown" :key="i" class="flex justify-between gap-3">
-                <span>{{ line.label }}<span v-if="line.detail"> — {{ line.detail }}</span></span>
-                <span class="shrink-0">{{ formatMoney(line.amountCents, estimate.currency) }}</span>
-              </li>
-            </ul>
-            <p class="mt-2 text-xs text-slate-400">{{ $t('public.estimateIndicative') }}</p>
-          </div>
-
-          <!-- Réserver → passe à la saisie des coordonnées -->
-          <button type="button" class="btn-primary w-full" @click="goToContact">
-            {{ reserveLabel }}
-          </button>
-        </template>
-      </template>
-
-      <!-- Étape 2 : coordonnées du client -->
-      <template v-else>
-        <!-- Rappel de la course estimée -->
-        <div v-if="estimate" class="rounded-xl bg-slate-50 p-4">
-          <div class="flex items-baseline justify-between">
-            <span class="text-sm text-slate-600">{{ $t('public.estimateLabel') }}</span>
-            <span class="font-serif text-2xl font-medium tracking-tight text-slate-900">
-              {{ formatMoney(estimate.amountCents, estimate.currency) }}
-            </span>
-          </div>
-          <button
-            type="button"
-            class="-mb-2 mt-1 inline-flex min-h-[44px] items-center text-xs font-medium text-brand-700 hover:underline"
-            @click="step = 'details'"
-          >
-            ← {{ $t('public.modifyTrip') }}
-          </button>
-        </div>
-
-        <!-- Coordonnées client -->
-        <div class="space-y-3">
-          <div>
-            <label class="label" for="name">{{ $t('public.nameLabel') }}</label>
-            <input id="name" v-model="customer.name" type="text" class="field" required />
-          </div>
-          <!-- Empilés sur mobile : côte à côte, téléphone et email saisis seraient illisibles. -->
-          <div class="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label class="label" for="phone">{{ $t('public.phoneLabel') }}</label>
-              <input id="phone" v-model="customer.phone" type="tel" class="field" required />
-            </div>
-            <div>
-              <label class="label" for="email">{{ $t('public.emailLabel') }}</label>
-              <input id="email" v-model="customer.email" type="email" class="field" required />
-            </div>
-          </div>
-          <div>
-            <label class="label" for="notes">{{ $t('public.notesLabel') }}</label>
-            <textarea id="notes" v-model="notes" rows="2" class="field" />
-          </div>
-        </div>
-
-        <!-- Règlement : choix quand plusieurs options, simple rappel sinon -->
-        <div v-if="paymentOptions.length > 1" class="space-y-2">
-          <p class="label">{{ $t('public.paymentQuestion') }}</p>
-          <label
-            v-for="opt in paymentOptions"
-            :key="opt.value"
-            class="flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition"
-            :class="selectedPayment === opt.value ? 'border-brand-600 bg-brand-50' : 'border-slate-200 hover:border-brand-200'"
-          >
-            <input v-model="selectedPayment" type="radio" :value="opt.value" class="mt-0.5" name="payment-choice" />
-            <span class="flex-1">
-              <span class="text-sm font-medium text-slate-800">{{ opt.label }}</span>
-              <span class="mt-0.5 block text-xs text-slate-500">{{ opt.hint }}</span>
-            </span>
-          </label>
-        </div>
-        <p v-else-if="paymentOptions.length === 1" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          {{ paymentOptions[0]!.label }} · {{ paymentOptions[0]!.hint }}
-        </p>
-
-        <!-- CGV -->
-        <label class="flex items-start gap-2.5 text-xs text-slate-600">
-          <input v-model="cgvAccepted" type="checkbox" class="mt-0.5 h-5 w-5 shrink-0 rounded border-slate-300" />
-          <span>{{ $t('public.cgv') }}</span>
-        </label>
-
-        <p v-if="errorMsg" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
-
-        <button type="submit" class="btn-primary w-full" :disabled="!canSubmit || submitting">
-          {{ submitting ? $t('public.submitting') : reserveLabel }}
-        </button>
-      </template>
-    </form>
-
-    <!-- Mention paiement sécurisé : uniquement si le paiement en ligne est proposé -->
-    <p v-if="driver.bookingMode.onlineAvailable" class="mt-6 text-center text-xs text-slate-400">
-      {{ $t('common.securePayment') }}
-    </p>
   </div>
 </template>
