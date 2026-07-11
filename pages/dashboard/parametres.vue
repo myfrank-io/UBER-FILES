@@ -5,14 +5,6 @@ import {
   type PaymentMethod,
 } from '~/lib/payment-methods'
 import { onlinePaymentPolicy, onSitePaymentMethods } from '~/lib/booking-policy'
-import {
-  priceTransfer,
-  priceHourly,
-  type TransferRateBandInput,
-  type HourlyRateTierInput,
-  type SurchargeInput,
-  type PriceResult,
-} from '~/lib/pricing'
 
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Réglages' })
@@ -320,7 +312,6 @@ async function saveCancelPolicy() {
 const transferBands = computed(() => (me.value as Record<string, unknown>)?.transferBands as Record<string, unknown>[] ?? [])
 const hourlyTiers = computed(() => (me.value as Record<string, unknown>)?.hourlyTiers as Record<string, unknown>[] ?? [])
 const currency = computed(() => ((me.value as Record<string, unknown>)?.currency as string) ?? 'eur')
-const timezone = computed(() => ((me.value as Record<string, unknown>)?.timezone as string) ?? 'Europe/Paris')
 const surcharges = computed(() => (me.value as Record<string, unknown>)?.surcharges as Record<string, unknown>[] ?? [])
 
 // Tarif de secours d'abord, puis du plus prioritaire au moins prioritaire :
@@ -603,67 +594,6 @@ async function deleteSurcharge(id: string) {
   )
 }
 
-// ─── Simulateur : vos tarifs appliqués par le vrai moteur de prix ──────────
-
-function defaultSimDate(): string {
-  const d = new Date(Date.now() + 3 * 3600_000)
-  d.setMinutes(0, 0, 0)
-  const off = d.getTimezoneOffset() * 60000
-  return new Date(d.getTime() - off).toISOString().slice(0, 16)
-}
-
-const sim = reactive({
-  type: 'TRANSFER' as 'TRANSFER' | 'HOURLY',
-  km: 15,
-  roundTrip: false,
-  when: defaultSimDate(),
-  hours: 3,
-})
-
-const simResult = computed<{ result?: PriceResult; error?: string } | null>(() => {
-  if (!me.value) return null
-  const params = {
-    currency: currency.value,
-    minimumFareCents: settings.minimumFareCents,
-    timezone: timezone.value,
-  }
-  const autoSurcharges: SurchargeInput[] = surcharges.value
-    .filter((s) => s.autoApply as boolean)
-    .map((s) => ({ name: s.name as string, kind: s.kind as 'FIXED' | 'PERCENT', amount: s.amount as number }))
-  try {
-    if (sim.type === 'TRANSFER') {
-      if (!sim.km || sim.km <= 0) return null
-      const bands: TransferRateBandInput[] = transferBands.value.map((b) => ({
-        name: b.name as string,
-        pricePerKmCents: b.pricePerKmCents as number,
-        daysOfWeek: b.daysOfWeek as number[],
-        startMinute: b.startMinute as number,
-        endMinute: b.endMinute as number,
-        priority: b.priority as number,
-        isDefault: b.isDefault as boolean,
-      }))
-      const result = priceTransfer({
-        distanceMeters: sim.km * 1000,
-        scheduledAt: new Date(sim.when),
-        roundTrip: sim.roundTrip,
-        bands,
-        surcharges: autoSurcharges,
-        params,
-      })
-      return { result }
-    }
-    if (!sim.hours || sim.hours <= 0) return null
-    const tiers: HourlyRateTierInput[] = hourlyTiers.value.map((t) => ({
-      minHours: t.minHours as number,
-      pricePerHourCents: t.pricePerHourCents as number,
-    }))
-    const result = priceHourly({ durationHours: sim.hours, tiers, surcharges: autoSurcharges, params })
-    return { result }
-  } catch (e) {
-    return { error: (e as Error).message }
-  }
-})
-
 // ─── Helper ───────────────────────────────────────────────────────────────
 
 async function call(key: string, fn: () => Promise<unknown>) {
@@ -713,70 +643,6 @@ async function call(key: string, fn: () => Promise<unknown>) {
 
     <!-- ═══════════════════ Onglet Tarifs ═══════════════════ -->
     <div v-if="tab === 'tarifs' && me" class="mt-5 space-y-5">
-      <!-- Simulateur -->
-      <div class="card !border-brand-200 !bg-brand-50/60">
-        <h2 class="font-semibold text-slate-900">🧮 Testez vos tarifs</h2>
-        <p class="mt-1 text-sm text-slate-600">
-          Le prix exact qu'obtiendrait un client, calculé avec vos réglages ci-dessous.
-        </p>
-
-        <div class="mt-3 flex gap-2">
-          <button
-            type="button"
-            class="rounded-full border px-4 py-2 text-sm font-medium transition-colors"
-            :class="sim.type === 'TRANSFER' ? 'border-brand-600 bg-white text-brand-700' : 'border-slate-300 text-slate-600'"
-            @click="sim.type = 'TRANSFER'"
-          >
-            Transfert
-          </button>
-          <button
-            type="button"
-            class="rounded-full border px-4 py-2 text-sm font-medium transition-colors"
-            :class="sim.type === 'HOURLY' ? 'border-brand-600 bg-white text-brand-700' : 'border-slate-300 text-slate-600'"
-            @click="sim.type = 'HOURLY'"
-          >
-            Mise à disposition
-          </button>
-        </div>
-
-        <!-- Le champ date+heure prend toute la largeur sur mobile : en demi-colonne,
-             l'heure du départ (déterminante pour le tarif) était coupée. -->
-        <div v-if="sim.type === 'TRANSFER'" class="mt-3 grid grid-cols-2 gap-3">
-          <div>
-            <label class="label" for="sim-km">Distance (km)</label>
-            <input id="sim-km" v-model.number="sim.km" type="number" min="1" step="1" class="field !bg-white" />
-          </div>
-          <div class="col-span-2 sm:col-span-1">
-            <label class="label" for="sim-when">Départ le</label>
-            <input id="sim-when" v-model="sim.when" type="datetime-local" class="field !bg-white" />
-          </div>
-          <label class="col-span-2 flex items-center gap-2.5 py-1 text-sm text-slate-700">
-            <input v-model="sim.roundTrip" type="checkbox" class="h-5 w-5 shrink-0 rounded border-slate-300" />
-            Aller-retour
-          </label>
-        </div>
-        <div v-else class="mt-3">
-          <label class="label" for="sim-hours">Durée (heures)</label>
-          <input id="sim-hours" v-model.number="sim.hours" type="number" min="1" max="24" class="field !bg-white sm:max-w-[180px]" />
-        </div>
-
-        <div v-if="simResult?.result" class="mt-4 rounded-xl bg-white p-4 ring-1 ring-slate-200">
-          <div class="flex items-baseline justify-between">
-            <span class="text-sm text-slate-600">Le client paierait</span>
-            <span class="font-serif text-3xl font-medium text-slate-950">{{ formatMoney(simResult.result.amountCents, currency) }}</span>
-          </div>
-          <ul class="mt-2 space-y-1 border-t border-slate-100 pt-2 text-xs text-slate-500">
-            <li v-for="(line, i) in simResult.result.breakdown" :key="i" class="flex justify-between gap-3">
-              <span>{{ line.label }}<span v-if="line.detail"> — {{ line.detail }}</span></span>
-              <span class="shrink-0">{{ formatMoney(line.amountCents, currency) }}</span>
-            </li>
-          </ul>
-        </div>
-        <p v-else-if="simResult?.error" class="mt-4 rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
-          ⚠️ {{ simResult.error }}
-        </p>
-      </div>
-
       <!-- Transfert (au km) -->
       <div class="card space-y-3">
         <div>
