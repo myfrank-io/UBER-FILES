@@ -52,6 +52,10 @@ const onboarding = computed(() => {
 
 // Le bandeau s'efface dès que tout l'obligatoire est fait.
 const visible = computed(() => Boolean(onboarding.value) && !onboarding.value!.complete)
+
+// Replié par défaut : le chauffeur garde un résumé compact (titre + progression)
+// et déplie la checklist détaillée seulement s'il le souhaite.
+const expanded = ref(false)
 </script>
 
 <template>
@@ -59,19 +63,40 @@ const visible = computed(() => Boolean(onboarding.value) && !onboarding.value!.c
     v-if="visible && onboarding"
     class="card border-brand-100 bg-gradient-to-br from-brand-50/70 to-white"
   >
-    <div class="flex items-start justify-between gap-4">
+    <!-- En-tête cliquable : replie / déplie la checklist détaillée. -->
+    <button
+      type="button"
+      class="flex w-full items-start justify-between gap-4 text-left"
+      :aria-expanded="expanded"
+      @click="expanded = !expanded"
+    >
       <div>
         <h2 class="font-serif text-lg font-medium text-slate-900">Finalisez votre configuration</h2>
         <p class="mt-0.5 text-sm text-slate-500">
           Encore quelques étapes avant de recevoir vos premières réservations.
         </p>
       </div>
-      <span class="shrink-0 rounded-full bg-brand-600 px-3 py-1 text-sm font-semibold text-white">
-        {{ onboarding.percent }}%
-      </span>
-    </div>
+      <div class="flex shrink-0 items-center gap-2">
+        <span class="rounded-full bg-brand-600 px-3 py-1 text-sm font-semibold text-white">
+          {{ onboarding.percent }}%
+        </span>
+        <svg
+          class="h-5 w-5 text-slate-400 transition-transform duration-200"
+          :class="{ 'rotate-180': expanded }"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            fill-rule="evenodd"
+            d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+            clip-rule="evenodd"
+          />
+        </svg>
+      </div>
+    </button>
 
-    <!-- Barre de progression -->
+    <!-- Barre de progression : reste visible même replié (résumé compact). -->
     <div class="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
       <div
         class="h-full rounded-full bg-brand-600 transition-all duration-500"
@@ -82,8 +107,8 @@ const visible = computed(() => Boolean(onboarding.value) && !onboarding.value!.c
       {{ onboarding.requiredDone }} / {{ onboarding.requiredTotal }} étapes obligatoires
     </p>
 
-    <!-- Checklist -->
-    <ul class="mt-4 space-y-1.5">
+    <!-- Checklist : masquée par défaut, affichée une fois déplié. -->
+    <ul v-if="expanded" class="mt-4 space-y-1.5">
       <li v-for="step in onboarding.steps" :key="step.key">
         <NuxtLink
           :to="STEP_META[step.key].href"
