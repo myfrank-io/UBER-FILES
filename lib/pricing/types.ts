@@ -26,10 +26,13 @@ export interface TransferRateBandInput {
   isDefault: boolean
 }
 
-export interface HourlyRateTierInput {
-  /** Durée seuil (heures) à partir de laquelle ce tarif s'applique. */
-  minHours: number
+export interface HourlyRateInput {
+  /** Tarif horaire de base (centimes). */
   pricePerHourCents: number
+  /** Seuil (heures) au-delà duquel le tarif heure supplémentaire s'applique. */
+  overtimeAfterHours?: number | null
+  /** Tarif des heures supplémentaires (centimes). */
+  overtimePricePerHourCents?: number | null
 }
 
 export interface BreakdownLine {
@@ -62,7 +65,7 @@ export interface TransferPricingInput {
 
 export interface HourlyPricingInput {
   durationHours: number
-  tiers: HourlyRateTierInput[]
+  rate: HourlyRateInput
   surcharges: SurchargeInput[]
   params: DriverPricingParams
 }

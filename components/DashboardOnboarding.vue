@@ -28,7 +28,7 @@ const onboarding = computed(() => {
     vehicleCount: m.vehicleCount ?? 0,
     hasPhone: Boolean(m.phone),
     hasServiceArea: Boolean(m.serviceArea),
-    hasRates: (m.transferBands?.length ?? 0) > 0 || (m.hourlyTiers?.length ?? 0) > 0,
+    hasRates: (m.transferBands?.length ?? 0) > 0 || m.hourlyRateCents != null,
     paymentMethods: m.paymentMethods ?? [],
     onlinePayoutReady: Boolean(m.stripe?.connected || m.sumup?.connected),
     telegramLinked: Boolean(m.telegramLinked),

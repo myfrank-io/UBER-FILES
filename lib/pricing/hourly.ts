@@ -1,54 +1,62 @@
 import { formatMoney, roundCents } from '../money'
 import { applySurcharges, PricingError } from './transfer'
-import type { BreakdownLine, HourlyPricingInput, HourlyRateTierInput, PriceResult } from './types'
-
-/**
- * Sélectionne le palier horaire applicable : celui dont `minHours` est le plus grand
- * tout en restant ≤ à la durée demandée. (Grille dégressive : plus c'est long, moins c'est cher.)
- */
-export function selectHourlyTier(
-  tiers: HourlyRateTierInput[],
-  durationHours: number,
-): HourlyRateTierInput | null {
-  const eligible = tiers
-    .filter((t) => t.minHours <= durationHours)
-    .sort((a, b) => b.minHours - a.minHours)
-  return eligible[0] ?? null
-}
+import type { BreakdownLine, HourlyPricingInput, PriceResult } from './types'
 
 /**
  * Calcule le prix d'une mise à disposition.
- * Tarif horaire dégressif par paliers (ex: 1h = 60 €, 4h = 55 €/h…).
+ * Tarif horaire de base jusqu'au seuil, puis tarif heure supplémentaire au-delà
+ * (ex: les 8 premières heures à 50 €/h, ensuite 40 €/h). Chaque heure est
+ * facturée au tarif de sa tranche — jamais toute la durée au tarif réduit.
  * Applique le prix minimum de course puis les majorations.
  */
 export function priceHourly(input: HourlyPricingInput): PriceResult {
-  const { durationHours, tiers, surcharges, params } = input
+  const { durationHours, rate, surcharges, params } = input
 
   if (durationHours <= 0 || !Number.isFinite(durationHours)) {
     throw new PricingError('Durée invalide pour une mise à disposition.', 'INVALID_DURATION')
   }
-  if (tiers.length === 0) {
-    throw new PricingError('Aucune grille horaire définie.', 'NO_TIERS')
+  if (!rate || !(rate.pricePerHourCents > 0)) {
+    throw new PricingError('Aucun tarif horaire défini.', 'NO_HOURLY_RATE')
   }
 
-  const tier = selectHourlyTier(tiers, durationHours)
-  if (!tier) {
-    throw new PricingError(
-      `Durée inférieure au plus petit palier (${Math.min(...tiers.map((t) => t.minHours))}h).`,
-      'BELOW_MIN_TIER',
+  const overtime =
+    rate.overtimeAfterHours != null &&
+    rate.overtimeAfterHours > 0 &&
+    rate.overtimePricePerHourCents != null &&
+    rate.overtimePricePerHourCents > 0 &&
+    durationHours > rate.overtimeAfterHours
+      ? { afterHours: rate.overtimeAfterHours, pricePerHourCents: rate.overtimePricePerHourCents }
+      : null
+
+  const breakdown: BreakdownLine[] = []
+  let subtotal: number
+
+  if (overtime) {
+    const baseCents = roundCents(rate.pricePerHourCents * overtime.afterHours)
+    const extraHours = durationHours - overtime.afterHours
+    const extraCents = roundCents(overtime.pricePerHourCents * extraHours)
+    subtotal = baseCents + extraCents
+    breakdown.push(
+      {
+        label: 'Mise à disposition',
+        amountCents: baseCents,
+        detail: `${overtime.afterHours} h × ${formatMoney(rate.pricePerHourCents, params.currency)}/h`,
+      },
+      {
+        label: 'Heures supplémentaires',
+        amountCents: extraCents,
+        detail: `${extraHours} h × ${formatMoney(overtime.pricePerHourCents, params.currency)}/h`,
+      },
     )
+  } else {
+    subtotal = roundCents(rate.pricePerHourCents * durationHours)
+    breakdown.push({
+      label: 'Mise à disposition',
+      amountCents: subtotal,
+      detail: `${durationHours} h × ${formatMoney(rate.pricePerHourCents, params.currency)}/h`,
+    })
   }
 
-  const baseCents = roundCents(tier.pricePerHourCents * durationHours)
-  const breakdown: BreakdownLine[] = [
-    {
-      label: 'Mise à disposition',
-      amountCents: baseCents,
-      detail: `${durationHours} h × ${formatMoney(tier.pricePerHourCents, params.currency)}/h`,
-    },
-  ]
-
-  let subtotal = baseCents
   if (subtotal < params.minimumFareCents) {
     const adjustment = params.minimumFareCents - subtotal
     breakdown.push({

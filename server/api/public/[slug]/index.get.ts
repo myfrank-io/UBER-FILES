@@ -45,9 +45,6 @@ export default defineEventHandler(async (event) => {
   const cheapestKm = driver.transferBands.length
     ? Math.min(...driver.transferBands.map((b) => b.pricePerKmCents))
     : null
-  const cheapestHour = driver.hourlyTiers.length
-    ? Math.min(...driver.hourlyTiers.map((t) => t.pricePerHourCents))
-    : null
 
   // Moyens de paiement effectivement proposables au client : le prépaiement en
   // ligne n'est retenu que si le prestataire actif (Stripe ou SumUp) est opérationnel ;
@@ -84,9 +81,12 @@ export default defineEventHandler(async (event) => {
     minimumFareCents: driver.minimumFareCents,
     minLeadTimeMinutes: driver.minLeadTimeMinutes,
     hasTransfer: driver.transferBands.length > 0,
-    hasHourly: driver.hourlyTiers.length > 0,
+    hasHourly: driver.hourlyRateCents != null,
     fromKmCents: cheapestKm,
-    fromHourCents: cheapestHour,
+    // « À partir de » : le tarif de base — c'est le prix réellement payé dès la
+    // première heure (le tarif heure supplémentaire, plus bas, n'est qu'un
+    // complément au-delà du seuil).
+    fromHourCents: driver.hourlyRateCents,
     bookingEnabled: acceptedPaymentMethods.length > 0,
     // Mode de réservation, pour adapter le formulaire et les messages du client :
     // badge « réservation instantanée », choix du règlement, écrans de succès.
