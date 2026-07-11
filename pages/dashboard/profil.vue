@@ -4,6 +4,13 @@ useHead({ title: 'Mon profil' })
 
 const { data: me, refresh } = await useMe()
 
+// Lien vers la page publique du chauffeur — seulement quand elle est en ligne
+// (un profil en attente de validation ou suspendu renverrait un 404).
+const publicPath = computed(() => {
+  const d = me.value as { slug?: string; status?: string } | null
+  return d?.status === 'ACTIVE' && d?.slug ? `/${d.slug}` : null
+})
+
 const saving = ref(false)
 const successMsg = ref('')
 const errorMsg = ref('')
@@ -148,7 +155,19 @@ async function save() {
   <div class="max-w-2xl">
     <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Mon profil</h1>
     <p v-if="!me" class="mt-1 text-sm text-slate-400">Chargement…</p>
-    <p class="mt-1 text-sm text-slate-500">Ces informations apparaissent sur votre page publique.</p>
+    <!-- « page publique » cliquable dès qu'elle est en ligne : ouvre la vitrine
+         du chauffeur dans un nouvel onglet (il reste dans son espace). -->
+    <p class="mt-1 text-sm text-slate-500">
+      Ces informations apparaissent sur votre
+      <a
+        v-if="publicPath"
+        :href="publicPath"
+        target="_blank"
+        rel="noopener"
+        class="font-medium text-brand-700 underline decoration-brand-300 underline-offset-2 hover:text-brand-800"
+      >page publique ↗</a>
+      <template v-else>page publique</template>.
+    </p>
 
     <form class="mt-6 space-y-6" @submit.prevent="save">
 
