@@ -88,8 +88,8 @@ model Driver {
   vehicleModel String?
   vehicleClass String? // Berline, Van, Premium...
   vehicleSeats Int?
-  services     String? @db.Text // description libre des prestations
-  serviceArea  String? @db.Text // zone desservie (texte)
+  services     String? @db.Text // plus exposé (carte « Zone & prestations » retirée) ; colonne conservée
+  serviceArea  String? @db.Text // plus exposé (carte « Zone & prestations » retirée) ; colonne conservée
   phone        String?
   contactEmail String?
 

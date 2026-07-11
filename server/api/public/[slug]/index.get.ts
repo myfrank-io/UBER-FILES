@@ -71,8 +71,6 @@ export default defineEventHandler(async (event) => {
       seats: driver.vehicleSeats,
     },
     vehicles,
-    services: driver.services,
-    serviceArea: driver.serviceArea,
     // Lien où le client peut laisser un avis — fiche Google connectée ou lien
     // manuel (Trustpilot…). Affiché en bouton sur la page publique s'il existe.
     reviewUrl: driverReviewUrl(driver),
