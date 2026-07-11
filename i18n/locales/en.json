@@ -107,5 +107,21 @@
     "cancelling": "Cancelling…",
     "cancelError": "Cancellation failed.",
     "alreadyCancelled": "This ride has been cancelled."
+  },
+  "review": {
+    "metaTitle": "Your review — {name}",
+    "title": "Thank you for riding with {name}!",
+    "subtitle": "How was your ride? Rate it in one tap.",
+    "starAria": "{n} star(s)",
+    "redirecting": "Thank you! Taking you to the review page…",
+    "formTitle": "What could have been better?",
+    "commentPlaceholder": "Tell us what wasn't perfect…",
+    "nameLabel": "Your name (optional)",
+    "submit": "Send my feedback",
+    "sending": "Sending…",
+    "sentTitle": "Thank you for your feedback",
+    "sentBody": "It has been passed on to {name}, who will take it on board for future rides.",
+    "sentFiveTitle": "Thank you so much!",
+    "sentFiveBody": "Your rating will mean a lot to them."
   }
 }

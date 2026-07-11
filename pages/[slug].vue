@@ -38,8 +38,6 @@ interface DriverPublic {
   contactEmail: string | null
   vehicle: { make: string | null; model: string | null; class: string | null; seats: number | null }
   vehicles: PublicVehicle[]
-  services: string | null
-  serviceArea: string | null
   reviewUrl: string | null
   currency: string
   minimumFareCents: number
@@ -73,7 +71,7 @@ useHead(() => {
       : `${appBase}${d.photoUrl}`
     : `${appBase}/og-default.jpg`
   // Données structurées schema.org (JSON-LD) : aident Google à comprendre qu'il
-  // s'agit d'une entreprise de transport locale (nom, zone, contact, image) et à
+  // s'agit d'une entreprise de transport locale (nom, contact, image) et à
   // faire ressortir la fiche dans les résultats. Pas de note/avis simulés ici —
   // Google pénalise les `aggregateRating` non vérifiables.
   const jsonLd: Record<string, unknown> = {
@@ -86,7 +84,6 @@ useHead(() => {
     description,
     priceRange: '€€',
     ...(d.phone ? { telephone: d.phone } : {}),
-    ...(d.serviceArea ? { areaServed: d.serviceArea } : {}),
     // Fiche d'avis publique du chauffeur (Google, Trustpilot…) rattachée à l'entité.
     ...(d.reviewUrl ? { sameAs: [d.reviewUrl] } : {}),
   }
@@ -407,19 +404,16 @@ function goToContact() {
           >
             {{ driver.vehicle.class }}<template v-if="driver.vehicle.seats"> · {{ $t('common.places', { count: driver.vehicle.seats }) }}</template>
           </span>
-          <span v-if="driver.serviceArea" class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
-            {{ driver.serviceArea }}
-          </span>
-          <!-- Lien d'avis (fiche Google, Trustpilot…), affiché s'il est renseigné. -->
-          <a
+          <!-- Lien d'avis : passe par la page de notation Ridewiz (5★ → dépôt public
+               sur la fiche du chauffeur, note inférieure → retour privé). Affiché
+               seulement si un lien d'avis est configuré. -->
+          <NuxtLink
             v-if="driver.reviewUrl"
-            :href="driver.reviewUrl"
-            target="_blank"
-            rel="noopener noreferrer nofollow"
+            :to="`/avis/${driver.slug}`"
             class="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-amber-700 transition hover:bg-amber-100"
           >
             ⭐ {{ $t('public.leaveReview') }}
-          </a>
+          </NuxtLink>
           <LangSwitcher class="ml-auto shrink-0" />
         </div>
         <!-- Véhicules : simples vignettes cliquables, le détail s'ouvre en grand. -->

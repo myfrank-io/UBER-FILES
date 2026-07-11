@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { requireDriverId } from '~/server/utils/auth'
-import { searchPlaces } from '~/server/utils/google-maps'
+import { searchPlaces, autocompleteEstablishments } from '~/server/utils/google-maps'
 
 // Recherche de la fiche d'établissement Google du chauffeur (nom + ville) pour
 // connecter le lien « laisser un avis ». Proxy serveur : la clé Google reste cachée.
@@ -19,6 +19,12 @@ export default defineEventHandler(async (event) => {
   if (!body.success) {
     throw createError({ statusCode: 400, statusMessage: 'Recherche invalide.' })
   }
-  const results = await searchPlaces(body.data.query, config.googleMapsApiKey)
+  let results = await searchPlaces(body.data.query, config.googleMapsApiKey)
+  // Les fiches « zone de chalandise » (sans adresse visible) échappent parfois
+  // à Text Search : l'autocomplétion, au matching différent, sert de second
+  // filet avant de conclure « aucun établissement trouvé ».
+  if (results.length === 0) {
+    results = await autocompleteEstablishments(body.data.query, config.googleMapsApiKey)
+  }
   return { results }
 })
