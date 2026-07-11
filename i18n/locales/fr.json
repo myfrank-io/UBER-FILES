@@ -118,7 +118,6 @@
     "starAria": "{n} étoile(s)",
     "redirecting": "Merci ! Redirection vers la page d'avis…",
     "formTitle": "Qu'est-ce qui aurait pu être mieux ?",
-    "formHint": "Votre retour est envoyé directement à {name} pour l'aider à s'améliorer. Il ne sera pas publié en ligne.",
     "commentPlaceholder": "Dites-nous ce qui n'a pas été parfait…",
     "nameLabel": "Votre nom (facultatif)",
     "submit": "Envoyer mon retour",
