@@ -389,12 +389,11 @@ function goToContact() {
         </div>
         <!-- Le sélecteur de langue vit dans la ligne des badges : il ne rogne
              pas le nom du chauffeur sur les petits écrans. -->
+        <!-- Seul le badge valorisant « réservation instantanée » est affiché ;
+             pas de badge quand le chauffeur valide manuellement. -->
         <div class="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
           <span v-if="driver.bookingMode.instant" class="rounded-full bg-green-100 px-2.5 py-1 text-green-700">
             ⚡ {{ $t('public.instantBooking') }}
-          </span>
-          <span v-else class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
-            ✋ {{ $t('public.driverConfirms') }}
           </span>
           <!-- Véhicule du profil, seulement quand la flotte n'est pas renseignée
                (sinon les vignettes ci-dessous portent déjà l'info). -->
