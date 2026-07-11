@@ -11,7 +11,9 @@ type Channel = 'SMS' | 'WHATSAPP' | 'EMAIL'
 // dans le geste de clic, sans dépendre d'un aller-retour réseau (fiabilité Android).
 const props = defineProps<{ publicUrl: string; driverName: string }>()
 
-const open = ref(false)
+// État partagé (useShareModal) : la modale peut aussi être ouverte depuis le
+// CTA central de l'accueil, pas seulement depuis le bouton flottant ci-dessous.
+const open = useShareModal()
 const busy = ref(false)
 const done = ref(false)
 const errorMsg = ref('')
