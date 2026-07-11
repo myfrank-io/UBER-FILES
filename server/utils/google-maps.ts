@@ -2,6 +2,7 @@
 // exposée au navigateur). Couvre Places Autocomplete et Routes (distance/durée).
 // Repli : si aucune clé n'est configurée, on estime via la formule de haversine pour
 // rester développable/testable sans clé.
+import { allowedMapsUrl, parseMapsPlaceUrl } from '~/lib/place-search'
 
 export interface RouteResult {
   distanceMeters: number
@@ -205,13 +206,19 @@ const FRANCE_LOCATION_BIAS = {
 /**
  * Recherche d'ÉTABLISSEMENTS par nom (Places Text Search) — utilisée par le
  * chauffeur pour retrouver sa fiche Google et en dériver le lien d'avis.
- * Contrairement à l'autocomplétion d'adresses, pas de repli sans clé : la BAN
- * ne connaît pas les établissements (l'appelant gère l'absence de clé).
+ * `near` resserre le biais autour d'un point (ex. coordonnées extraites d'un
+ * lien Maps partagé) — sinon biais France entière. Contrairement à
+ * l'autocomplétion d'adresses, pas de repli sans clé : la BAN ne connaît pas
+ * les établissements (l'appelant gère l'absence de clé).
  */
 export async function searchPlaces(
   query: string,
   apiKey: string,
+  near?: LatLng,
 ): Promise<PlaceSummary[]> {
+  const locationBias = near
+    ? { circle: { center: { latitude: near.lat, longitude: near.lng }, radius: 30_000 } }
+    : FRANCE_LOCATION_BIAS
   const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
     method: 'POST',
     headers: {
@@ -223,7 +230,7 @@ export async function searchPlaces(
       textQuery: query,
       languageCode: 'fr',
       regionCode: 'FR',
-      locationBias: FRANCE_LOCATION_BIAS,
+      locationBias,
       pageSize: 5,
     }),
   })
@@ -284,6 +291,55 @@ export async function autocompleteEstablishments(
     }))
     .filter((p) => p.name)
     .slice(0, 5)
+}
+
+/**
+ * Résout un lien de partage Google Maps collé par le chauffeur (maps.app.goo.gl,
+ * g.page, google.com/maps…) en candidats de fiche : on suit les redirections
+ * UNIQUEMENT pour des hôtes Google connus (allowedMapsUrl, anti-SSRF), on
+ * extrait nom + coordonnées de l'URL finale, puis Text Search resserré autour
+ * du point. Chemin de secours pour les fiches que la recherche par nom rate
+ * (zone de chalandise) : partager sa fiche depuis l'app Maps est un geste
+ * simple, contrairement au lien d'avis caché dans la console Google Business.
+ */
+export async function resolveMapsShareUrl(
+  rawUrl: string,
+  apiKey: string,
+): Promise<PlaceSummary[]> {
+  const url = allowedMapsUrl(rawUrl)
+  if (!url) return []
+
+  let finalUrl = url.toString()
+  try {
+    const res = await fetch(finalUrl, { redirect: 'follow', signal: AbortSignal.timeout(5000) })
+    if (res.url) finalUrl = res.url
+    // Seule l'URL finale nous intéresse — on libère la connexion sans lire le corps.
+    void res.body?.cancel()
+  } catch {
+    // Lien lent ou mort : on tente le décodage de l'URL telle quelle.
+  }
+
+  // Après redirections, on doit toujours être chez Google (chaîne de confiance).
+  try {
+    const landed = new URL(finalUrl)
+    // Depuis une IP européenne (nos fonctions Vercel), Google intercale souvent
+    // sa page de consentement : la vraie URL Maps est dans le paramètre continue.
+    if (landed.hostname.startsWith('consent.google.')) {
+      finalUrl = landed.searchParams.get('continue') ?? finalUrl
+    }
+    if (!/(^|\.)google\.[a-z]{2,3}(\.[a-z]{2})?$|(^|\.)goo\.gl$|(^|\.)g\.page$/.test(new URL(finalUrl).hostname)) {
+      return []
+    }
+  } catch {
+    return []
+  }
+
+  const hint = parseMapsPlaceUrl(finalUrl)
+  if (!hint.name) return []
+  const near = hint.lat != null && hint.lng != null ? { lat: hint.lat, lng: hint.lng } : undefined
+  const results = await searchPlaces(hint.name, apiKey, near)
+  if (results.length > 0) return results
+  return autocompleteEstablishments(hint.name, apiKey)
 }
 
 /**
