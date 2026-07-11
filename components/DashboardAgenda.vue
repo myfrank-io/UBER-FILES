@@ -682,12 +682,13 @@ function eventTimeLabel(e: CalEvent): string {
             />
           </div>
 
+          <!-- min-w-0 : les champs date iOS ne débordent pas de leur colonne. -->
           <div class="grid grid-cols-2 gap-3">
-            <div>
+            <div class="min-w-0">
               <label class="label" for="block-start-date">Du</label>
               <input id="block-start-date" v-model="block.startDate" type="date" class="field" />
             </div>
-            <div>
+            <div class="min-w-0">
               <label class="label" for="block-end-date">Au (inclus)</label>
               <input id="block-end-date" v-model="block.endDate" type="date" class="field" :min="block.startDate" />
             </div>
@@ -699,11 +700,11 @@ function eventTimeLabel(e: CalEvent): string {
           </label>
 
           <div v-if="!block.allDay" class="grid grid-cols-2 gap-3">
-            <div>
+            <div class="min-w-0">
               <label class="label" for="block-start-time">De</label>
               <input id="block-start-time" v-model="block.startTime" type="time" class="field" />
             </div>
-            <div>
+            <div class="min-w-0">
               <label class="label" for="block-end-time">À</label>
               <input id="block-end-time" v-model="block.endTime" type="time" class="field" />
             </div>
