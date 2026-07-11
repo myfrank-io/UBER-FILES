@@ -30,10 +30,6 @@ const schema = z.object({
   vehicleClass: z.string().max(60).optional(),
   vehicleSeats: z.number().int().min(1).max(20).optional(),
 
-  // Zone & prestations
-  serviceArea: z.string().max(500).optional(),
-  services: z.string().max(1000).optional(),
-
   // Identité légale
   siren: z.string().max(20).optional(),
 })
@@ -75,8 +71,6 @@ export default defineEventHandler(async (event) => {
       vehicleModel: data.vehicleModel,
       vehicleClass: data.vehicleClass,
       vehicleSeats: data.vehicleSeats,
-      serviceArea: data.serviceArea,
-      services: data.services,
       siren: data.siren,
       sirenVerified: sirenCheck?.verified ?? false,
       companyName: sirenCheck?.companyName,

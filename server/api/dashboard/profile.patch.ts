@@ -20,8 +20,6 @@ const schema = z.object({
   vehicleModel: z.string().max(60).optional().nullable(),
   vehicleClass: z.string().max(60).optional().nullable(),
   vehicleSeats: z.number().int().min(1).max(20).optional().nullable(),
-  services: z.string().max(1000).optional().nullable(),
-  serviceArea: z.string().max(500).optional().nullable(),
   phone: z.string().max(30).optional().nullable(),
   contactEmail: z.string().email().optional().nullable(),
   // Lien d'avis (Google, Trustpilot…). Chaîne vide = effacement.

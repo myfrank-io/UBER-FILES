@@ -29,8 +29,6 @@ const form = reactive({
   vehicleModel: '',
   vehicleClass: '',
   vehicleSeats: null as number | null,
-  serviceArea: '',
-  services: '',
 })
 
 const step = ref<1 | 2>(1)
@@ -107,8 +105,6 @@ async function register() {
         vehicleModel: form.vehicleModel || undefined,
         vehicleClass: form.vehicleClass || undefined,
         vehicleSeats: form.vehicleSeats || undefined,
-        serviceArea: form.serviceArea || undefined,
-        services: form.services || undefined,
       },
     })
     await refreshSession()
@@ -317,18 +313,6 @@ async function register() {
               <label class="rw-lbl" for="vehicleSeats">Places</label>
               <input id="vehicleSeats" v-model.number="form.vehicleSeats" type="number" class="rw-field" min="1" max="20" placeholder="4" />
             </div>
-          </div>
-        </div>
-
-        <div class="rw-card space-y-5">
-          <div class="rw-sect">Zone &amp; prestations</div>
-          <div>
-            <label class="rw-lbl" for="serviceArea">Zone desservie</label>
-            <input id="serviceArea" v-model="form.serviceArea" type="text" class="rw-field" maxlength="500" placeholder="Île-de-France, aéroports CDG et Orly…" />
-          </div>
-          <div>
-            <label class="rw-lbl" for="services">Vos prestations</label>
-            <textarea id="services" v-model="form.services" class="rw-field min-h-[88px]" maxlength="1000" placeholder="Transferts aéroport, mise à disposition, mariage…" />
           </div>
         </div>
 

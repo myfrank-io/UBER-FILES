@@ -90,8 +90,6 @@ const form = reactive({
   vehicleModel: '',
   vehicleClass: '',
   vehicleSeats: null as number | null,
-  services: '',
-  serviceArea: '',
   phone: '',
   contactEmail: '',
 })
@@ -106,8 +104,6 @@ watchEffect(() => {
   form.vehicleModel = (d.vehicleModel as string) ?? ''
   form.vehicleClass = (d.vehicleClass as string) ?? ''
   form.vehicleSeats = (d.vehicleSeats as number | null) ?? null
-  form.services = (d.services as string) ?? ''
-  form.serviceArea = (d.serviceArea as string) ?? ''
   form.phone = (d.phone as string) ?? ''
   form.contactEmail = (d.contactEmail as string) ?? ''
 })
@@ -129,8 +125,6 @@ async function save() {
         vehicleModel: form.vehicleModel || null,
         vehicleClass: form.vehicleClass || null,
         vehicleSeats: form.vehicleSeats || null,
-        services: form.services || null,
-        serviceArea: form.serviceArea || null,
         phone: form.phone || null,
         contactEmail: form.contactEmail || null,
       },
@@ -232,19 +226,6 @@ async function save() {
 
       <!-- Véhicules (gestion intégrée) -->
       <VehiclesManager />
-
-      <!-- Zone & prestations -->
-      <div class="card space-y-4">
-        <h2 class="font-semibold text-slate-900">Zone & prestations</h2>
-        <div>
-          <label class="label" for="services">Description des prestations</label>
-          <textarea id="services" v-model="form.services" class="field min-h-[80px]" maxlength="1000" placeholder="Transferts aéroport, mise à disposition, mariage…" />
-        </div>
-        <div>
-          <label class="label" for="serviceArea">Zone desservie</label>
-          <input id="serviceArea" v-model="form.serviceArea" type="text" class="field" maxlength="500" placeholder="Île-de-France, aéroports CDG et Orly…" />
-        </div>
-      </div>
 
       <!-- Contact -->
       <div class="card space-y-4">

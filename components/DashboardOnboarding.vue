@@ -12,7 +12,7 @@ const { data: me } = await useMe()
 const STEP_META: Record<OnboardingStepKey, { label: string; hint: string; href: string; icon: string }> = {
   profil: { label: 'Compléter mon profil', hint: 'Photo et présentation', href: '/dashboard/profil', icon: '👤' },
   vehicule: { label: 'Ajouter mon véhicule', hint: 'Marque, modèle, places', href: '/dashboard/profil', icon: '🚗' },
-  zone: { label: 'Zone et contact', hint: 'Téléphone et zone desservie', href: '/dashboard/profil', icon: '📍' },
+  contact: { label: 'Renseigner mon téléphone', hint: 'Numéro affiché à vos clients', href: '/dashboard/profil', icon: '📞' },
   tarifs: { label: 'Définir mes tarifs', hint: 'Au moins une grille (transfert ou horaire)', href: '/dashboard/parametres', icon: '💶' },
   paiement: { label: 'Choisir mes moyens de paiement', hint: 'En ligne et/ou sur place', href: '/dashboard/parametres', icon: '💳' },
   encaissement: { label: 'Activer l’encaissement', hint: 'Connecter SumUp ou Stripe', href: '/dashboard/parametres', icon: '🏦' },
@@ -27,7 +27,6 @@ const onboarding = computed(() => {
     hasIntro: Boolean(m.tagline),
     vehicleCount: m.vehicleCount ?? 0,
     hasPhone: Boolean(m.phone),
-    hasServiceArea: Boolean(m.serviceArea),
     hasRates: (m.transferBands?.length ?? 0) > 0 || m.hourlyRateCents != null,
     paymentMethods: m.paymentMethods ?? [],
     onlinePayoutReady: Boolean(m.stripe?.connected || m.sumup?.connected),
