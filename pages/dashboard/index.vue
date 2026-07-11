@@ -9,6 +9,15 @@ const { formatMoney, formatDateTime } = useFormat()
 
 // lazy : la navigation s'affiche immédiatement, les données arrivent ensuite.
 const { data, refresh, pending } = await useFetch('/api/dashboard/overview', { lazy: true })
+
+// Slug + statut (même clé auto-générée que le layout → une seule requête) :
+// icône « voir ma page publique » à côté du titre, seulement quand la page
+// est en ligne (profil ACTIVE — sinon elle renverrait un 404).
+const { data: me } = await useFetch('/api/dashboard/me')
+const publicPath = computed(() => {
+  const d = me.value as { slug?: string; status?: string } | null
+  return d?.status === 'ACTIVE' && d?.slug ? `/${d.slug}` : null
+})
 const { error: toastError, success: toastSuccess } = useToast()
 
 const busyId = ref<string | null>(null)
@@ -93,7 +102,24 @@ async function resend(quoteId: string) {
 
 <template>
   <div>
-    <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Accueil</h1>
+    <div class="flex items-center gap-2.5">
+      <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Accueil</h1>
+      <!-- Ouvre la vitrine publique du chauffeur dans un nouvel onglet -->
+      <a
+        v-if="publicPath"
+        :href="publicPath"
+        target="_blank"
+        rel="noopener"
+        class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-brand-300 hover:text-brand-700"
+        aria-label="Voir ma page publique"
+        title="Voir ma page publique"
+      >
+        <svg class="h-[18px] w-[18px]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" />
+          <path d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" />
+        </svg>
+      </a>
+    </div>
 
     <!-- Onboarding guidé : disparaît une fois la configuration obligatoire faite. -->
     <DashboardOnboarding class="mt-5" />
