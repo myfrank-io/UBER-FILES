@@ -85,7 +85,6 @@ function removePhoto() {
 const form = reactive({
   displayName: '',
   tagline: '',
-  bio: '',
   photoUrl: '',
   vehicleMake: '',
   vehicleModel: '',
@@ -102,7 +101,6 @@ watchEffect(() => {
   const d = me.value as Record<string, unknown>
   form.displayName = (d.displayName as string) ?? ''
   form.tagline = (d.tagline as string) ?? ''
-  form.bio = (d.bio as string) ?? ''
   form.photoUrl = (d.photoUrl as string) ?? ''
   form.vehicleMake = (d.vehicleMake as string) ?? ''
   form.vehicleModel = (d.vehicleModel as string) ?? ''
@@ -127,7 +125,6 @@ async function save() {
       body: {
         displayName: form.displayName,
         tagline: form.tagline || null,
-        bio: form.bio || null,
         vehicleMake: form.vehicleMake || null,
         vehicleModel: form.vehicleModel || null,
         vehicleClass: form.vehicleClass || null,
@@ -178,10 +175,6 @@ async function save() {
         <div>
           <label class="label" for="tagline">Accroche (1 ligne)</label>
           <input id="tagline" v-model="form.tagline" type="text" class="field" maxlength="200" placeholder="Ex : Chauffeur VTC premium en Île-de-France" />
-        </div>
-        <div>
-          <label class="label" for="bio">Biographie</label>
-          <textarea id="bio" v-model="form.bio" class="field min-h-[100px]" maxlength="2000" placeholder="Décrivez votre expérience, vos valeurs…" />
         </div>
         <div>
           <label class="label">Photo de profil</label>

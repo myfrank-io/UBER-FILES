@@ -37,7 +37,6 @@ interface DriverPublic {
   slug: string
   displayName: string
   tagline: string | null
-  bio: string | null
   photoUrl: string | null
   phone: string | null
   contactEmail: string | null
@@ -125,7 +124,7 @@ useHead(() => {
     link: [{ rel: 'canonical', href: url }],
     script: [
       // On échappe « < » (→ <) pour empêcher qu'un champ saisi par le
-      // chauffeur (nom, bio…) contenant une balise script fermante ne casse la page.
+      // chauffeur (nom, accroche…) contenant une balise script fermante ne casse la page.
       { type: 'application/ld+json', innerHTML: JSON.stringify(jsonLd).replace(/</g, '\\u003c') },
     ],
   }
@@ -397,7 +396,6 @@ function goToContact() {
           <p v-if="driver.tagline" class="text-sm text-slate-500">{{ driver.tagline }}</p>
         </div>
       </div>
-      <p v-if="driver.bio" class="mt-4 text-sm text-slate-600">{{ driver.bio }}</p>
       <div class="mt-4 flex flex-wrap gap-2 text-xs">
         <span
           v-if="driver.bookingMode.instant"

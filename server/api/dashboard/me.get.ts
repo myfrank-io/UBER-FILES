@@ -30,7 +30,6 @@ export default defineEventHandler(async (event) => {
     emailVerified: account?.emailVerified ?? true,
     displayName: driver.displayName,
     tagline: driver.tagline,
-    bio: driver.bio,
     photoUrl: publicPhotoUrl(driver, photoCount > 0),
     vehicleMake: driver.vehicleMake,
     vehicleModel: driver.vehicleModel,

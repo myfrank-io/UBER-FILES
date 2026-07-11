@@ -66,7 +66,6 @@ async function main() {
       status: 'ACTIVE',
       displayName: 'Karim — Chauffeur VTC Paris',
       tagline: 'Transferts aéroport & mise à disposition, 7j/7',
-      bio: 'Chauffeur VTC depuis 8 ans, véhicule premium, eau et chargeurs à bord.',
       vehicleMake: 'Mercedes',
       vehicleModel: 'Classe E',
       vehicleClass: 'Berline premium',
