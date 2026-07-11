@@ -37,8 +37,6 @@ export default defineEventHandler(async (event) => {
     vehicleSeats: driver.vehicleSeats,
     // Nombre de véhicules enregistrés (étape « Véhicule » de l'onboarding).
     vehicleCount,
-    services: driver.services,
-    serviceArea: driver.serviceArea,
     phone: driver.phone,
     contactEmail: driver.contactEmail,
     reviewUrl: driver.reviewUrl,

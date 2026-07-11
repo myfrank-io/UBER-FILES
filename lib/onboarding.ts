@@ -9,7 +9,7 @@ import type { PaymentMethod } from './payment-methods'
 export type OnboardingStepKey =
   | 'profil'
   | 'vehicule'
-  | 'zone'
+  | 'contact'
   | 'tarifs'
   | 'paiement'
   | 'encaissement'
@@ -21,7 +21,6 @@ export interface OnboardingInput {
   hasIntro: boolean
   vehicleCount: number
   hasPhone: boolean
-  hasServiceArea: boolean
   // Au moins une grille tarifaire (transfert ou mise à disposition).
   hasRates: boolean
   paymentMethods: PaymentMethod[]
@@ -58,7 +57,7 @@ export function computeOnboarding(input: OnboardingInput): OnboardingResult {
   const steps: OnboardingStep[] = [
     { key: 'profil', done: input.hasPhoto && input.hasIntro, optional: false },
     { key: 'vehicule', done: input.vehicleCount > 0, optional: false },
-    { key: 'zone', done: input.hasPhone && input.hasServiceArea, optional: false },
+    { key: 'contact', done: input.hasPhone, optional: false },
     { key: 'tarifs', done: input.hasRates, optional: false },
     { key: 'paiement', done: input.paymentMethods.length > 0, optional: false },
     { key: 'encaissement', done: encaissementDone, optional: false },

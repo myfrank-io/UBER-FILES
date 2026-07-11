@@ -70,8 +70,6 @@ async function main() {
       vehicleModel: 'Classe E',
       vehicleClass: 'Berline premium',
       vehicleSeats: 4,
-      services: 'Transferts aéroport (CDG, Orly, Beauvais), gares, mise à disposition.',
-      serviceArea: 'Paris et Île-de-France',
       phone: '+33600000000',
       contactEmail: 'karim@example.com',
       siren: '900123456',
