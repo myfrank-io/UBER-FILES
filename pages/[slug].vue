@@ -45,6 +45,8 @@ interface DriverPublic {
   hasTransfer: boolean
   bookingEnabled: boolean
   hasHourly: boolean
+  // Majoration appliquée aux réservations faites moins de X minutes avant le départ.
+  lastMinuteSurcharge: { maxLeadTimeMinutes: number; amountCents: number } | null
   acceptedPaymentMethods: PaymentMethod[]
   bookingMode: BookingModePublic
 }
@@ -151,6 +153,27 @@ function defaultDateTime(): string {
 const minScheduledAt = computed(() =>
   toDatetimeLocal(new Date(Date.now() + (driver.value?.minLeadTimeMinutes ?? 0) * 60_000)),
 )
+
+// Fenêtre en clair : « 45 min », « 2 h », « 1 h 30 ».
+function formatLeadWindow(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`
+}
+
+// Majoration dernière minute : le client est prévenu dès que l'horaire choisi
+// tombe dans la fenêtre — la ligne figure ensuite dans le détail de l'estimation.
+const lastMinuteNotice = computed(() => {
+  const s = driver.value?.lastMinuteSurcharge
+  if (!s || !scheduledAt.value) return ''
+  const leadMs = new Date(scheduledAt.value).getTime() - Date.now()
+  if (Number.isNaN(leadMs) || leadMs >= s.maxLeadTimeMinutes * 60_000) return ''
+  return t('public.lastMinuteNotice', {
+    window: formatLeadWindow(s.maxLeadTimeMinutes),
+    amount: formatMoney(s.amountCents, driver.value!.currency),
+  })
+})
 
 const estimate = ref<{ amountCents: number; currency: string; breakdown: { label: string; amountCents: number; detail?: string }[] } | null>(null)
 const estimating = ref(false)
@@ -529,6 +552,10 @@ function goToContact() {
               <input id="datetime" v-model="scheduledAt" type="datetime-local" class="field" :min="minScheduledAt" />
               <p class="mt-1 text-xs text-slate-500">
                 {{ $t('public.leadTime', { hours: Math.round(driver.minLeadTimeMinutes / 60) }) }}
+              </p>
+              <!-- Majoration dernière minute : annoncée avant même l'estimation. -->
+              <p v-if="lastMinuteNotice" class="mt-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                ⏱ {{ lastMinuteNotice }}
               </p>
             </div>
 
