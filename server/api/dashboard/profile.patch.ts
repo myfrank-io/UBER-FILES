@@ -24,6 +24,9 @@ const schema = z.object({
   contactEmail: z.string().email().optional().nullable(),
   // Lien d'avis (Google, Trustpilot…). Chaîne vide = effacement.
   reviewUrl: z.union([z.string().url('Lien d’avis invalide.').max(500), z.literal(''), z.null()]).optional(),
+  // Modèle du message « Partager ma page » ({client}, {chauffeur}, {lien_avis},
+  // {lien_reservation}). Vide ou null = retour au modèle par défaut.
+  shareMessageTemplate: z.union([z.string().max(2000, 'Modèle trop long (2000 caractères max).'), z.null()]).optional(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -40,6 +43,10 @@ export default defineEventHandler(async (event) => {
   // Chaîne vide sur le lien d'avis = effacement (stocké NULL).
   const data = { ...body.data }
   if (data.reviewUrl === '') data.reviewUrl = null
+  // Modèle de partage vide (ou espaces) = retour au modèle par défaut (NULL).
+  if (typeof data.shareMessageTemplate === 'string' && !data.shareMessageTemplate.trim()) {
+    data.shareMessageTemplate = null
+  }
 
   const driver = await prisma.driver.update({
     where: { id: driverId },

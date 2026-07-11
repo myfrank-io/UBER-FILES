@@ -40,6 +40,8 @@ export default defineEventHandler(async (event) => {
     phone: driver.phone,
     contactEmail: driver.contactEmail,
     reviewUrl: driver.reviewUrl,
+    // Modèle personnalisé du message « Partager ma page » (null = défaut).
+    shareMessageTemplate: driver.shareMessageTemplate,
     // Fiche Google connectée (lien d'avis dérivé du placeId) — null sinon.
     googlePlace: driver.googlePlaceId
       ? {

@@ -178,6 +178,29 @@ describe('emailTemplates client — variantes des flux', () => {
     })
     expect(noPayment.html).not.toContain('règlement sur place')
   })
+
+  it('shareBookingPage : reprend le message, boutonne les liens connus et échappe le texte', () => {
+    const publicUrl = 'https://app.test/karim-paris'
+    const reviewUrl = 'https://app.test/avis/karim-paris'
+    const tpl = emailTemplates.shareBookingPage({
+      driverName: 'Karim VTC',
+      publicUrl,
+      reviewUrl,
+      message: `Bonjour Marie <script>alert(1)</script>,\n\nMerci d’avoir voyagé avec Karim VTC 🙏\n\nLaissez un avis :\n${reviewUrl}\n\nRéservez votre prochaine course avec Ridewiz :\n${publicUrl}\n\nÀ bientôt ! Infos : https://exemple.test/faq`,
+    })
+    expect(tpl.subject).toBe('Merci pour votre confiance — Karim VTC')
+    expect(tpl.html).toContain('Merci d’avoir voyagé avec Karim VTC')
+    // Les lignes-liens connues deviennent des boutons…
+    expect(tpl.html).toContain(`<a href="${reviewUrl}"`)
+    expect(tpl.html).toContain('⭐ Laisser un avis')
+    expect(tpl.html).toContain(`<a href="${publicUrl}"`)
+    expect(tpl.html).toContain('Réserver ma prochaine course')
+    // …les autres liens restent cliquables en ligne…
+    expect(tpl.html).toContain('<a href="https://exemple.test/faq"')
+    // …et le texte saisi est échappé.
+    expect(tpl.html).not.toContain('<script>')
+    expect(tpl.html).toContain('&lt;script&gt;')
+  })
 })
 
 describe('emailTemplates chauffeur', () => {
