@@ -704,18 +704,37 @@ export const emailTemplates = {
     }
   },
   // Le chauffeur partage sa page publique de réservation à un client (depuis son
-  // espace, bouton « Partager ma page »). Canal email.
-  shareBookingPage(opts: { driverName: string; customerName: string; publicUrl: string }) {
+  // espace, bouton « Partager ma page »). Canal email. Le corps reprend tel quel
+  // le message (modèle personnalisable par le chauffeur) : remerciement, demande
+  // d'avis, invitation à réserver. Les lignes constituées uniquement du lien de
+  // réservation ou du lien d'avis deviennent des boutons ; les autres liens
+  // restent cliquables en ligne.
+  shareBookingPage(opts: {
+    driverName: string
+    message: string
+    publicUrl: string
+    reviewUrl?: string | null
+  }) {
+    const buttonLabels: Record<string, string> = {
+      [opts.publicUrl]: 'Réserver ma prochaine course',
+      ...(opts.reviewUrl ? { [opts.reviewUrl]: '⭐ Laisser un avis' } : {}),
+    }
+    const linkify = (line: string) =>
+      line.replace(
+        /https?:\/\/[^\s<]+/g,
+        (url) => `<a href="${url}" style="color:#B5793F;word-break:break-all">${url}</a>`,
+      )
+    const body = opts.message
+      .split('\n')
+      .map((line) => {
+        const label = buttonLabels[line.trim()]
+        if (label) return button(line.trim(), label)
+        return `<p style="margin:0 0 6px">${linkify(esc(line)) || '&nbsp;'}</p>`
+      })
+      .join('')
     return {
-      subject: `Réservez votre course — ${opts.driverName}`,
-      html: wrap(
-        `Bonjour ${esc(opts.customerName)} 👋`,
-        `<p><strong>${esc(opts.driverName)}</strong> vous invite à réserver vos prochaines
-            courses directement en ligne, en quelques secondes.</p>
-         ${button(opts.publicUrl, 'Réserver ma course')}
-         <p style="font-size:13px;color:#6C7889">Ou copiez ce lien dans votre navigateur :<br />
-            <a href="${opts.publicUrl}" style="color:#B5793F">${opts.publicUrl}</a></p>`,
-      ),
+      subject: `Merci pour votre confiance — ${opts.driverName}`,
+      html: wrap('Merci pour votre confiance 🙏', body),
     }
   },
   passwordReset(opts: { resetUrl: string }) {

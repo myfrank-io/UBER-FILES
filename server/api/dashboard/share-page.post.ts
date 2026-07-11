@@ -3,10 +3,11 @@ import { requireDriverId } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { buildShareMessage } from '~/lib/share-message'
+import { driverReviewUrl, reviewFunnelPath } from '~/lib/review-link'
 
 // Bouton « Partager ma page » (espace chauffeur) : le chauffeur enregistre un
-// client (téléphone obligatoire, email optionnel) et lui envoie le lien de sa
-// page publique de réservation par le canal choisi.
+// client (téléphone obligatoire, email requis pour le canal email) et lui envoie
+// un message de remerciement + demande d'avis + lien de réservation.
 //  - EMAIL    : l'email est envoyé directement (serveur).
 //  - SMS/WA   : le client (navigateur) ouvre l'app avec le message pré-rempli ;
 //               on renvoie juste le message + le lien.
@@ -16,6 +17,10 @@ const schema = z.object({
   phone: z.string().min(1, 'Téléphone requis.').max(30),
   email: z.string().email('Email invalide.').optional(),
   channel: z.enum(['SMS', 'WHATSAPP', 'EMAIL']),
+  // Message rendu côté client (aperçu de la modale, modèle éventuellement adapté
+  // sans être enregistré) : « ce qui est prévisualisé est ce qui part ». En son
+  // absence, le serveur reconstruit le message depuis le modèle enregistré.
+  message: z.string().max(2500).optional(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -36,7 +41,7 @@ export default defineEventHandler(async (event) => {
 
   const driver = await prisma.driver.findUnique({
     where: { id: driverId },
-    select: { slug: true, displayName: true },
+    select: { slug: true, displayName: true, reviewUrl: true, googlePlaceId: true, shareMessageTemplate: true },
   })
   if (!driver) throw createError({ statusCode: 404, statusMessage: 'Chauffeur introuvable.' })
 
@@ -44,10 +49,27 @@ export default defineEventHandler(async (event) => {
   await upsertCustomerByPhone(driverId, { name, phone, email })
 
   const publicUrl = `${config.public.appBaseUrl}/${driver.slug}`
-  const message = buildShareMessage({ customerName: name, driverName: driver.displayName, publicUrl })
+  // Dépôt d'avis : toujours la page de notation Ridewiz (5★ → lien public,
+  // 1-4★ → retour privé), jamais le lien externe directement.
+  const reviewUrl = `${config.public.appBaseUrl}${reviewFunnelPath(driver.slug)}`
+  const message =
+    body.data.message?.trim() ||
+    buildShareMessage({
+      customerName: name,
+      driverName: driver.displayName,
+      publicUrl,
+      reviewUrl,
+      hasReviewLink: Boolean(driverReviewUrl(driver)),
+      template: driver.shareMessageTemplate,
+    })
 
   if (channel === 'EMAIL') {
-    const tpl = emailTemplates.shareBookingPage({ driverName: driver.displayName, customerName: name, publicUrl })
+    const tpl = emailTemplates.shareBookingPage({
+      driverName: driver.displayName,
+      message,
+      publicUrl,
+      reviewUrl,
+    })
     const { sent } = await sendEmail({ to: email!, ...tpl })
     return { ok: true, channel, sent, message, publicUrl }
   }
