@@ -63,7 +63,6 @@ export default defineEventHandler(async (event) => {
     slug: driver.slug,
     displayName: driver.displayName,
     tagline: driver.tagline,
-    bio: driver.bio,
     photoUrl: publicPhotoUrl(driver, driverPhotoCount > 0),
     vehicle: {
       make: driver.vehicleMake,

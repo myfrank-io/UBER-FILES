@@ -24,7 +24,7 @@ const onboarding = computed(() => {
   if (!m) return null
   return computeOnboarding({
     hasPhoto: Boolean(m.photoUrl),
-    hasIntro: Boolean(m.bio || m.tagline),
+    hasIntro: Boolean(m.tagline),
     vehicleCount: m.vehicleCount ?? 0,
     hasPhone: Boolean(m.phone),
     hasServiceArea: Boolean(m.serviceArea),
