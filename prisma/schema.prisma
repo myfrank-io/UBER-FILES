@@ -260,6 +260,11 @@ model Surcharge {
   amount    Int // centimes si FIXED, points de base si PERCENT
   autoApply Boolean @default(false) // appliquée automatiquement à toute course
 
+  // Majoration « dernière minute » : si renseigné, ne s'applique que lorsque la
+  // course est réservée moins de X minutes avant la prise en charge (ex : 120 =
+  // commande passée moins de 2 h à l'avance). null = majoration classique.
+  maxLeadTimeMinutes Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
