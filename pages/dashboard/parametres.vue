@@ -1272,13 +1272,13 @@ async function call(key: string, fn: () => Promise<unknown>) {
         <div v-if="!googlePlace" class="mt-4">
           <form class="flex items-end gap-2" @submit.prevent="searchPlace">
             <div class="min-w-0 flex-1">
-              <label class="label" for="place-query">Nom de votre entreprise + ville</label>
+              <label class="label" for="place-query">Nom de votre entreprise + ville, ou lien Google Maps</label>
               <input
                 id="place-query"
                 v-model="placeQuery"
                 type="text"
                 class="field"
-                maxlength="200"
+                maxlength="500"
                 placeholder="Ex : Karim VTC Lyon"
               />
             </div>
@@ -1289,8 +1289,10 @@ async function call(key: string, fn: () => Promise<unknown>) {
 
           <div v-if="placeResults" class="mt-3 space-y-2">
             <p v-if="placeResults.length === 0" class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              Aucun établissement trouvé. Précisez le nom exact de votre fiche Google et votre
-              ville, ou collez directement votre lien d'avis ci-dessous.
+              Aucun établissement trouvé. Essayez le nom exact de votre fiche + votre ville, ou
+              <strong>collez le lien de votre fiche depuis l'app Google Maps</strong>
+              (votre fiche → Partager → Copier le lien) dans le champ ci-dessus.
+              En dernier recours, utilisez votre lien d'avis ci-dessous.
             </p>
             <button
               v-for="p in placeResults"
