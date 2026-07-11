@@ -96,20 +96,21 @@ async function logout() {
 
     <!-- Contenu -->
     <main class="flex-1 px-5 py-6 sm:px-8 sm:py-8">
-      <!-- Bandeau d'usurpation : l'admin visite l'espace d'un chauffeur -->
+      <!-- Bandeau d'usurpation : l'admin visite l'espace d'un chauffeur.
+           Une seule ligne compacte — l'info tient en un coup d'œil sur mobile. -->
       <div
         v-if="impersonator"
-        class="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-3 text-sm text-indigo-900"
+        :title="`Connecté en tant que ${impersonator.email}`"
+        class="mb-4 flex items-center justify-between gap-2 rounded-xl border border-indigo-200 bg-indigo-50 py-1 pl-3.5 pr-1 text-xs text-indigo-900 sm:text-sm"
       >
-        <p>
-          👁️ Vous consultez cet espace en tant qu'administrateur
-          (<strong>{{ impersonator.email }}</strong>). Vos modifications s'appliquent au chauffeur.
+        <p class="min-w-0 truncate">
+          👁️ <strong>Mode admin</strong> — vos modifications s'appliquent au chauffeur
         </p>
         <button
-          class="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 font-medium text-indigo-700 hover:bg-indigo-100"
+          class="flex min-h-[40px] shrink-0 items-center whitespace-nowrap rounded-lg px-2.5 font-semibold text-indigo-700 hover:bg-indigo-100"
           @click="stopImpersonation"
         >
-          ← Revenir à l'administration
+          ← Admin
         </button>
       </div>
 
