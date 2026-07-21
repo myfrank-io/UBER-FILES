@@ -106,7 +106,19 @@
     "cancelButton": "Annuler la course",
     "cancelling": "Annulation…",
     "cancelError": "Annulation impossible.",
-    "alreadyCancelled": "Cette course a été annulée."
+    "alreadyCancelled": "Cette course a été annulée.",
+    "modifyButton": "Modifier l'horaire",
+    "modifyTitle": "Nouvel horaire",
+    "modifyTimeLabel": "Nouvelle date et heure",
+    "modifySubmit": "Enregistrer le nouvel horaire",
+    "modifyCancel": "Annuler",
+    "modifySaving": "Enregistrement…",
+    "modifyError": "Modification impossible.",
+    "modifyAppliedTitle": "Horaire modifié ✅",
+    "modifyAppliedBody": "Votre course est maintenant prévue le {date}.",
+    "modifyPendingTitle": "Demande envoyée ⏳",
+    "modifyPendingBody": "La course étant proche, votre chauffeur doit valider ce changement. Votre horaire actuel reste valable tant qu'il n'a pas accepté.",
+    "modifyPendingBanner": "Modification en attente de validation du chauffeur : {date}."
   },
   "review": {
     "metaTitle": "Votre avis — {name}",

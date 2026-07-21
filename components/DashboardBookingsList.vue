@@ -89,6 +89,21 @@ async function markPaid(id: string) {
     markingPaid.value = null
   }
 }
+
+// Réponse à une demande de report d'horaire du client (course proche).
+const respondingReschedule = ref<string | null>(null)
+async function respondReschedule(id: string, action: 'accept' | 'refuse') {
+  respondingReschedule.value = id
+  try {
+    await $fetch(`/api/dashboard/bookings/${id}/reschedule`, { method: 'POST', body: { action } })
+    toastSuccess(action === 'accept' ? 'Nouvel horaire appliqué.' : 'Modification refusée.')
+    await refresh()
+  } catch (e) {
+    toastError((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.')
+  } finally {
+    respondingReschedule.value = null
+  }
+}
 </script>
 
 <template>
@@ -155,7 +170,7 @@ async function markPaid(id: string) {
               <p class="font-semibold text-slate-900">{{ b.customer.name }}</p>
               <StatusBadge :status="b.status" />
             </div>
-            <p class="mt-1 text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
+            <p class="mt-1 text-sm text-slate-600">{{ formatDateTime(b.scheduledAt, data?.timezone) }}</p>
             <!-- Adresses en texte simple sur la carte (le tap ouvre la fiche, où les
                  liens de navigation GPS restent disponibles). -->
             <div v-if="b.ride.type === 'TRANSFER'" class="mt-0.5 text-xs text-slate-500">
@@ -175,6 +190,34 @@ async function markPaid(id: string) {
             />
           </div>
           <p class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</p>
+        </div>
+
+        <!-- Demande de report d'horaire du client (course proche) : à valider. -->
+        <div
+          v-if="b.pendingScheduledAt && b.status === 'CONFIRMED'"
+          class="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3"
+          @click.stop
+        >
+          <p class="text-xs font-semibold text-amber-800">🗓️ Demande de modification d'horaire</p>
+          <p class="mt-0.5 text-sm text-slate-700">
+            Nouvel horaire souhaité : <strong>{{ formatDateTime(b.pendingScheduledAt, data?.timezone) }}</strong>
+          </p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button
+              class="btn-primary flex-1 !py-2 text-xs"
+              :disabled="respondingReschedule === b.id"
+              @click="respondReschedule(b.id, 'accept')"
+            >
+              {{ respondingReschedule === b.id ? '…' : 'Accepter' }}
+            </button>
+            <button
+              class="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              :disabled="respondingReschedule === b.id"
+              @click="respondReschedule(b.id, 'refuse')"
+            >
+              Refuser
+            </button>
+          </div>
         </div>
 
         <!-- Actions rapides regroupées sous un seul séparateur, hauteurs unifiées.

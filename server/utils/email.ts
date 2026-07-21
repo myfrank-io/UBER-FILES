@@ -975,4 +975,97 @@ export const emailTemplates = {
       ),
     }
   },
+  // ── Report d'horaire à l'initiative du CLIENT (self-service) ──
+  // Report appliqué directement (course pas imminente) : le client est confirmé.
+  rescheduleConfirmedCustomer(opts: {
+    driverName: string
+    oldScheduledAt: Date
+    newScheduledAt: Date
+    timezone: string
+    manageUrl: string
+    // true quand le report vient d'être accepté par le chauffeur (course proche).
+    acceptedByDriver?: boolean
+  }) {
+    const intro = opts.acceptedByDriver
+      ? `<p><strong>${esc(opts.driverName)}</strong> a accepté le nouvel horaire de votre course.</p>`
+      : `<p>Le nouvel horaire de votre course est confirmé.</p>`
+    return {
+      subject: `Nouvel horaire confirmé — ${opts.driverName}`,
+      html: wrap(
+        'Horaire modifié ✅',
+        `${intro}
+         <p style="color:#6C7889;text-decoration:line-through;margin:0">${formatRideDateTime(opts.oldScheduledAt, opts.timezone)}</p>
+         <p style="font-size:18px;font-weight:700;margin:2px 0 0">${formatRideDateTime(opts.newScheduledAt, opts.timezone)}</p>
+         ${button(opts.manageUrl, 'Voir ma réservation')}`,
+      ),
+    }
+  },
+  // Report demandé alors que la course est proche : en attente de validation du chauffeur.
+  reschedulePendingCustomer(opts: {
+    driverName: string
+    newScheduledAt: Date
+    timezone: string
+    manageUrl: string
+  }) {
+    return {
+      subject: `Demande de modification envoyée — ${opts.driverName}`,
+      html: wrap(
+        'Demande envoyée ⏳',
+        `<p>Votre demande de nouvel horaire (<strong>${formatRideDateTime(opts.newScheduledAt, opts.timezone)}</strong>)
+            a été transmise à <strong>${esc(opts.driverName)}</strong>.</p>
+         <p>La course étant proche, elle nécessite sa validation. Vous serez prévenu de sa réponse ;
+            <strong>votre horaire actuel reste valable</strong> tant qu'il n'a pas accepté.</p>
+         ${button(opts.manageUrl, 'Voir ma réservation')}`,
+      ),
+    }
+  },
+  // Le chauffeur refuse le report (course proche) : l'horaire d'origine est conservé.
+  rescheduleRefusedCustomer(opts: {
+    driverName: string
+    scheduledAt: Date
+    timezone: string
+    manageUrl: string
+  }) {
+    return {
+      subject: `Modification non retenue — ${opts.driverName}`,
+      html: wrap(
+        'Modification non retenue',
+        `<p>${esc(opts.driverName)} n'a pas pu accepter le nouvel horaire demandé.</p>
+         <p><strong>Votre course est maintenue à son horaire initial :</strong><br />
+            ${formatRideDateTime(opts.scheduledAt, opts.timezone)}.</p>
+         <p style="font-size:13px;color:#6C7889">Besoin d'un autre créneau ? Contactez directement votre chauffeur.</p>
+         ${button(opts.manageUrl, 'Voir ma réservation')}`,
+      ),
+    }
+  },
+  // Notification chauffeur d'un report client — informative (appliqué) ou avec
+  // action requise (à valider car la course est proche).
+  rescheduleDriver(opts: {
+    driverFirstName?: string
+    customerName: string
+    oldScheduledAt: Date
+    newScheduledAt: Date
+    timezone: string
+    dashboardUrl: string
+    // true : report en attente de validation (course proche) ; false : déjà appliqué.
+    needsApproval: boolean
+  }) {
+    const body = opts.needsApproval
+      ? `<p><strong>${esc(opts.customerName)}</strong> demande à déplacer sa course. La course
+            étant proche, <strong>votre validation est requise</strong> — vous pouvez accepter ou refuser.</p>`
+      : `<p><strong>${esc(opts.customerName)}</strong> a déplacé sa course. Votre calendrier est déjà à jour.</p>`
+    return {
+      subject: opts.needsApproval
+        ? `Demande de modification d'horaire — ${opts.customerName}`
+        : `Course déplacée — ${opts.customerName}`,
+      html: wrap(
+        opts.needsApproval ? 'Modification à valider ⏳' : 'Course déplacée 🗓️',
+        `${helloDriver(opts.driverFirstName)}
+         ${body}
+         <p style="color:#6C7889;text-decoration:line-through;margin:8px 0 0">${formatRideDateTime(opts.oldScheduledAt, opts.timezone)}</p>
+         <p style="font-size:18px;font-weight:700;margin:2px 0 0">${formatRideDateTime(opts.newScheduledAt, opts.timezone)}</p>
+         ${button(opts.dashboardUrl, opts.needsApproval ? 'Accepter ou refuser' : 'Voir mes réservations')}`,
+      ),
+    }
+  },
 }

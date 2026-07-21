@@ -198,3 +198,33 @@ export function preRideAlertMessage(opts: {
 
   return { text: lines.join('\n'), buttons: navButtons.length ? [navButtons] : [] }
 }
+
+/**
+ * Notifie le chauffeur d'un report d'horaire demandé par le client — soit
+ * informatif (déjà appliqué, course pas imminente), soit avec action requise
+ * (à valider depuis l'espace car la course est proche).
+ */
+export function rescheduleMessage(opts: {
+  driverDisplayName: string
+  customerName: string
+  oldScheduledAt: Date
+  newScheduledAt: Date
+  timezone: string
+  needsApproval: boolean
+}): { text: string } {
+  const lines = [
+    hello(opts.driverDisplayName),
+    opts.needsApproval
+      ? `🗓️ <b>Modification d'horaire à valider</b>`
+      : `🗓️ <b>Course déplacée</b>`,
+    `Client : ${escHtml(opts.customerName)}`,
+    `Avant : ${formatRideDateTime(opts.oldScheduledAt, opts.timezone)}`,
+    `Après : <b>${formatRideDateTime(opts.newScheduledAt, opts.timezone)}</b>`,
+  ]
+  if (opts.needsApproval) {
+    lines.push(`La course est proche : acceptez ou refusez depuis votre espace.`)
+  } else {
+    lines.push(`Votre calendrier est déjà à jour.`)
+  }
+  return { text: lines.join('\n') }
+}

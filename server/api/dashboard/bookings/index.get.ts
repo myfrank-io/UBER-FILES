@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
       : {}),
   }
 
-  const [bookings, total] = await Promise.all([
+  const [bookings, total, driver] = await Promise.all([
     prisma.booking.findMany({
       where,
       include: {
@@ -37,13 +37,18 @@ export default defineEventHandler(async (event) => {
       take: perPage,
     }),
     prisma.booking.count({ where }),
+    prisma.driver.findUniqueOrThrow({ where: { id: driverId }, select: { timezone: true } }),
   ])
 
   return {
+    // Fuseau du lieu de prise en charge : toutes les heures s'affichent ainsi.
+    timezone: driver.timezone,
     bookings: bookings.map((b) => ({
       id: b.id,
       status: b.status,
       scheduledAt: b.scheduledAt,
+      // Demande de report d'horaire en attente de validation (badge + actions côté chauffeur).
+      pendingScheduledAt: b.pendingScheduledAt,
       amountCents: b.amountCents,
       currency: b.quote.currency,
       customer: { name: b.customer.name, phone: b.customer.phone, email: b.customer.email },
