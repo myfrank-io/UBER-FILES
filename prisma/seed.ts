@@ -174,13 +174,16 @@ async function main() {
     ],
   })
 
-  // Mise à disposition : les 8 premières heures à 60 €/h, puis 50 €/h
+  // Mise à disposition : les 8 premières heures à 60 €/h, puis 50 €/h,
+  // puis 45 €/h au-delà de 12 h
   await prisma.driver.update({
     where: { id: driver.id },
     data: {
       hourlyRateCents: 6000,
       hourlyOvertimeAfterHours: 8,
       hourlyOvertimeRateCents: 5000,
+      hourlyOvertime2AfterHours: 12,
+      hourlyOvertime2RateCents: 4500,
     },
   })
 

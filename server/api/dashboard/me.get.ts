@@ -75,6 +75,8 @@ export default defineEventHandler(async (event) => {
     hourlyRateCents: driver.hourlyRateCents,
     hourlyOvertimeAfterHours: driver.hourlyOvertimeAfterHours,
     hourlyOvertimeRateCents: driver.hourlyOvertimeRateCents,
+    hourlyOvertime2AfterHours: driver.hourlyOvertime2AfterHours,
+    hourlyOvertime2RateCents: driver.hourlyOvertime2RateCents,
     cancellationPolicy: driver.cancellationPolicy,
     surcharges: driver.surcharges,
   }
