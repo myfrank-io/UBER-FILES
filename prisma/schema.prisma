@@ -162,12 +162,16 @@ model Driver {
   locale               String @default("fr")
 
   // Mise à disposition : tarif horaire de base, puis tarif réduit au-delà d'un
-  // seuil (« les 8 premières heures à 50 €/h, ensuite 40 €/h »). Chaque heure
-  // est facturée au tarif de sa tranche. hourlyRateCents null = mise à
-  // disposition non proposée ; seuil/tarif supp null = tarif unique.
-  hourlyRateCents          Int?
-  hourlyOvertimeAfterHours Int? // seuil en heures (les heures au-delà passent au tarif réduit)
-  hourlyOvertimeRateCents  Int?
+  // seuil (« les 8 premières heures à 50 €/h, ensuite 40 €/h »), et en option
+  // une seconde tranche au-delà d'un second seuil (« puis 30 €/h après 12 h »).
+  // Chaque heure est facturée au tarif de sa tranche. hourlyRateCents null =
+  // mise à disposition non proposée ; seuil/tarif supp null = tarif unique ;
+  // la seconde tranche n'existe que si la première est définie (seuil 2 > seuil 1).
+  hourlyRateCents           Int?
+  hourlyOvertimeAfterHours  Int? // seuil en heures (les heures au-delà passent au tarif réduit)
+  hourlyOvertimeRateCents   Int?
+  hourlyOvertime2AfterHours Int? // second seuil, strictement supérieur au premier
+  hourlyOvertime2RateCents  Int?
 
   // Relations
   user             User?

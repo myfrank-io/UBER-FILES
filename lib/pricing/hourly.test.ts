@@ -19,6 +19,13 @@ const rate: HourlyRateInput = {
 // Tarif unique, sans heures supplémentaires.
 const flatRate: HourlyRateInput = { pricePerHourCents: 6000 }
 
+// Deux tranches : 8 premières heures à 50 €/h, puis 40 €/h, puis 30 €/h au-delà de 12 h.
+const twoTierRate: HourlyRateInput = {
+  ...rate,
+  overtime2AfterHours: 12,
+  overtime2PricePerHourCents: 3000,
+}
+
 describe('priceHourly', () => {
   it('facture au tarif de base sous le seuil', () => {
     const r = priceHourly({ durationHours: 5, rate, surcharges: [], params })
@@ -38,6 +45,50 @@ describe('priceHourly', () => {
     expect(r.breakdown).toHaveLength(2)
     expect(r.breakdown[0]).toMatchObject({ label: 'Mise à disposition', amountCents: 40000 })
     expect(r.breakdown[1]).toMatchObject({ label: 'Heures supplémentaires', amountCents: 8000 })
+  })
+
+  it('facture la seconde tranche au-delà de son seuil', () => {
+    const r = priceHourly({ durationHours: 14, rate: twoTierRate, surcharges: [], params })
+    expect(r.amountCents).toBe(62000) // 8 × 50 € + 4 × 40 € + 2 × 30 €
+    expect(r.breakdown).toHaveLength(3)
+    expect(r.breakdown[0]).toMatchObject({ label: 'Mise à disposition', amountCents: 40000 })
+    expect(r.breakdown[1]).toMatchObject({
+      label: "Heures supplémentaires (jusqu'à 12 h)",
+      amountCents: 16000,
+    })
+    expect(r.breakdown[2]).toMatchObject({
+      label: 'Heures supplémentaires (au-delà de 12 h)',
+      amountCents: 6000,
+    })
+  })
+
+  it('n\'entame pas la seconde tranche sous son seuil', () => {
+    const r = priceHourly({ durationHours: 10, rate: twoTierRate, surcharges: [], params })
+    expect(r.amountCents).toBe(48000) // 8 × 50 € + 2 × 40 €, identique à une seule tranche
+    expect(r.breakdown).toHaveLength(2)
+    expect(r.breakdown[1]).toMatchObject({ label: 'Heures supplémentaires' })
+  })
+
+  it('ignore une seconde tranche sans première tranche', () => {
+    const r = priceHourly({
+      durationHours: 14,
+      rate: { pricePerHourCents: 5000, overtime2AfterHours: 12, overtime2PricePerHourCents: 3000 },
+      surcharges: [],
+      params,
+    })
+    expect(r.amountCents).toBe(70000) // 14 × 50 €
+    expect(r.breakdown).toHaveLength(1)
+  })
+
+  it('ignore une seconde tranche dont le seuil ne dépasse pas le premier', () => {
+    const r = priceHourly({
+      durationHours: 14,
+      rate: { ...rate, overtime2AfterHours: 8, overtime2PricePerHourCents: 3000 },
+      surcharges: [],
+      params,
+    })
+    expect(r.amountCents).toBe(64000) // 8 × 50 € + 6 × 40 € : la config incohérente est ignorée
+    expect(r.breakdown).toHaveLength(2)
   })
 
   it('ne facture jamais moins pour une durée plus longue', () => {

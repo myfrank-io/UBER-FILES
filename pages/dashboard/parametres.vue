@@ -592,7 +592,7 @@ async function deleteBand(id: string) {
   )
 }
 
-// ─── Mise à disposition : tarif de base + heure supplémentaire ─────────────
+// ─── Mise à disposition : tarif de base + heure supplémentaire + 2e tranche ─
 
 const hourly = reactive({
   enabled: false,
@@ -600,6 +600,9 @@ const hourly = reactive({
   overtimeEnabled: false,
   overtimeAfterHours: 8,
   overtimeRateEuros: '',
+  overtime2Enabled: false,
+  overtime2AfterHours: 12,
+  overtime2RateEuros: '',
 })
 
 watchEffect(() => {
@@ -608,11 +611,16 @@ watchEffect(() => {
   const rate = d.hourlyRateCents as number | null
   const otAfter = d.hourlyOvertimeAfterHours as number | null
   const otRate = d.hourlyOvertimeRateCents as number | null
+  const ot2After = d.hourlyOvertime2AfterHours as number | null
+  const ot2Rate = d.hourlyOvertime2RateCents as number | null
   hourly.enabled = rate != null
   hourly.pricePerHourEuros = rate != null ? (rate / 100).toFixed(2) : ''
   hourly.overtimeEnabled = otAfter != null && otRate != null
   hourly.overtimeAfterHours = otAfter ?? 8
   hourly.overtimeRateEuros = otRate != null ? (otRate / 100).toFixed(2) : ''
+  hourly.overtime2Enabled = ot2After != null && ot2Rate != null
+  hourly.overtime2AfterHours = ot2After ?? 12
+  hourly.overtime2RateEuros = ot2Rate != null ? (ot2Rate / 100).toFixed(2) : ''
 })
 
 // `v` peut être un nombre : v-model sur un input type="number" caste
@@ -631,23 +639,45 @@ const hourlyOvertimeValid = computed(
     hourly.overtimeAfterHours <= 23,
 )
 
+// La seconde tranche n'existe que comme prolongement de la première : son
+// seuil doit dépasser strictement le premier.
+const hourlyOvertime2Active = computed(() => hourly.overtimeEnabled && hourly.overtime2Enabled)
+const hourlyOvertime2CentsInput = computed(() => eurosToCents(hourly.overtime2RateEuros))
+const hourlyOvertime2Valid = computed(
+  () =>
+    hourlyOvertime2CentsInput.value != null &&
+    hourly.overtime2AfterHours > hourly.overtimeAfterHours &&
+    hourly.overtime2AfterHours <= 23,
+)
+
 // Phrase récapitulative : le paramétrage se relit d'une traite, impossible à
 // mal interpréter (« Les 8 premières heures à 50 €/h, puis 40 €/h… »).
 const hourlyRecap = computed(() => {
   const base = hourlyRateCentsInput.value
   if (!base) return ''
   if (hourly.overtimeEnabled && hourlyOvertimeValid.value) {
-    return `Les ${hourly.overtimeAfterHours} premières heures à ${formatMoney(base, currency.value)}/h, puis ${formatMoney(hourlyOvertimeCentsInput.value!, currency.value)}/h par heure supplémentaire.`
+    const first = `Les ${hourly.overtimeAfterHours} premières heures à ${formatMoney(base, currency.value)}/h`
+    if (hourlyOvertime2Active.value && hourlyOvertime2Valid.value) {
+      return `${first}, puis ${formatMoney(hourlyOvertimeCentsInput.value!, currency.value)}/h jusqu'à la ${hourly.overtime2AfterHours}e heure, puis ${formatMoney(hourlyOvertime2CentsInput.value!, currency.value)}/h par heure supplémentaire.`
+    }
+    return `${first}, puis ${formatMoney(hourlyOvertimeCentsInput.value!, currency.value)}/h par heure supplémentaire.`
   }
   return `Tarif unique : ${formatMoney(base, currency.value)}/h, quelle que soit la durée.`
 })
 
-// Exemple chiffré au-delà du seuil : montre le devis en deux lignes.
+// Exemple chiffré au-delà du dernier seuil : montre le devis ligne par ligne.
 const hourlyExample = computed(() => {
   const base = hourlyRateCentsInput.value
   if (!base || !hourly.overtimeEnabled || !hourlyOvertimeValid.value) return ''
   const after = hourly.overtimeAfterHours
   const ot = hourlyOvertimeCentsInput.value!
+  if (hourlyOvertime2Active.value && hourlyOvertime2Valid.value) {
+    const after2 = hourly.overtime2AfterHours
+    const ot2 = hourlyOvertime2CentsInput.value!
+    const midHours = after2 - after
+    const total = base * after + ot * midHours + ot2 * 2
+    return `Exemple : ${after2 + 2} h = ${after} h × ${formatMoney(base, currency.value)} + ${midHours} h × ${formatMoney(ot, currency.value)} + 2 h × ${formatMoney(ot2, currency.value)} = ${formatMoney(total, currency.value)}.`
+  }
   const total = base * after + ot * 2
   return `Exemple : ${after + 2} h = ${after} h × ${formatMoney(base, currency.value)} + 2 h × ${formatMoney(ot, currency.value)} = ${formatMoney(total, currency.value)}.`
 })
@@ -656,7 +686,9 @@ const hourlySaveDisabled = computed(
   () =>
     saving.value === 'hourly' ||
     (hourly.enabled &&
-      (!hourlyRateCentsInput.value || (hourly.overtimeEnabled && !hourlyOvertimeValid.value))),
+      (!hourlyRateCentsInput.value ||
+        (hourly.overtimeEnabled && !hourlyOvertimeValid.value) ||
+        (hourlyOvertime2Active.value && !hourlyOvertime2Valid.value))),
 )
 
 async function saveHourly() {
@@ -669,6 +701,10 @@ async function saveHourly() {
             pricePerHourCents: hourlyRateCentsInput.value,
             overtimeAfterHours: hourly.overtimeEnabled ? hourly.overtimeAfterHours : null,
             overtimeRateCents: hourly.overtimeEnabled ? hourlyOvertimeCentsInput.value : null,
+            overtime2AfterHours: hourlyOvertime2Active.value ? hourly.overtime2AfterHours : null,
+            overtime2RateCents: hourlyOvertime2Active.value
+              ? hourlyOvertime2CentsInput.value
+              : null,
           }
         : { enabled: false },
     }),
@@ -1050,13 +1086,13 @@ async function call(key: string, fn: () => Promise<unknown>) {
         </button>
       </div>
 
-      <!-- Mise à disposition : tarif de base + heure supplémentaire -->
+      <!-- Mise à disposition : tarif de base + heure supplémentaire + 2e tranche -->
       <form class="card space-y-4" @submit.prevent="saveHourly">
         <div>
           <h2 class="font-semibold text-slate-900">Mise à disposition — prix à l'heure</h2>
           <p class="mt-1 text-sm text-slate-600">
-            Votre tarif horaire et, si vous le souhaitez, un tarif réduit au-delà d'un
-            certain nombre d'heures.
+            Votre tarif horaire et, si vous le souhaitez, une ou deux tranches de prix
+            réduites au-delà d'un certain nombre d'heures.
           </p>
         </div>
 
@@ -1076,16 +1112,34 @@ async function call(key: string, fn: () => Promise<unknown>) {
             Tarif réduit pour les heures supplémentaires
           </label>
 
-          <div v-if="hourly.overtimeEnabled" class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="label" for="hourly-after">Au-delà de (heures)</label>
-              <input id="hourly-after" v-model.number="hourly.overtimeAfterHours" type="number" min="1" max="23" class="field" />
+          <template v-if="hourly.overtimeEnabled">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="label" for="hourly-after">Au-delà de (heures)</label>
+                <input id="hourly-after" v-model.number="hourly.overtimeAfterHours" type="number" min="1" max="23" class="field" />
+              </div>
+              <div>
+                <label class="label" for="hourly-overtime">Heure supplémentaire (€/h)</label>
+                <input id="hourly-overtime" v-model="hourly.overtimeRateEuros" type="number" step="0.01" min="0.01" class="field" placeholder="40,00" />
+              </div>
             </div>
-            <div>
-              <label class="label" for="hourly-overtime">Heure supplémentaire (€/h)</label>
-              <input id="hourly-overtime" v-model="hourly.overtimeRateEuros" type="number" step="0.01" min="0.01" class="field" placeholder="40,00" />
+
+            <label class="flex items-center gap-2.5 py-1 text-sm text-slate-600">
+              <input v-model="hourly.overtime2Enabled" type="checkbox" class="h-5 w-5 shrink-0 rounded accent-brand-600" />
+              Nouvelle tranche de prix au-delà d'un certain nombre d'heures
+            </label>
+
+            <div v-if="hourly.overtime2Enabled" class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="label" for="hourly-after-2">Au-delà de (heures)</label>
+                <input id="hourly-after-2" v-model.number="hourly.overtime2AfterHours" type="number" :min="hourly.overtimeAfterHours + 1" max="23" class="field" />
+              </div>
+              <div>
+                <label class="label" for="hourly-overtime-2">Heure supplémentaire (€/h)</label>
+                <input id="hourly-overtime-2" v-model="hourly.overtime2RateEuros" type="number" step="0.01" min="0.01" class="field" placeholder="35,00" />
+              </div>
             </div>
-          </div>
+          </template>
 
           <div v-if="hourlyRecap" class="rounded-xl bg-brand-50 px-4 py-3">
             <p class="text-sm font-medium text-slate-900">{{ hourlyRecap }}</p>

@@ -45,6 +45,10 @@ export interface HourlyRateInput {
   overtimeAfterHours?: number | null
   /** Tarif des heures supplémentaires (centimes). */
   overtimePricePerHourCents?: number | null
+  /** Second seuil (heures), strictement supérieur au premier. */
+  overtime2AfterHours?: number | null
+  /** Tarif des heures au-delà du second seuil (centimes). */
+  overtime2PricePerHourCents?: number | null
 }
 
 export interface BreakdownLine {
