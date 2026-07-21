@@ -141,7 +141,7 @@ async function confirmOnSite() {
           <p v-if="terminalLabel(quote.ride.pickupAddress, quote.ride.pickupTerminal)" class="text-slate-500">
             🚪 {{ terminalLabel(quote.ride.pickupAddress, quote.ride.pickupTerminal) }}
           </p>
-          <p>{{ $t('quote.on', { date: formatDateTime(quote.ride.scheduledAt) }) }}</p>
+          <p>{{ $t('quote.on', { date: formatDateTime(quote.ride.scheduledAt, quote.timezone) }) }}</p>
         </div>
 
         <ul class="mt-4 space-y-1 border-t border-slate-100 pt-4 text-xs text-slate-500">
@@ -166,7 +166,7 @@ async function confirmOnSite() {
           {{ $t('quote.rejectedBody') }}
         </div>
         <template v-else-if="quote.status === 'SENT'">
-          <p class="mt-2 text-xs text-slate-400">{{ $t('quote.validUntil', { date: formatDateTime(quote.expiresAt) }) }}</p>
+          <p class="mt-2 text-xs text-slate-400">{{ $t('quote.validUntil', { date: formatDateTime(quote.expiresAt, quote.timezone) }) }}</p>
 
           <!-- Retour de paiement sans confirmation : le client a peut-être quitté sans payer -->
           <p v-if="paymentUnconfirmed" class="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">

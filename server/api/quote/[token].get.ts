@@ -52,6 +52,8 @@ export default defineEventHandler(async (event) => {
       onSiteMethods: mode.onSiteMethods,
     },
     driver: { displayName: quote.driver.displayName, slug: quote.driver.slug },
+    // Fuseau du lieu de prise en charge : l'heure du devis s'affiche toujours ainsi.
+    timezone: quote.driver.timezone,
     ride: {
       type: quote.rideRequest.type,
       scheduledAt: quote.rideRequest.scheduledAt,

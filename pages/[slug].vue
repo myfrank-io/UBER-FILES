@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // Page publique de réservation d'un chauffeur (marque blanche, mobile-first).
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
+import { timezoneLabel } from '~/lib/datetime'
 
 const route = useRoute()
 const slug = route.params.slug as string
@@ -40,6 +42,8 @@ interface DriverPublic {
   vehicles: PublicVehicle[]
   reviewUrl: string | null
   currency: string
+  // Fuseau du lieu de prise en charge : l'heure saisie y est ancrée (pas au navigateur).
+  timezone: string
   minimumFareCents: number
   minLeadTimeMinutes: number
   hasTransfer: boolean
@@ -133,10 +137,22 @@ const customer = reactive({ name: '', phone: '', email: '' })
 const notes = ref('')
 const cgvAccepted = ref(false)
 
-function toDatetimeLocal(d: Date): string {
-  // format pour <input type="datetime-local"> (heure locale)
-  const off = d.getTimezoneOffset() * 60000
-  return new Date(d.getTime() - off).toISOString().slice(0, 16)
+// Fuseau du lieu de prise en charge (chauffeur). TOUTE heure saisie/affichée est
+// ancrée dessus, jamais sur le fuseau du navigateur du client — sinon un client
+// dans un autre fuseau (ex : Antilles) verrait/enverrait une heure décalée.
+const driverTz = computed(() => driver.value?.timezone ?? 'Europe/Paris')
+const tzHint = computed(() => timezoneLabel(driverTz.value, locale.value === 'en' ? 'en' : 'fr'))
+
+// Un instant (Date UTC) → chaîne « yyyy-MM-ddTHH:mm » pour <input datetime-local>,
+// exprimée dans le fuseau du chauffeur (l'input, lui, n'a pas de notion de fuseau).
+function toDriverLocalInput(d: Date): string {
+  return formatInTimeZone(d, driverTz.value, "yyyy-MM-dd'T'HH:mm")
+}
+
+// L'heure murale saisie (sans fuseau) → instant UTC, interprétée dans le fuseau
+// du chauffeur. C'est ce qui corrige le bug : « 11:30 » = 11:30 sur le lieu.
+function driverLocalToInstant(local: string): Date {
+  return fromZonedTime(local, driverTz.value)
 }
 
 function defaultDateTime(): string {
@@ -145,13 +161,13 @@ function defaultDateTime(): string {
   d.setMinutes(0, 0, 0)
   // L'arrondi à l'heure ne doit pas retomber sous le délai minimum.
   if (d.getTime() < Date.now() + leadMs) d.setTime(d.getTime() + 3600_000)
-  return toDatetimeLocal(d)
+  return toDriverLocalInput(d)
 }
 
 // Borne basse du sélecteur : impossible de choisir une date déjà passée ou sous le
 // délai minimum de réservation (l'erreur n'apparaissait sinon qu'à l'estimation).
 const minScheduledAt = computed(() =>
-  toDatetimeLocal(new Date(Date.now() + (driver.value?.minLeadTimeMinutes ?? 0) * 60_000)),
+  toDriverLocalInput(new Date(Date.now() + (driver.value?.minLeadTimeMinutes ?? 0) * 60_000)),
 )
 
 // Fenêtre en clair : « 45 min », « 2 h », « 1 h 30 ».
@@ -167,7 +183,7 @@ function formatLeadWindow(minutes: number): string {
 const lastMinuteNotice = computed(() => {
   const s = driver.value?.lastMinuteSurcharge
   if (!s || !scheduledAt.value) return ''
-  const leadMs = new Date(scheduledAt.value).getTime() - Date.now()
+  const leadMs = driverLocalToInstant(scheduledAt.value).getTime() - Date.now()
   if (Number.isNaN(leadMs) || leadMs >= s.maxLeadTimeMinutes * 60_000) return ''
   return t('public.lastMinuteNotice', {
     window: formatLeadWindow(s.maxLeadTimeMinutes),
@@ -252,7 +268,9 @@ async function resolveCoords(
 }
 
 function isoScheduledAt(): string {
-  return new Date(scheduledAt.value).toISOString()
+  // L'heure murale choisie est interprétée dans le fuseau du chauffeur (lieu de
+  // prise en charge), puis envoyée au serveur en ISO UTC.
+  return driverLocalToInstant(scheduledAt.value).toISOString()
 }
 
 async function buildPayload() {
@@ -548,7 +566,10 @@ function goToContact() {
             </template>
 
             <div>
-              <label class="label" for="datetime">{{ $t('public.datetimeLabel') }}</label>
+              <label class="label" for="datetime">
+                {{ $t('public.datetimeLabel') }}
+                <span class="font-normal text-slate-400">({{ tzHint }})</span>
+              </label>
               <input id="datetime" v-model="scheduledAt" type="datetime-local" class="field" :min="minScheduledAt" />
               <p class="mt-1 text-xs text-slate-500">
                 {{ $t('public.leadTime', { hours: Math.round(driver.minLeadTimeMinutes / 60) }) }}

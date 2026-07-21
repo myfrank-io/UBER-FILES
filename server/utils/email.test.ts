@@ -4,6 +4,7 @@ import { emailTemplates } from './email'
 const base = {
   customerName: 'Ali & Fils <script>alert(1)</script>',
   scheduledAt: new Date('2026-08-15T14:30:00Z'),
+  timezone: 'Europe/Paris',
 }
 
 describe('emailTemplates client', () => {
@@ -37,6 +38,7 @@ describe('emailTemplates client', () => {
       expiresAt: new Date('2026-08-16T14:30:00Z'),
       type: 'TRANSFER',
       scheduledAt: base.scheduledAt,
+      timezone: base.timezone,
       pickupAddress: '11 rue du Muguet',
       dropoffAddress: 'Place de Brest',
       originalAmountCents: 5000,
@@ -57,6 +59,7 @@ describe('emailTemplates client', () => {
       expiresAt: new Date('2026-08-16T14:30:00Z'),
       type: 'HOURLY',
       scheduledAt: base.scheduledAt,
+      timezone: base.timezone,
       durationHours: 3,
       originalAmountCents: 6000,
     })
@@ -98,6 +101,7 @@ describe('emailTemplates client — variantes des flux', () => {
       onSiteAvailable: true,
       type: 'TRANSFER',
       scheduledAt: base.scheduledAt,
+      timezone: base.timezone,
       pickupAddress: 'A',
       dropoffAddress: 'B',
       originalAmountCents: 5000,
@@ -117,6 +121,7 @@ describe('emailTemplates client — variantes des flux', () => {
       onSiteAvailable: true,
       type: 'HOURLY',
       scheduledAt: base.scheduledAt,
+      timezone: base.timezone,
       durationHours: 3,
       originalAmountCents: 6000,
     })
@@ -130,6 +135,7 @@ describe('emailTemplates client — variantes des flux', () => {
       amountCents: 8000,
       currency: 'EUR',
       scheduledAt: base.scheduledAt,
+      timezone: base.timezone,
       method: 'ONSITE_CASH',
       manageUrl: 'https://app.test/reservation/tok',
       acceptedByDriver: true,
@@ -161,6 +167,7 @@ describe('emailTemplates client — variantes des flux', () => {
     const tpl = emailTemplates.reminder({
       driverName: 'Karim VTC',
       scheduledAt: base.scheduledAt,
+      timezone: base.timezone,
       manageUrl: 'https://app.test/reservation/tok',
       amountCents: 8550,
       currency: 'EUR',
@@ -174,6 +181,7 @@ describe('emailTemplates client — variantes des flux', () => {
     const noPayment = emailTemplates.reminder({
       driverName: 'Karim VTC',
       scheduledAt: base.scheduledAt,
+      timezone: base.timezone,
       manageUrl: 'https://app.test/reservation/tok',
     })
     expect(noPayment.html).not.toContain('règlement sur place')
@@ -210,6 +218,7 @@ describe('emailTemplates chauffeur', () => {
       customerName: 'Paul <b>!</b>',
       customerPhone: '+33788764719',
       scheduledAt: new Date('2026-08-15T14:30:00Z'),
+      timezone: 'Europe/Paris',
       type: 'TRANSFER',
       pickupAddress: '11 rue du Muguet, Brest',
       dropoffAddress: 'Place de Brest, Le Mans',

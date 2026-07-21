@@ -2,6 +2,7 @@
 // renvoie un succès simulé (dev/test). Tous les emails client passent par ici.
 import { formatMoney } from '~/lib/money'
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
+import { formatRideDate, formatRideDateTime, formatRideTime } from '~/lib/datetime'
 
 interface SendArgs {
   to: string
@@ -103,6 +104,7 @@ export const emailTemplates = {
     driverName: string
     type: 'TRANSFER' | 'HOURLY'
     scheduledAt: Date
+    timezone: string
     pickupAddress?: string | null
     dropoffAddress?: string | null
     roundTrip?: boolean
@@ -131,7 +133,7 @@ export const emailTemplates = {
          <p>Nous avons bien reçu votre demande de réservation : elle vient d'être
             <strong>transmise à ${esc(opts.driverName)}</strong>.</p>
          <div style="background:#FBF7F0;border:1px solid #EFE7D8;border-radius:8px;padding:16px;margin:16px 0">
-           📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
+           📅 <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong><br />
            📍 ${trajet}<br />
            💶 Montant estimé : <strong>${formatMoney(opts.amountCents, opts.currency)}</strong>
          </div>
@@ -156,6 +158,7 @@ export const emailTemplates = {
     // Récap de la course (rappelé dans l'email).
     type: 'TRANSFER' | 'HOURLY'
     scheduledAt: Date
+    timezone: string
     pickupAddress?: string | null
     dropoffAddress?: string | null
     roundTrip?: boolean
@@ -196,12 +199,12 @@ export const emailTemplates = {
         'Votre devis est prêt',
         `${intro}
          <div style="background:#FBF7F0;border:1px solid #EFE7D8;border-radius:8px;padding:16px;margin:16px 0">
-           📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
+           📅 <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong><br />
            📍 ${trajet}
          </div>
          ${priceBlock}
          ${button(opts.payUrl, label)}
-         <p style="font-size:13px;color:#6C7889">Devis valable jusqu'au ${opts.expiresAt.toLocaleString('fr-FR')}.</p>`,
+         <p style="font-size:13px;color:#6C7889">Devis valable jusqu'au ${formatRideDateTime(opts.expiresAt, opts.timezone)}.</p>`,
       ),
     }
   },
@@ -221,6 +224,7 @@ export const emailTemplates = {
     onSiteAvailable?: boolean
     type: 'TRANSFER' | 'HOURLY'
     scheduledAt: Date
+    timezone: string
     pickupAddress?: string | null
     dropoffAddress?: string | null
     roundTrip?: boolean
@@ -230,9 +234,7 @@ export const emailTemplates = {
       opts.type === 'TRANSFER'
         ? `${esc(opts.pickupAddress ?? '?')} → ${esc(opts.dropoffAddress ?? '?')}${opts.roundTrip ? ' (aller-retour)' : ''}`
         : `Mise à disposition ${opts.durationHours ?? '?'} h${opts.pickupAddress ? ` — départ : ${esc(opts.pickupAddress)}` : ''}`
-    const dateStr = opts.scheduledAt.toLocaleString('fr-FR', {
-      weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
-    })
+    const dateStr = formatRideDateTime(opts.scheduledAt, opts.timezone)
     const onsiteOnly = opts.prepayment === false
     const invite = onsiteOnly
       ? `il ne vous reste qu'à <strong>confirmer votre réservation</strong> — le règlement se fera sur place, le jour de la course`
@@ -241,7 +243,7 @@ export const emailTemplates = {
         : `il ne vous reste qu'à <strong>procéder au paiement</strong>`
     const label = onsiteOnly ? 'Confirmer ma réservation' : 'Payer et confirmer ma course'
     return {
-      subject: `Rappel — confirmez votre course du ${opts.scheduledAt.toLocaleDateString('fr-FR')} · ${opts.driverName}`,
+      subject: `Rappel — confirmez votre course du ${formatRideDate(opts.scheduledAt, opts.timezone)} · ${opts.driverName}`,
       html: wrap(
         'Votre course attend votre confirmation ⏳',
         `<p>Bonjour${opts.customerName ? ` ${esc(opts.customerName)}` : ''},</p>
@@ -253,7 +255,7 @@ export const emailTemplates = {
          <p style="margin:8px 0;font-family:Georgia,'Times New Roman',serif;font-size:30px;color:#0E1B2C">${formatMoney(opts.amountCents, opts.currency)}</p>
          <p>Le créneau n'est pas encore bloqué : ${invite}.</p>
          ${button(opts.payUrl, label)}
-         <p style="font-size:13px;color:#6C7889">Offre valable jusqu'au ${opts.expiresAt.toLocaleString('fr-FR')} — passé ce délai, le créneau est libéré.</p>`,
+         <p style="font-size:13px;color:#6C7889">Offre valable jusqu'au ${formatRideDateTime(opts.expiresAt, opts.timezone)} — passé ce délai, le créneau est libéré.</p>`,
       ),
     }
   },
@@ -262,6 +264,7 @@ export const emailTemplates = {
     amountCents: number
     currency: string
     scheduledAt: Date
+    timezone: string
     manageUrl: string
     driverPhone?: string | null
     driverEmail?: string | null
@@ -281,7 +284,7 @@ export const emailTemplates = {
       html: wrap(
         'Votre réservation est confirmée ✅',
         `<p>Le paiement de <strong>${formatMoney(opts.amountCents, opts.currency)}</strong> a bien été reçu.</p>
-         <p>Prise en charge le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
+         <p>Prise en charge le <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong>.</p>
          ${contactBlock('Votre chauffeur', { name: opts.driverName, phone: opts.driverPhone, email: opts.driverEmail })}
          ${button(opts.manageUrl, 'Gérer ma réservation')}
          <hr style="border:none;border-top:1px solid #EFE7D8;margin:16px 0" />
@@ -295,6 +298,7 @@ export const emailTemplates = {
     amountCents: number
     currency: string
     scheduledAt: Date
+    timezone: string
     method: PaymentMethod
     manageUrl: string
     driverPhone?: string | null
@@ -325,7 +329,7 @@ export const emailTemplates = {
         'Votre réservation est confirmée ✅',
         `${intro}
          <p style="font-size:13px;color:#3C4A5A">Moyen de paiement prévu : <strong>${PAYMENT_METHOD_LABELS[opts.method]}</strong>.</p>
-         <p>Prise en charge le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
+         <p>Prise en charge le <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong>.</p>
          ${contactBlock('Votre chauffeur', { name: opts.driverName, phone: opts.driverPhone, email: opts.driverEmail })}
          ${button(opts.manageUrl, 'Gérer ma réservation')}
          <hr style="border:none;border-top:1px solid #EFE7D8;margin:16px 0" />
@@ -341,6 +345,7 @@ export const emailTemplates = {
     customerPhone?: string | null
     type: 'TRANSFER' | 'HOURLY'
     scheduledAt: Date
+    timezone: string
     pickupAddress?: string | null
     dropoffAddress?: string | null
     roundTrip?: boolean
@@ -375,7 +380,7 @@ export const emailTemplates = {
         'Nouvelle demande de course 🚗',
         `${helloDriver(opts.driverFirstName)}
          <p><strong>${esc(opts.customerName)}</strong>${opts.customerPhone ? ` (${esc(opts.customerPhone)})` : ''} souhaite réserver :</p>
-         <p>📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
+         <p>📅 <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong><br />
             📍 ${trajet}</p>
          <p>Prix calculé : <strong style="font-size:20px">${formatMoney(opts.amountCents, opts.currency)}</strong></p>
          ${opts.paymentLabel ? `<p style="font-size:13px;color:#3C4A5A">💶 Règlement prévu : <strong>${esc(opts.paymentLabel)}</strong></p>` : ''}
@@ -391,6 +396,7 @@ export const emailTemplates = {
     customerPhone?: string | null
     customerEmail?: string | null
     scheduledAt: Date
+    timezone: string
     amountCents: number
     currency: string
     // true : payé en ligne ; false : à encaisser sur place (method précise le moyen)
@@ -410,16 +416,17 @@ export const emailTemplates = {
     const paiement = opts.paidOnline
       ? `<strong>${formatMoney(opts.amountCents, opts.currency)}</strong> payés en ligne.`
       : `<strong>${formatMoney(opts.amountCents, opts.currency)}</strong> à encaisser sur place${opts.method ? ` (${PAYMENT_METHOD_SHORT_LABELS[opts.method]})` : ''}.`
+    const dateStr = formatRideDateTime(opts.scheduledAt, opts.timezone)
     const intro = opts.autoConfirmed
       ? `<p><strong>${esc(opts.customerName)}</strong> vient de réserver : la course du
-         <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong> a été <strong>confirmée
+         <strong>${dateStr}</strong> a été <strong>confirmée
          automatiquement</strong> (créneau libre).</p>`
       : opts.acceptedByDriver
         ? `<p>Vous avez accepté la réservation de <strong>${esc(opts.customerName)}</strong> :
-           la course du <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong> est confirmée.</p>`
-        : `<p><strong>${esc(opts.customerName)}</strong> a confirmé sa course du <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>`
+           la course du <strong>${dateStr}</strong> est confirmée.</p>`
+        : `<p><strong>${esc(opts.customerName)}</strong> a confirmé sa course du <strong>${dateStr}</strong>.</p>`
     return {
-      subject: `Course confirmée — ${opts.customerName} (${opts.scheduledAt.toLocaleString('fr-FR')})`,
+      subject: `Course confirmée — ${opts.customerName} (${formatRideDateTime(opts.scheduledAt, opts.timezone, 'fr', { withZone: false })})`,
       html: wrap(
         'Course confirmée ✅',
         `${helloDriver(opts.driverFirstName)}
@@ -436,6 +443,7 @@ export const emailTemplates = {
     driverFirstName?: string
     customerName: string
     scheduledAt: Date
+    timezone: string
     refundCents: number
     currency: string
   }) {
@@ -443,11 +451,11 @@ export const emailTemplates = {
       ? `Remboursement client : ${formatMoney(opts.refundCents, opts.currency)}.`
       : 'Aucun remboursement automatique effectué.'
     return {
-      subject: `Course annulée — ${opts.customerName} (${opts.scheduledAt.toLocaleString('fr-FR')})`,
+      subject: `Course annulée — ${opts.customerName} (${formatRideDateTime(opts.scheduledAt, opts.timezone, 'fr', { withZone: false })})`,
       html: wrap(
         'Annulation client ❌',
         `${helloDriver(opts.driverFirstName)}
-         <p><strong>${esc(opts.customerName)}</strong> a annulé sa réservation prévue le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
+         <p><strong>${esc(opts.customerName)}</strong> a annulé sa réservation prévue le <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong>.</p>
          <p>${refundStr}</p>
          <p>Le créneau est libéré dans votre calendrier.</p>`,
       ),
@@ -462,6 +470,7 @@ export const emailTemplates = {
     customerName: string
     customerPhone?: string | null
     scheduledAt: Date
+    timezone: string
     type: 'TRANSFER' | 'HOURLY'
     durationHours?: number | null
     pickupAddress?: string | null
@@ -480,11 +489,11 @@ export const emailTemplates = {
       opts.wazeUrl ? button(opts.wazeUrl, '🚗 Lancer Waze') : '',
     ].filter(Boolean).join('')
     return {
-      subject: `⏰ Course dans ~2 h — ${opts.customerName} (${opts.scheduledAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })})`,
+      subject: `⏰ Course dans ~2 h — ${opts.customerName} (${formatRideTime(opts.scheduledAt, opts.timezone)})`,
       html: wrap(
         'Votre course approche ⏰',
         `${helloDriver(opts.driverFirstName)}
-         <p>Prise en charge le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
+         <p>Prise en charge le <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong>.</p>
          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0">
            ${trajet}
          </div>
@@ -497,6 +506,7 @@ export const emailTemplates = {
   reminder(opts: {
     driverName: string
     scheduledAt: Date
+    timezone: string
     manageUrl: string
     // Coordonnées du chauffeur : le client peut l'appeler ou lui écrire en un geste.
     driverPhone?: string | null
@@ -516,7 +526,7 @@ export const emailTemplates = {
       subject: `Rappel : votre course demain — ${opts.driverName}`,
       html: wrap(
         'Rappel de course',
-        `<p>Votre course avec ${opts.driverName} est prévue le <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>.</p>
+        `<p>Votre course avec ${opts.driverName} est prévue le <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong>.</p>
          ${paymentLine}
          ${contactBlock('Votre chauffeur', { name: opts.driverName, phone: opts.driverPhone, email: opts.driverEmail })}
          ${button(opts.manageUrl, 'Voir ma réservation')}`,
@@ -530,6 +540,7 @@ export const emailTemplates = {
     driverName: string
     type: 'TRANSFER' | 'HOURLY'
     scheduledAt: Date
+    timezone: string
     pickupAddress?: string | null
     dropoffAddress?: string | null
     roundTrip?: boolean
@@ -548,7 +559,7 @@ export const emailTemplates = {
          <p>${esc(opts.driverName)} n'est malheureusement <strong>pas disponible</strong> pour
             cette course :</p>
          <div style="background:#FBF7F0;border:1px solid #EFE7D8;border-radius:8px;padding:16px;margin:16px 0">
-           📅 <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong><br />
+           📅 <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong><br />
            📍 ${trajet}
          </div>
          <p>Aucune somme ne vous a été débitée.</p>
@@ -772,6 +783,7 @@ export const emailTemplates = {
     amountCents: number
     currency: string
     scheduledAt: Date
+    timezone: string
     payUrl: string
     expiresAt: Date
   }) {
@@ -780,9 +792,9 @@ export const emailTemplates = {
       html: wrap(
         'Votre devis expire bientôt ⏳',
         `<p>Votre course avec ${esc(opts.driverName)} prévue le
-          <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong> n'est pas encore confirmée.</p>
+          <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong> n'est pas encore confirmée.</p>
          <p style="font-size:28px;font-weight:700;color:#0E1B2C">${formatMoney(opts.amountCents, opts.currency)}</p>
-         <p>Le devis expire le <strong>${opts.expiresAt.toLocaleString('fr-FR')}</strong>.
+         <p>Le devis expire le <strong>${formatRideDateTime(opts.expiresAt, opts.timezone)}</strong>.
           Passé ce délai, le créneau sera libéré et il faudra refaire une demande.</p>
          ${button(opts.payUrl, 'Payer et confirmer ma course')}`,
       ),
@@ -795,6 +807,7 @@ export const emailTemplates = {
     siren?: string | null
     customerName: string
     scheduledAt: Date
+    timezone: string
     rideLabel: string // "Transfert — CDG → Paris" / "Mise à disposition — 4 h"
     breakdown: { label: string; amountCents: number; detail?: string }[]
     amountCents: number
@@ -811,7 +824,7 @@ export const emailTemplates = {
       )
       .join('')
     return {
-      subject: `Reçu de votre course du ${opts.scheduledAt.toLocaleDateString('fr-FR')} — ${opts.driverName}`,
+      subject: `Reçu de votre course du ${formatRideDate(opts.scheduledAt, opts.timezone)} — ${opts.driverName}`,
       html: wrap(
         'Reçu de course',
         `<p>Bonjour ${esc(opts.customerName)},</p>
@@ -819,7 +832,7 @@ export const emailTemplates = {
          <table style="width:100%;margin:16px 0;border-collapse:collapse">
            <tr><td style="padding:4px 0;color:#9A8B72;font-size:13px">Référence</td><td style="padding:4px 0;text-align:right;font-size:13px">${esc(opts.bookingRef)}</td></tr>
            <tr><td style="padding:4px 0;color:#9A8B72;font-size:13px">Prestation</td><td style="padding:4px 0;text-align:right;font-size:13px">${esc(opts.rideLabel)}</td></tr>
-           <tr><td style="padding:4px 0;color:#9A8B72;font-size:13px">Prise en charge</td><td style="padding:4px 0;text-align:right;font-size:13px">${opts.scheduledAt.toLocaleString('fr-FR')}</td></tr>
+           <tr><td style="padding:4px 0;color:#9A8B72;font-size:13px">Prise en charge</td><td style="padding:4px 0;text-align:right;font-size:13px">${formatRideDateTime(opts.scheduledAt, opts.timezone)}</td></tr>
            <tr><td style="padding:4px 0;color:#9A8B72;font-size:13px">Paiement</td><td style="padding:4px 0;text-align:right;font-size:13px">${esc(opts.paymentLabel)}</td></tr>
          </table>
          <hr style="border:none;border-top:1px solid #EFE7D8;margin:8px 0" />
@@ -871,6 +884,7 @@ export const emailTemplates = {
   quoteExpiredNotice(opts: {
     driverName: string
     scheduledAt: Date
+    timezone: string
     rebookUrl: string
   }) {
     return {
@@ -878,7 +892,7 @@ export const emailTemplates = {
       html: wrap(
         'Votre devis a expiré ⌛',
         `<p>Votre devis pour la course prévue le
-          <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong> a expiré sans être confirmé,
+          <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong> a expiré sans être confirmé,
           et le créneau a été libéré.</p>
          <p>Pas d'inquiétude : vous pouvez refaire une demande en quelques secondes.</p>
          ${button(opts.rebookUrl, 'Refaire une demande')}`,
@@ -889,6 +903,7 @@ export const emailTemplates = {
   // gains de la semaine écoulée. Vue d'ensemble motivante de l'activité.
   weeklyDriverRecap(opts: {
     driverFirstName?: string
+    timezone: string
     upcomingCount: number
     upcoming: { scheduledAt: Date; customerName: string; label: string }[]
     lastWeekCount: number
@@ -900,7 +915,7 @@ export const emailTemplates = {
       .map(
         (r) =>
           `<tr>
-             <td style="padding:6px 0;font-size:13px;color:#16283D">${r.scheduledAt.toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+             <td style="padding:6px 0;font-size:13px;color:#16283D">${formatRideDateTime(r.scheduledAt, opts.timezone)}</td>
              <td style="padding:6px 0;font-size:13px;color:#5B6B7E">${esc(r.customerName)} — ${esc(r.label)}</td>
            </tr>`,
       )
@@ -934,6 +949,7 @@ export const emailTemplates = {
     customerName: string
     driverName: string
     scheduledAt: Date
+    timezone: string
     refunded: boolean // remboursement en ligne déclenché
     refundCents: number
     currency: string
@@ -952,7 +968,7 @@ export const emailTemplates = {
         'Votre course a été annulée',
         `<p>Bonjour ${esc(opts.customerName)},</p>
          <p>Nous sommes désolés : ${esc(opts.driverName)} a dû annuler votre course prévue le
-          <strong>${opts.scheduledAt.toLocaleString('fr-FR')}</strong>, en raison d'un imprévu.</p>
+          <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong>, en raison d'un imprévu.</p>
          ${money}
          <p>Vous pouvez refaire une demande dès maintenant — un autre créneau est peut-être disponible.</p>
          ${button(opts.rebookUrl, 'Refaire une demande')}`,

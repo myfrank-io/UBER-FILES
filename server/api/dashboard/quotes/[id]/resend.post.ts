@@ -81,6 +81,7 @@ export default defineEventHandler(async (event) => {
       onSiteAvailable,
       type: quote.rideRequest.type,
       scheduledAt: quote.rideRequest.scheduledAt,
+      timezone: quote.driver.timezone,
       pickupAddress: quote.rideRequest.pickupAddress,
       dropoffAddress: quote.rideRequest.dropoffAddress,
       roundTrip: quote.rideRequest.roundTrip,

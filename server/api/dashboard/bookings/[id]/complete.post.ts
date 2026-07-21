@@ -68,6 +68,7 @@ export default defineEventHandler(async (event) => {
       siren: booking.driver.siren,
       customerName: req.customerName,
       scheduledAt: booking.scheduledAt,
+      timezone: booking.driver.timezone,
       rideLabel,
       breakdown,
       amountCents: booking.amountCents,
