@@ -31,6 +31,9 @@ export default defineEventHandler(async (event) => {
     id: booking.id,
     status: booking.status,
     scheduledAt: booking.scheduledAt,
+    // Demande de report d'horaire en attente de validation du chauffeur (le cas échéant).
+    pendingScheduledAt: booking.pendingScheduledAt,
+    timezone: booking.driver.timezone,
     amountCents: booking.amountCents,
     currency: booking.quote.currency,
     createdAt: booking.createdAt,

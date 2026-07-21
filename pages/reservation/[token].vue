@@ -1,12 +1,15 @@
 <script setup lang="ts">
-// Page client : gestion d'une réservation confirmée (consultation + annulation).
+// Page client : gestion d'une réservation confirmée (consultation, modification
+// d'horaire, annulation).
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
 import { terminalLabel } from '~/lib/hubs'
+import { timezoneLabel } from '~/lib/datetime'
 
 const route = useRoute()
 const token = route.params.token as string
 const { formatMoney, formatDateTime } = useFormat()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 function shortMethod(method: unknown): string {
   return PAYMENT_METHOD_SHORT_LABELS[method as PaymentMethod] ?? ''
@@ -32,6 +35,56 @@ async function cancel() {
     errorMsg.value = err?.data?.statusMessage || t('reservation.cancelError')
   } finally {
     cancelling.value = false
+  }
+}
+
+// ─── Modification d'horaire ───
+// L'heure murale saisie est ancrée sur le fuseau du chauffeur (lieu de prise en
+// charge), comme le formulaire de réservation — jamais sur le navigateur.
+const showReschedule = ref(false)
+const rescheduling = ref(false)
+const rescheduleError = ref('')
+const rescheduleDone = ref<null | { status: 'APPLIED' | 'PENDING'; scheduledAt: string }>(null)
+const newSchedule = ref('')
+
+const driverTz = computed(() => (booking.value as { timezone?: string } | null)?.timezone ?? 'Europe/Paris')
+const tzHint = computed(() => timezoneLabel(driverTz.value, locale.value === 'en' ? 'en' : 'fr'))
+
+function toDriverLocalInput(value: string | Date): string {
+  return formatInTimeZone(new Date(value), driverTz.value, "yyyy-MM-dd'T'HH:mm")
+}
+// Borne basse : maintenant (dans le fuseau du chauffeur). Le délai minimum précis
+// est de toute façon revalidé côté serveur.
+const minReschedule = computed(() => toDriverLocalInput(new Date()))
+
+function openReschedule() {
+  const b = booking.value as { scheduledAt?: string } | null
+  newSchedule.value = toDriverLocalInput(b?.scheduledAt ?? new Date())
+  rescheduleError.value = ''
+  rescheduleDone.value = null
+  showReschedule.value = true
+}
+
+async function submitReschedule() {
+  if (!newSchedule.value || rescheduling.value) return
+  rescheduling.value = true
+  rescheduleError.value = ''
+  try {
+    const res = await $fetch<{ status: 'APPLIED' | 'PENDING'; scheduledAt?: string; pendingScheduledAt?: string }>(
+      `/api/booking/${token}/reschedule`,
+      { method: 'POST', body: { scheduledAt: fromZonedTime(newSchedule.value, driverTz.value).toISOString() } },
+    )
+    rescheduleDone.value = {
+      status: res.status,
+      scheduledAt: res.scheduledAt ?? res.pendingScheduledAt ?? newSchedule.value,
+    }
+    showReschedule.value = false
+    await refresh()
+  } catch (e) {
+    const err = e as { data?: { statusMessage?: string } }
+    rescheduleError.value = err?.data?.statusMessage || t('reservation.modifyError')
+  } finally {
+    rescheduling.value = false
   }
 }
 </script>
@@ -106,7 +159,47 @@ async function cancel() {
         </div>
       </div>
 
+      <!-- Report en attente de validation du chauffeur (course proche). -->
+      <div v-if="booking.pendingScheduledAt" class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        ⏳ {{ $t('reservation.modifyPendingBanner', { date: formatDateTime(booking.pendingScheduledAt, booking.timezone) }) }}
+      </div>
+
+      <!-- Confirmation après une action de modification. -->
+      <div v-if="rescheduleDone" class="mt-4 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+        <p class="font-semibold">
+          {{ rescheduleDone.status === 'APPLIED' ? $t('reservation.modifyAppliedTitle') : $t('reservation.modifyPendingTitle') }}
+        </p>
+        <p class="mt-1">
+          {{ rescheduleDone.status === 'APPLIED'
+            ? $t('reservation.modifyAppliedBody', { date: formatDateTime(rescheduleDone.scheduledAt, booking.timezone) })
+            : $t('reservation.modifyPendingBody') }}
+        </p>
+      </div>
+
       <template v-if="booking.status === 'CONFIRMED'">
+        <!-- Modification d'horaire (self-service). -->
+        <div class="mt-4">
+          <button v-if="!showReschedule" class="btn-ghost w-full" @click="openReschedule">
+            🗓️ {{ $t('reservation.modifyButton') }}
+          </button>
+          <div v-else class="rounded-xl border border-slate-200 p-4">
+            <label class="label" for="newSchedule">
+              {{ $t('reservation.modifyTimeLabel') }}
+              <span class="font-normal text-slate-400">({{ tzHint }})</span>
+            </label>
+            <input id="newSchedule" v-model="newSchedule" type="datetime-local" class="field" :min="minReschedule" />
+            <p v-if="rescheduleError" class="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ rescheduleError }}</p>
+            <div class="mt-3 flex gap-2">
+              <button class="btn-primary flex-1" :disabled="rescheduling" @click="submitReschedule">
+                {{ rescheduling ? $t('reservation.modifySaving') : $t('reservation.modifySubmit') }}
+              </button>
+              <button class="btn-ghost" :disabled="rescheduling" @click="showReschedule = false">
+                {{ $t('reservation.modifyCancel') }}
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div class="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
           <!-- Payé en ligne : on parle remboursement. Sinon (règlement sur place),
                rien n'a été prélevé : on parle simplement d'annulation. -->

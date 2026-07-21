@@ -485,6 +485,14 @@ model Booking {
   scheduledAt DateTime
   amountCents Int
 
+  // Demande de report d'horaire par le client alors que la course est proche
+  // (moins de `freeUntilHours` avant le départ) : le nouvel horaire est stocké
+  // ici EN ATTENTE jusqu'à ce que le chauffeur l'accepte ou le refuse. Hors de
+  // cette fenêtre, le report est appliqué directement à `scheduledAt` sans passer
+  // par ces champs. null = aucune demande en attente.
+  pendingScheduledAt DateTime?
+  pendingRequestedAt DateTime?
+
   // Jeton signé permettant au client de modifier/annuler depuis son email.
   manageToken String @unique @default(cuid())
 

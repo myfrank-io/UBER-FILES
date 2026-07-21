@@ -49,6 +49,8 @@ export default defineEventHandler(async (event) => {
     amountCents: booking.amountCents,
     currency: booking.quote.currency,
     scheduledAt: booking.scheduledAt,
+    // Report demandé en attente de validation du chauffeur (course proche), le cas échéant.
+    pendingScheduledAt: booking.pendingScheduledAt,
     // Fuseau du lieu de prise en charge : l'heure s'affiche toujours ainsi côté client.
     timezone: booking.driver.timezone,
     driver: {

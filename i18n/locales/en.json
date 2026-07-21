@@ -106,7 +106,19 @@
     "cancelButton": "Cancel the ride",
     "cancelling": "Cancelling…",
     "cancelError": "Cancellation failed.",
-    "alreadyCancelled": "This ride has been cancelled."
+    "alreadyCancelled": "This ride has been cancelled.",
+    "modifyButton": "Change the time",
+    "modifyTitle": "New time",
+    "modifyTimeLabel": "New date and time",
+    "modifySubmit": "Save the new time",
+    "modifyCancel": "Cancel",
+    "modifySaving": "Saving…",
+    "modifyError": "Change failed.",
+    "modifyAppliedTitle": "Time changed ✅",
+    "modifyAppliedBody": "Your ride is now scheduled for {date}.",
+    "modifyPendingTitle": "Request sent ⏳",
+    "modifyPendingBody": "As the ride is soon, your driver must approve this change. Your current time stays valid until they accept.",
+    "modifyPendingBanner": "Change awaiting driver approval: {date}."
   },
   "review": {
     "metaTitle": "Your review — {name}",
