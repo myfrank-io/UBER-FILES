@@ -7,7 +7,7 @@ import { timezoneLabel } from '~/lib/datetime'
 const route = useRoute()
 const slug = route.params.slug as string
 const { formatMoney } = useFormat()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 interface PublicVehicle {
   id: string
@@ -117,29 +117,12 @@ useHead(() => {
   }
 })
 
-// ─── État du formulaire ───
-// Transfert par défaut — la mise à disposition n'est présélectionnée que si le
-// chauffeur ne propose pas de transfert.
-const type = ref<'TRANSFER' | 'HOURLY'>(driver.value?.hasTransfer === false ? 'HOURLY' : 'TRANSFER')
-const pickup = ref('')
-const dropoff = ref('')
-// Coordonnées exactes résolues à la sélection d'une suggestion (placeId → Place
-// Details). null tant que l'utilisateur tape librement → repli géocodage du texte.
-const pickupCoords = ref<{ lat: number; lng: number } | null>(null)
-const dropoffCoords = ref<{ lat: number; lng: number } | null>(null)
-// Terminal/hall de prise en charge choisi (hubs) + coords précises de ce terminal.
-const pickupTerminal = ref<string | null>(null)
-const terminalCoords = ref<{ lat: number; lng: number } | null>(null)
-const roundTrip = ref(false)
-const durationHours = ref(2)
-const scheduledAt = ref(defaultDateTime())
-const customer = reactive({ name: '', phone: '', email: '' })
-const notes = ref('')
-const cgvAccepted = ref(false)
-
-// Fuseau du lieu de prise en charge (chauffeur). TOUTE heure saisie/affichée est
-// ancrée dessus, jamais sur le fuseau du navigateur du client — sinon un client
-// dans un autre fuseau (ex : Antilles) verrait/enverrait une heure décalée.
+// ─── Fuseau du lieu de prise en charge (chauffeur) ───
+// TOUTE heure saisie/affichée est ancrée dessus, jamais sur le fuseau du
+// navigateur du client — sinon un client dans un autre fuseau (ex : Antilles)
+// verrait/enverrait une heure décalée. Déclaré AVANT l'état du formulaire :
+// l'initialisation de `scheduledAt` (defaultDateTime) en dépend, et un `const`
+// n'est pas hoisté (ReferenceError sinon — page entière en 500).
 const driverTz = computed(() => driver.value?.timezone ?? 'Europe/Paris')
 const tzHint = computed(() => timezoneLabel(driverTz.value, locale.value === 'en' ? 'en' : 'fr'))
 
@@ -163,6 +146,26 @@ function defaultDateTime(): string {
   if (d.getTime() < Date.now() + leadMs) d.setTime(d.getTime() + 3600_000)
   return toDriverLocalInput(d)
 }
+
+// ─── État du formulaire ───
+// Transfert par défaut — la mise à disposition n'est présélectionnée que si le
+// chauffeur ne propose pas de transfert.
+const type = ref<'TRANSFER' | 'HOURLY'>(driver.value?.hasTransfer === false ? 'HOURLY' : 'TRANSFER')
+const pickup = ref('')
+const dropoff = ref('')
+// Coordonnées exactes résolues à la sélection d'une suggestion (placeId → Place
+// Details). null tant que l'utilisateur tape librement → repli géocodage du texte.
+const pickupCoords = ref<{ lat: number; lng: number } | null>(null)
+const dropoffCoords = ref<{ lat: number; lng: number } | null>(null)
+// Terminal/hall de prise en charge choisi (hubs) + coords précises de ce terminal.
+const pickupTerminal = ref<string | null>(null)
+const terminalCoords = ref<{ lat: number; lng: number } | null>(null)
+const roundTrip = ref(false)
+const durationHours = ref(2)
+const scheduledAt = ref(defaultDateTime())
+const customer = reactive({ name: '', phone: '', email: '' })
+const notes = ref('')
+const cgvAccepted = ref(false)
 
 // Borne basse du sélecteur : impossible de choisir une date déjà passée ou sous le
 // délai minimum de réservation (l'erreur n'apparaissait sinon qu'à l'estimation).
