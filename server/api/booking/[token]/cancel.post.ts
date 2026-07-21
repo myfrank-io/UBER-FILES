@@ -7,6 +7,7 @@ import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { notifyDriver } from '~/server/utils/notify-driver'
 import { driverFirstName } from '~/server/utils/telegram'
 import { formatMoney } from '~/lib/money'
+import { formatRideDateTime } from '~/lib/datetime'
 import { isOnSiteMethod } from '~/lib/payment-methods'
 
 // Annulation d'une réservation par le client. Rembourse le paiement en ligne selon
@@ -113,7 +114,7 @@ export default defineEventHandler(async (event) => {
 
   // Notification chauffeur : email (canal principal) + Telegram si réactivé.
   const req = booking.quote.rideRequest
-  const scheduledStr = booking.scheduledAt.toLocaleString('fr-FR')
+  const scheduledStr = formatRideDateTime(booking.scheduledAt, booking.driver.timezone)
   const refundStr = refunded
     ? `Remboursement : ${formatMoney(refund.refundCents, booking.quote.currency)}`
     : paidPayment
@@ -125,6 +126,7 @@ export default defineEventHandler(async (event) => {
       driverFirstName: driverFirstName(booking.driver.displayName),
       customerName: req.customerName,
       scheduledAt: booking.scheduledAt,
+      timezone: booking.driver.timezone,
       refundCents: refunded ? refund.refundCents : 0,
       currency: booking.quote.currency,
     }),

@@ -82,6 +82,9 @@ export default defineEventHandler(async (event) => {
     // manuel (Trustpilot…). Affiché en bouton sur la page publique s'il existe.
     reviewUrl: driverReviewUrl(driver),
     currency: driver.currency,
+    // Fuseau du lieu de prise en charge : le formulaire ancre l'heure saisie
+    // dessus (et non sur le navigateur du client) et l'affiche avec ce repère.
+    timezone: driver.timezone,
     minimumFareCents: driver.minimumFareCents,
     minLeadTimeMinutes: driver.minLeadTimeMinutes,
     hasTransfer: driver.transferBands.length > 0,

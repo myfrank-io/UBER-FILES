@@ -67,7 +67,7 @@ async function cancel() {
         <p v-if="terminalLabel(booking.ride.pickupAddress, booking.ride.pickupTerminal)" class="text-slate-500">
           🚪 {{ terminalLabel(booking.ride.pickupAddress, booking.ride.pickupTerminal) }}
         </p>
-        <p>{{ $t('reservation.on', { date: formatDateTime(booking.scheduledAt) }) }}</p>
+        <p>{{ $t('reservation.on', { date: formatDateTime(booking.scheduledAt, booking.timezone) }) }}</p>
         <p class="font-semibold text-slate-900">{{ formatMoney(booking.amountCents, booking.currency) }}</p>
         <!-- Situation de règlement, en un coup d'œil -->
         <p v-if="booking.payment?.paid" class="text-xs font-medium text-green-700">

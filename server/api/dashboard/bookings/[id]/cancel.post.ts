@@ -79,6 +79,7 @@ export default defineEventHandler(async (event) => {
         customerName: req.customerName,
         driverName: booking.driver.displayName,
         scheduledAt: booking.scheduledAt,
+        timezone: booking.driver.timezone,
         refunded,
         refundCents: refunded ? booking.amountCents : 0,
         currency: booking.quote.currency,

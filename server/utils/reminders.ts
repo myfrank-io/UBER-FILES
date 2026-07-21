@@ -38,6 +38,7 @@ export async function sendDueReminders(now: Date = new Date()): Promise<{ sent: 
     const tpl = emailTemplates.reminder({
       driverName: b.driver.displayName,
       scheduledAt: b.scheduledAt,
+      timezone: b.driver.timezone,
       manageUrl: `${config.public.appBaseUrl}/reservation/${manageToken}`,
       driverPhone: b.driver.phone,
       driverEmail: b.driver.contactEmail,
@@ -98,6 +99,7 @@ export async function sendPreRideAlerts(now: Date = new Date()): Promise<{ sent:
         customerName: req.customerName,
         customerPhone: req.customerPhone,
         scheduledAt: b.scheduledAt,
+        timezone: b.driver.timezone,
         type: req.type,
         durationHours: req.durationHours,
         pickupAddress: pickupDisplay,
@@ -111,6 +113,7 @@ export async function sendPreRideAlerts(now: Date = new Date()): Promise<{ sent:
         customerName: req.customerName,
         customerPhone: req.customerPhone,
         scheduledAt: b.scheduledAt,
+        timezone: b.driver.timezone,
         type: req.type,
         durationHours: req.durationHours,
         pickupAddress: pickupDisplay,
@@ -163,6 +166,7 @@ export async function sendQuoteExpiryReminders(now: Date = new Date()): Promise<
       amountCents: q.amountCents,
       currency: q.currency,
       scheduledAt: q.rideRequest.scheduledAt,
+      timezone: q.driver.timezone,
       payUrl: `${config.public.appBaseUrl}/devis/${payToken}`,
       expiresAt: q.expiresAt,
     })
@@ -205,6 +209,7 @@ export async function sendExpiredQuoteNotices(now: Date = new Date()): Promise<{
     const tpl = emailTemplates.quoteExpiredNotice({
       driverName: q.driver.displayName,
       scheduledAt: q.rideRequest.scheduledAt,
+      timezone: q.driver.timezone,
       rebookUrl: `${config.public.appBaseUrl}/${q.driver.slug}`,
     })
     await sendEmail({ to: q.rideRequest.customerEmail, ...tpl })
@@ -267,6 +272,7 @@ export async function sendWeeklyDriverRecap(now: Date = new Date()): Promise<{ s
     await notifyDriver(d, {
       email: emailTemplates.weeklyDriverRecap({
         driverFirstName: driverFirstName(d.displayName),
+        timezone: d.timezone,
         upcomingCount: upcoming.length,
         upcoming: upcoming.slice(0, 5).map((b) => ({
           scheduledAt: b.scheduledAt,

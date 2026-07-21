@@ -49,6 +49,8 @@ export default defineEventHandler(async (event) => {
     amountCents: booking.amountCents,
     currency: booking.quote.currency,
     scheduledAt: booking.scheduledAt,
+    // Fuseau du lieu de prise en charge : l'heure s'affiche toujours ainsi côté client.
+    timezone: booking.driver.timezone,
     driver: {
       displayName: booking.driver.displayName,
       phone: booking.driver.phone,

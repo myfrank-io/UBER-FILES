@@ -2,6 +2,7 @@
 // via boutons inline. Sans token, on journalise simplement (dev/test).
 import { randomBytes } from 'node:crypto'
 import { formatMoney } from '~/lib/money'
+import { formatRideDateTime } from '~/lib/datetime'
 
 /** Code d'appairage à usage unique (lien /start du bot). */
 export function randomLinkCode(): string {
@@ -76,6 +77,7 @@ export function newRequestMessage(opts: {
   customerName: string
   type: 'TRANSFER' | 'HOURLY'
   scheduledAt: Date
+  timezone: string
   amountCents: number
   currency: string
   pickupAddress?: string | null
@@ -89,7 +91,7 @@ export function newRequestMessage(opts: {
     hello(opts.driverDisplayName),
     `🚗 <b>Nouvelle demande</b>`,
     `Client : ${escHtml(opts.customerName)}`,
-    `Quand : ${opts.scheduledAt.toLocaleString('fr-FR')}`,
+    `Quand : ${formatRideDateTime(opts.scheduledAt, opts.timezone)}`,
   ]
   if (opts.type === 'TRANSFER') {
     lines.push(`Trajet : ${opts.pickupAddress ?? '?'} → ${opts.dropoffAddress ?? '?'}`)
@@ -124,6 +126,7 @@ export function bookingConfirmedMessage(opts: {
   customerName: string
   customerPhone?: string | null
   scheduledAt: Date
+  timezone: string
   type?: 'TRANSFER' | 'HOURLY'
   durationHours?: number | null
   pickupAddress?: string | null
@@ -142,7 +145,7 @@ export function bookingConfirmedMessage(opts: {
     hello(opts.driverDisplayName),
     `✅ <b>Course confirmée</b>`,
     `Client : ${escHtml(opts.customerName)}${opts.customerPhone ? ` — 📞 ${escHtml(opts.customerPhone)}` : ''}`,
-    `Quand : ${opts.scheduledAt.toLocaleString('fr-FR')}`,
+    `Quand : ${formatRideDateTime(opts.scheduledAt, opts.timezone)}`,
   ]
   if (opts.type === 'TRANSFER') {
     lines.push(`Trajet : ${escHtml(opts.pickupAddress ?? '?')} → ${escHtml(opts.dropoffAddress ?? '?')}`)
@@ -165,6 +168,7 @@ export function preRideAlertMessage(opts: {
   customerName: string
   customerPhone?: string | null
   scheduledAt: Date
+  timezone: string
   type: 'TRANSFER' | 'HOURLY'
   durationHours?: number | null
   pickupAddress?: string | null
@@ -176,7 +180,7 @@ export function preRideAlertMessage(opts: {
 }): { text: string; buttons: InlineButton[][] } {
   const lines = [
     hello(opts.driverDisplayName),
-    `⏰ <b>Course dans ~2 h</b> — ${opts.scheduledAt.toLocaleString('fr-FR')}`,
+    `⏰ <b>Course dans ~2 h</b> — ${formatRideDateTime(opts.scheduledAt, opts.timezone)}`,
     `Client : ${escHtml(opts.customerName)}${opts.customerPhone ? ` — 📞 ${escHtml(opts.customerPhone)}` : ''}`,
   ]
   if (opts.type === 'TRANSFER') {
