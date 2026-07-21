@@ -12,7 +12,11 @@ export default defineEventHandler(async (event) => {
   const [driver, account, vehicleCount, photoCount] = await Promise.all([
     prisma.driver.findUniqueOrThrow({
       where: { id: driverId },
-      include: { transferBands: true, cancellationPolicy: true, surcharges: true },
+      include: {
+        transferBands: { include: { tiers: { orderBy: { position: 'asc' } } } },
+        cancellationPolicy: true,
+        surcharges: true,
+      },
     }),
     prisma.user.findUnique({
       where: { id: sessionUser.id },

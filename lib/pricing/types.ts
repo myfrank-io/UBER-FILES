@@ -12,9 +12,21 @@ export interface SurchargeInput {
   amount: number
 }
 
+export interface TransferRateTierInput {
+  /** Borne haute de la tranche en km (exclue). null = dernière tranche, illimitée. */
+  uptoKm: number | null
+  pricePerKmCents: number
+}
+
 export interface TransferRateBandInput {
   name: string
   pricePerKmCents: number
+  /**
+   * Paliers dégressifs optionnels, du premier au dernier. Barème progressif :
+   * chaque kilomètre est facturé au tarif de sa tranche. Vide ou absent =
+   * prix unique `pricePerKmCents`.
+   */
+  tiers?: TransferRateTierInput[]
   /** Jours couverts (0 = dimanche … 6 = samedi). Vide = tous les jours. */
   daysOfWeek: number[]
   /** Minute de début dans la journée locale (0..1439). */

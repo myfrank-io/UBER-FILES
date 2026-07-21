@@ -169,6 +169,170 @@ describe('priceTransfer', () => {
     ).toThrow(PricingError)
   })
 
+  // Grille dégressive type de la demande : 0→21 km à 2,00 €, 21→70 km à
+  // 1,70 €, au-delà de 70 km à 1,10 €. Barème progressif : chaque kilomètre
+  // est facturé au tarif de sa tranche.
+  const tieredBands: TransferRateBandInput[] = [
+    {
+      name: 'Jour',
+      pricePerKmCents: 200,
+      tiers: [
+        { uptoKm: 21, pricePerKmCents: 200 },
+        { uptoKm: 70, pricePerKmCents: 170 },
+        { uptoKm: null, pricePerKmCents: 110 },
+      ],
+      daysOfWeek: [],
+      startMinute: 0,
+      endMinute: 1440,
+      priority: 1,
+      isDefault: true,
+    },
+  ]
+  const at = new Date('2026-06-15T12:00:00Z')
+
+  it('facture au tarif de la première tranche une course courte', () => {
+    const r = priceTransfer({
+      distanceMeters: 10_000,
+      scheduledAt: at,
+      roundTrip: false,
+      bands: tieredBands,
+      surcharges: [],
+      params,
+    })
+    expect(r.amountCents).toBe(2000) // 10 km × 2,00 €
+    expect(r.breakdown).toHaveLength(1)
+  })
+
+  it('découpe une course à cheval sur deux tranches', () => {
+    const r = priceTransfer({
+      distanceMeters: 30_000,
+      scheduledAt: at,
+      roundTrip: false,
+      bands: tieredBands,
+      surcharges: [],
+      params,
+    })
+    // 21 km × 2,00 € + 9 km × 1,70 € = 42,00 € + 15,30 €
+    expect(r.amountCents).toBe(5730)
+    expect(r.breakdown).toHaveLength(2)
+    expect(r.breakdown[0].label).toContain('Jour')
+    expect(r.breakdown[0].amountCents).toBe(4200)
+    expect(r.breakdown[1].label).toBe('De 21 à 70 km')
+    expect(r.breakdown[1].amountCents).toBe(1530)
+  })
+
+  it('découpe une course longue sur les trois tranches', () => {
+    const r = priceTransfer({
+      distanceMeters: 100_000,
+      scheduledAt: at,
+      roundTrip: false,
+      bands: tieredBands,
+      surcharges: [],
+      params,
+    })
+    // 21 × 2,00 + 49 × 1,70 + 30 × 1,10 = 42,00 + 83,30 + 33,00
+    expect(r.amountCents).toBe(15830)
+    expect(r.breakdown).toHaveLength(3)
+    expect(r.breakdown[2].label).toBe('Au-delà de 70 km')
+    expect(r.breakdown[2].amountCents).toBe(3300)
+  })
+
+  it('garantit un prix qui ne baisse jamais au passage d’un seuil', () => {
+    const price = (meters: number) =>
+      priceTransfer({
+        distanceMeters: meters,
+        scheduledAt: at,
+        roundTrip: false,
+        bands: tieredBands,
+        surcharges: [],
+        params,
+      }).amountCents
+    expect(price(71_000)).toBeGreaterThan(price(69_000))
+    expect(price(21_500)).toBeGreaterThan(price(20_900))
+  })
+
+  it('applique la grille à la distance totale d’un aller-retour', () => {
+    const r = priceTransfer({
+      distanceMeters: 15_000,
+      scheduledAt: at,
+      roundTrip: true,
+      bands: tieredBands,
+      surcharges: [],
+      params,
+    })
+    // 2 × 15 km = 30 km facturés : 21 × 2,00 + 9 × 1,70
+    expect(r.amountCents).toBe(5730)
+  })
+
+  it('gère une distance fractionnaire par tranche', () => {
+    const r = priceTransfer({
+      distanceMeters: 30_500,
+      scheduledAt: at,
+      roundTrip: false,
+      bands: tieredBands,
+      surcharges: [],
+      params,
+    })
+    // 21 × 2,00 + 9,5 × 1,70 = 42,00 + 16,15
+    expect(r.amountCents).toBe(5815)
+  })
+
+  it('retrie des tranches reçues dans le désordre', () => {
+    const shuffled: TransferRateBandInput[] = [
+      {
+        ...tieredBands[0],
+        tiers: [
+          { uptoKm: null, pricePerKmCents: 110 },
+          { uptoKm: 21, pricePerKmCents: 200 },
+          { uptoKm: 70, pricePerKmCents: 170 },
+        ],
+      },
+    ]
+    const r = priceTransfer({
+      distanceMeters: 100_000,
+      scheduledAt: at,
+      roundTrip: false,
+      bands: shuffled,
+      surcharges: [],
+      params,
+    })
+    expect(r.amountCents).toBe(15830)
+  })
+
+  it('traite la dernière tranche comme illimitée même si elle est bornée', () => {
+    const capped: TransferRateBandInput[] = [
+      {
+        ...tieredBands[0],
+        tiers: [
+          { uptoKm: 21, pricePerKmCents: 200 },
+          { uptoKm: 70, pricePerKmCents: 170 },
+        ],
+      },
+    ]
+    const r = priceTransfer({
+      distanceMeters: 100_000,
+      scheduledAt: at,
+      roundTrip: false,
+      bands: capped,
+      surcharges: [],
+      params,
+    })
+    // 21 × 2,00 + 79 × 1,70 : les km au-delà de 70 restent au tarif du dernier palier
+    expect(r.amountCents).toBe(17630)
+  })
+
+  it('applique le prix minimum de course aussi avec une grille', () => {
+    const r = priceTransfer({
+      distanceMeters: 2_000, // 2 km × 2,00 € = 4,00 € < 10,00 €
+      scheduledAt: at,
+      roundTrip: false,
+      bands: tieredBands,
+      surcharges: [],
+      params,
+    })
+    expect(r.amountCents).toBe(1000)
+  })
+
   it('utilise la bande par défaut si aucune ne correspond à l’heure', () => {
     const restrictedBands: TransferRateBandInput[] = [
       {

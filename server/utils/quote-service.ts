@@ -1,4 +1,4 @@
-import type { Driver, Surcharge, TransferRateBand } from '@prisma/client'
+import type { Driver, Surcharge, TransferRateBand, TransferRateTier } from '@prisma/client'
 import {
   priceHourly,
   priceTransfer,
@@ -10,7 +10,7 @@ import { computeRoute, type LatLng } from './google-maps'
 // `photoUrl` est omis globalement par le client Prisma (blob base64 jamais
 // rapatrié) : le type reflète la forme réellement retournée par les requêtes.
 export interface DriverWithPricing extends Omit<Driver, 'photoUrl'> {
-  transferBands: TransferRateBand[]
+  transferBands: (TransferRateBand & { tiers: TransferRateTier[] })[]
   surcharges: Surcharge[]
 }
 
@@ -92,6 +92,7 @@ export async function computeQuote(args: ComputeArgs): Promise<QuoteComputation>
       bands: driver.transferBands.map((b) => ({
         name: b.name,
         pricePerKmCents: b.pricePerKmCents,
+        tiers: (b.tiers ?? []).map((t) => ({ uptoKm: t.uptoKm, pricePerKmCents: t.pricePerKmCents })),
         daysOfWeek: b.daysOfWeek,
         startMinute: b.startMinute,
         endMinute: b.endMinute,
