@@ -7,7 +7,7 @@ import { timezoneLabel } from '~/lib/datetime'
 const route = useRoute()
 const slug = route.params.slug as string
 const { formatMoney } = useFormat()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 interface PublicVehicle {
   id: string
@@ -132,16 +132,18 @@ const pickupTerminal = ref<string | null>(null)
 const terminalCoords = ref<{ lat: number; lng: number } | null>(null)
 const roundTrip = ref(false)
 const durationHours = ref(2)
+// Fuseau du lieu de prise en charge (chauffeur). TOUTE heure saisie/affichée est
+// ancrée dessus, jamais sur le fuseau du navigateur du client — sinon un client
+// dans un autre fuseau (ex : Antilles) verrait/enverrait une heure décalée.
+// Déclaré AVANT `scheduledAt` : sa valeur initiale (defaultDateTime → toDriverLocalInput)
+// lit déjà `driverTz`. Placé après, l'accès tomberait en zone morte (TDZ) et
+// planterait tout le rendu de la page (« Cannot access 'driverTz' before initialization »).
+const driverTz = computed(() => driver.value?.timezone ?? 'Europe/Paris')
+const tzHint = computed(() => timezoneLabel(driverTz.value, locale.value === 'en' ? 'en' : 'fr'))
 const scheduledAt = ref(defaultDateTime())
 const customer = reactive({ name: '', phone: '', email: '' })
 const notes = ref('')
 const cgvAccepted = ref(false)
-
-// Fuseau du lieu de prise en charge (chauffeur). TOUTE heure saisie/affichée est
-// ancrée dessus, jamais sur le fuseau du navigateur du client — sinon un client
-// dans un autre fuseau (ex : Antilles) verrait/enverrait une heure décalée.
-const driverTz = computed(() => driver.value?.timezone ?? 'Europe/Paris')
-const tzHint = computed(() => timezoneLabel(driverTz.value, locale.value === 'en' ? 'en' : 'fr'))
 
 // Un instant (Date UTC) → chaîne « yyyy-MM-ddTHH:mm » pour <input datetime-local>,
 // exprimée dans le fuseau du chauffeur (l'input, lui, n'a pas de notion de fuseau).
