@@ -6,6 +6,7 @@ import {
 } from '~/lib/payment-methods'
 import { onlinePaymentPolicy, onSitePaymentMethods } from '~/lib/booking-policy'
 import { reviewFunnelPath } from '~/lib/review-link'
+import { parseTierRows, type TierRowForm } from '~/lib/tier-form'
 
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Réglages' })
@@ -445,6 +446,9 @@ function bandWhenLabel(b: Record<string, unknown>): string {
 interface BandForm {
   name: string
   pricePerKmEuros: string
+  /** Grille dégressive selon la distance (sinon prix unique au km). */
+  tiered: boolean
+  tiers: TierRowForm[]
   startTime: string
   endTime: string
   daysOfWeek: number[]
@@ -455,6 +459,8 @@ interface BandForm {
 const newBand = reactive<BandForm>({
   name: '',
   pricePerKmEuros: '',
+  tiered: false,
+  tiers: [],
   startTime: '06:00',
   endTime: '22:00',
   daysOfWeek: [],
@@ -463,7 +469,50 @@ const newBand = reactive<BandForm>({
 })
 
 const editingBand = ref<string | null>(null)
-const editBandForm = reactive<BandForm>({ ...newBand, daysOfWeek: [] })
+const editBandForm = reactive<BandForm>({ ...newBand, daysOfWeek: [], tiers: [] })
+
+/** Paliers d'une bande renvoyée par l'API (triés par position côté serveur). */
+function bandTiers(b: Record<string, unknown>): { uptoKm: number | null; pricePerKmCents: number }[] {
+  return (b.tiers as { uptoKm: number | null; pricePerKmCents: number }[] | undefined) ?? []
+}
+
+// Bascule prix unique ⇄ grille dégressive. La grille reste en mémoire pour
+// pouvoir changer d'avis sans tout ressaisir.
+function setTiered(form: BandForm, on: boolean) {
+  form.tiered = on
+  if (on && form.tiers.length < 2) {
+    // Grille de départ : le prix actuel devient celui de la première tranche.
+    form.tiers = [
+      { uptoKm: '', priceEuros: form.pricePerKmEuros },
+      { uptoKm: '', priceEuros: '' },
+    ]
+  }
+  if (!on && !form.pricePerKmEuros && form.tiers[0]?.priceEuros) {
+    form.pricePerKmEuros = form.tiers[0].priceEuros
+  }
+}
+
+// Partie « prix » du corps envoyé à l'API : grille validée, ou prix unique
+// avec `tiers: []` (ce qui supprime la grille existante côté serveur).
+function bandPriceBody(form: BandForm) {
+  return form.tiered
+    ? { tiers: parseTierRows(form.tiers) ?? [] }
+    : { pricePerKmCents: Math.round(parseFloat(form.pricePerKmEuros) * 100), tiers: [] }
+}
+
+const newBandPriceValid = computed(() =>
+  newBand.tiered ? parseTierRows(newBand.tiers) != null : !!newBand.pricePerKmEuros,
+)
+const editBandPriceValid = computed(() =>
+  editBandForm.tiered ? parseTierRows(editBandForm.tiers) != null : !!editBandForm.pricePerKmEuros,
+)
+
+// Résumé d'une grille sur la carte : « 2,00 € → 1,70 € → 1,10 €/km ».
+function tierSummary(b: Record<string, unknown>): string {
+  return bandTiers(b)
+    .map((t) => formatMoney(t.pricePerKmCents, currency.value))
+    .join(' → ') + '/km'
+}
 
 function toggleDay(form: BandForm, day: number) {
   const i = form.daysOfWeek.indexOf(day)
@@ -475,6 +524,12 @@ function startEditBand(b: Record<string, unknown>) {
   editingBand.value = b.id as string
   editBandForm.name = b.name as string
   editBandForm.pricePerKmEuros = ((b.pricePerKmCents as number) / 100).toFixed(2)
+  const tiers = bandTiers(b)
+  editBandForm.tiered = tiers.length >= 2
+  editBandForm.tiers = tiers.map((t) => ({
+    uptoKm: t.uptoKm != null ? String(t.uptoKm) : '',
+    priceEuros: (t.pricePerKmCents / 100).toFixed(2),
+  }))
   editBandForm.startTime = minuteToInput(b.startMinute as number)
   editBandForm.endTime = minuteToInput((b.endMinute as number) % 1440)
   editBandForm.daysOfWeek = [...(b.daysOfWeek as number[])]
@@ -496,7 +551,7 @@ async function addBand() {
       method: 'POST',
       body: {
         name: newBand.name,
-        pricePerKmCents: Math.round(parseFloat(newBand.pricePerKmEuros) * 100),
+        ...bandPriceBody(newBand),
         ...bandMinutes(newBand),
         daysOfWeek: newBand.daysOfWeek,
         // Un nouveau tarif spécifique doit gagner sur les existants quand il
@@ -506,7 +561,7 @@ async function addBand() {
         isDefault: newBand.isDefault,
       },
     })
-    Object.assign(newBand, { name: '', pricePerKmEuros: '', startTime: '06:00', endTime: '22:00', daysOfWeek: [], priority: 0, isDefault: false })
+    Object.assign(newBand, { name: '', pricePerKmEuros: '', tiered: false, tiers: [], startTime: '06:00', endTime: '22:00', daysOfWeek: [], priority: 0, isDefault: false })
     addingBand.value = false
   })
 }
@@ -519,7 +574,7 @@ async function updateBand(id: string) {
       method: 'PATCH',
       body: {
         name: editBandForm.name,
-        pricePerKmCents: Math.round(parseFloat(editBandForm.pricePerKmEuros) * 100),
+        ...bandPriceBody(editBandForm),
         ...bandMinutes(editBandForm),
         daysOfWeek: editBandForm.daysOfWeek,
         priority: editBandForm.priority,
@@ -783,6 +838,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
           <h2 class="font-semibold text-slate-900">Transfert — prix au km</h2>
           <p class="mt-1 text-sm text-slate-600">
             Prix d'un trajet = distance × votre prix au km, selon le moment du départ.
+            Le prix au km peut être dégressif par paliers de distance.
             Quand plusieurs tarifs correspondent, le plus haut dans la liste gagne.
           </p>
         </div>
@@ -795,15 +851,46 @@ async function call(key: string, fn: () => Promise<unknown>) {
         >
           <!-- Édition -->
           <div v-if="editingBand === (b.id as string)" class="space-y-3">
+            <div>
+              <label class="label">Nom du tarif</label>
+              <input v-model="editBandForm.name" type="text" class="field" placeholder="Nuit, Week-end…" />
+            </div>
+            <div>
+              <label class="label">Prix au km</label>
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  class="rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors"
+                  :class="!editBandForm.tiered
+                    ? 'border-brand-600 bg-brand-600 text-white'
+                    : 'border-slate-300 text-slate-600 hover:border-slate-400'"
+                  @click="setTiered(editBandForm, false)"
+                >
+                  Prix unique
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors"
+                  :class="editBandForm.tiered
+                    ? 'border-brand-600 bg-brand-600 text-white'
+                    : 'border-slate-300 text-slate-600 hover:border-slate-400'"
+                  @click="setTiered(editBandForm, true)"
+                >
+                  Dégressif selon la distance
+                </button>
+              </div>
+              <input
+                v-if="!editBandForm.tiered"
+                v-model="editBandForm.pricePerKmEuros"
+                type="number"
+                step="0.01"
+                min="0.01"
+                class="field mt-2 !w-36"
+                placeholder="2,50"
+              />
+              <RateTierEditor v-else class="mt-2.5" :tiers="editBandForm.tiers" :currency="currency" />
+            </div>
             <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="label">Nom du tarif</label>
-                <input v-model="editBandForm.name" type="text" class="field" placeholder="Nuit, Week-end…" />
-              </div>
-              <div>
-                <label class="label">Prix au km (€)</label>
-                <input v-model="editBandForm.pricePerKmEuros" type="number" step="0.01" min="0.01" class="field" />
-              </div>
               <div>
                 <label class="label">De</label>
                 <input v-model="editBandForm.startTime" type="time" class="field !px-2.5" />
@@ -845,7 +932,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
               </div>
             </details>
             <div class="flex gap-2">
-              <button type="button" class="btn-primary !py-2.5 text-sm" :disabled="saving === `band-edit-${b.id}`" @click="updateBand(b.id as string)">
+              <button type="button" class="btn-primary !py-2.5 text-sm" :disabled="saving === `band-edit-${b.id}` || !editBandPriceValid" @click="updateBand(b.id as string)">
                 {{ saving === `band-edit-${b.id}` ? '…' : 'Enregistrer' }}
               </button>
               <button type="button" class="btn-ghost !py-2.5 text-sm" @click="editingBand = null">Annuler</button>
@@ -865,6 +952,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
             </div>
             <div class="shrink-0 text-right">
               <p class="font-serif text-lg font-medium text-slate-950">{{ formatMoney(b.pricePerKmCents as number, currency) }}<span class="text-xs font-sans text-slate-500">/km</span></p>
+              <p v-if="bandTiers(b).length" class="mt-0.5 text-[11px] text-slate-500">{{ tierSummary(b) }}</p>
               <p class="-mr-2.5 mt-0.5 flex justify-end gap-1 text-xs">
                 <button type="button" class="rounded-lg px-2.5 py-2 font-semibold text-brand-700 hover:bg-brand-50" @click="startEditBand(b)">Modifier</button>
                 <button type="button" class="rounded-lg px-2.5 py-2 font-semibold text-red-600 hover:bg-red-50" @click="deleteBand(b.id as string)">Supprimer</button>
@@ -877,15 +965,46 @@ async function call(key: string, fn: () => Promise<unknown>) {
         <div v-if="addingBand" class="rounded-xl border border-dashed border-brand-300 p-4">
           <p class="mb-3 text-sm font-semibold text-slate-900">Nouveau tarif</p>
           <div class="space-y-3">
+            <div>
+              <label class="label">Nom du tarif</label>
+              <input v-model="newBand.name" type="text" class="field" placeholder="Nuit, Week-end…" />
+            </div>
+            <div>
+              <label class="label">Prix au km</label>
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  class="rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors"
+                  :class="!newBand.tiered
+                    ? 'border-brand-600 bg-brand-600 text-white'
+                    : 'border-slate-300 text-slate-600 hover:border-slate-400'"
+                  @click="setTiered(newBand, false)"
+                >
+                  Prix unique
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors"
+                  :class="newBand.tiered
+                    ? 'border-brand-600 bg-brand-600 text-white'
+                    : 'border-slate-300 text-slate-600 hover:border-slate-400'"
+                  @click="setTiered(newBand, true)"
+                >
+                  Dégressif selon la distance
+                </button>
+              </div>
+              <input
+                v-if="!newBand.tiered"
+                v-model="newBand.pricePerKmEuros"
+                type="number"
+                step="0.01"
+                min="0.01"
+                class="field mt-2 !w-36"
+                placeholder="2,50"
+              />
+              <RateTierEditor v-else class="mt-2.5" :tiers="newBand.tiers" :currency="currency" />
+            </div>
             <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="label">Nom du tarif</label>
-                <input v-model="newBand.name" type="text" class="field" placeholder="Nuit, Week-end…" />
-              </div>
-              <div>
-                <label class="label">Prix au km (€)</label>
-                <input v-model="newBand.pricePerKmEuros" type="number" step="0.01" min="0.01" class="field" placeholder="2,50" />
-              </div>
               <div>
                 <label class="label">De</label>
                 <input v-model="newBand.startTime" type="time" class="field !px-2.5" />
@@ -914,7 +1033,7 @@ async function call(key: string, fn: () => Promise<unknown>) {
               </div>
             </div>
             <div class="flex gap-2">
-              <button type="button" class="btn-primary whitespace-nowrap !py-2.5 text-sm" :disabled="saving === 'band-add' || !newBand.name || !newBand.pricePerKmEuros" @click="addBand">
+              <button type="button" class="btn-primary whitespace-nowrap !py-2.5 text-sm" :disabled="saving === 'band-add' || !newBand.name || !newBandPriceValid" @click="addBand">
                 {{ saving === 'band-add' ? '…' : 'Ajouter' }}
               </button>
               <button type="button" class="btn-ghost !py-2.5 text-sm" @click="addingBand = false">Annuler</button>

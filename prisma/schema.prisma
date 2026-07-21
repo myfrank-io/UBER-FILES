@@ -233,6 +233,9 @@ model TransferRateBand {
   driverId String
 
   name           String // "Jour", "Nuit", "Heures de pointe"...
+  // Prix unique au km. Quand la bande a des paliers dégressifs (`tiers`), le
+  // calcul utilise la grille et cette colonne est alignée sur le premier palier
+  // (prix d'appel : affichage « à partir de », tris, compatibilité).
   pricePerKmCents Int
   // Jours de semaine couverts (0 = dimanche ... 6 = samedi). Vide = tous les jours.
   daysOfWeek     Int[]  @default([])
@@ -241,10 +244,34 @@ model TransferRateBand {
   priority       Int    @default(0)
   isDefault      Boolean @default(false) // bande de repli si aucune autre ne matche
 
+  tiers TransferRateTier[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([driverId])
+}
+
+/// Palier dégressif optionnel d'une bande de transfert : « de 0 à 21 km à
+/// 2,00 €/km, de 21 à 70 km à 1,70 €/km, au-delà 1,10 €/km ». Barème
+/// PROGRESSIF : chaque kilomètre est facturé au tarif de sa tranche (comme les
+/// heures supplémentaires de la mise à disposition), le prix total ne baisse
+/// donc jamais quand la distance augmente. Une bande sans palier garde son
+/// prix unique `pricePerKmCents`.
+model TransferRateTier {
+  id     String           @id @default(cuid())
+  band   TransferRateBand @relation(fields: [bandId], references: [id], onDelete: Cascade)
+  bandId String
+
+  /// Borne haute de la tranche en km (exclue). NULL = dernière tranche, illimitée.
+  uptoKm          Int?
+  pricePerKmCents Int
+  position        Int  @default(0) // ordre des tranches (0 = première)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bandId])
 }
 
 enum SurchargeKind {

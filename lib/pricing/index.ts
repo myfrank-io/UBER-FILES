@@ -1,7 +1,7 @@
 // Point d'entrée du moteur de tarification.
 import { applyBps } from '../money'
 export * from './types'
-export { priceTransfer, applySurcharges, PricingError } from './transfer'
+export { priceTransfer, applySurcharges, PricingError, tierSegments } from './transfer'
 export { priceHourly } from './hourly'
 export { selectBand, localMoment, minuteInRange } from './timeband'
 

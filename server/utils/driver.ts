@@ -9,7 +9,10 @@ import type { PaymentMethod } from '~/lib/payment-methods'
 export async function loadActiveDriverBySlug(slug: string): Promise<DriverWithPricing> {
   const driver = await prisma.driver.findUnique({
     where: { slug },
-    include: { transferBands: true, surcharges: true },
+    include: {
+      transferBands: { include: { tiers: { orderBy: { position: 'asc' } } } },
+      surcharges: true,
+    },
   })
   if (!driver || driver.status !== 'ACTIVE') {
     throw createError({ statusCode: 404, statusMessage: 'Chauffeur introuvable.' })
