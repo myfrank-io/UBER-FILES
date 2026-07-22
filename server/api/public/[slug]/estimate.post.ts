@@ -26,6 +26,7 @@ export default defineEventHandler(async (event) => {
       dropoff: input.dropoff,
       roundTrip: input.roundTrip,
       durationHours: input.durationHours,
+      airport: input.airport,
       apiKey: config.googleMapsApiKey || undefined,
     })
     return {

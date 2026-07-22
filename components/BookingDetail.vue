@@ -151,6 +151,10 @@ async function cancelBooking() {
 
           <div class="card !p-4">
             <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Trajet</p>
+            <!-- Transfert aéroport : trajet en clair + n° de vol (suivi du retard). -->
+            <p v-if="(detail.ride as Record<string, unknown>).airport" class="mt-1.5 text-xs font-semibold text-brand-700">
+              ✈️ Transfert aéroport — {{ (detail.ride as Record<string, string>).airport }}<template v-if="(detail.ride as Record<string, unknown>).flightNumber"> · vol {{ (detail.ride as Record<string, string>).flightNumber }}</template>
+            </p>
             <template v-if="(detail.ride as Record<string, unknown>).type === 'TRANSFER'">
               <RideRoute
                 nav

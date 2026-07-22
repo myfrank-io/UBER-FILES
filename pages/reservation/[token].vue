@@ -113,7 +113,7 @@ async function submitReschedule() {
 
       <div class="mt-4 space-y-1 text-sm text-slate-600">
         <div v-if="booking.ride.type === 'TRANSFER'">
-          <p><strong>{{ $t('reservation.transfer') }}</strong>{{ booking.ride.roundTrip ? $t('common.roundTripSuffix') : '' }}</p>
+          <p><strong>{{ booking.ride.airport ? `✈️ ${$t('reservation.airportTransfer')}` : $t('reservation.transfer') }}</strong>{{ booking.ride.roundTrip ? $t('common.roundTripSuffix') : '' }}</p>
           <RideRoute wrap class="mt-1" :pickup="booking.ride.pickupAddress" :dropoff="booking.ride.dropoffAddress" />
         </div>
         <p v-else><strong>{{ $t('reservation.hourly') }}</strong> — {{ $t('reservation.hourlyDuration', { hours: booking.ride.durationHours }) }}</p>

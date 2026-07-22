@@ -1,11 +1,21 @@
 import { z } from 'zod'
 import { PAYMENT_METHODS } from '~/lib/payment-methods'
+import { AIRPORT_HUB_IDS, AIRPORT_ZONES } from '~/lib/airport'
 
 // Schémas de validation partagés (toutes les entrées API passent par Zod).
 
 export const latLngSchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
+})
+
+// Transfert aéroport (onglet dédié) : aéroport, sens et zone choisis par le
+// client. Complète un type TRANSFER classique — le prix devient le forfait de la
+// zone (ou le prix au km hors Paris) au lieu de la grille kilométrique.
+export const airportSelectionSchema = z.object({
+  hub: z.enum(AIRPORT_HUB_IDS),
+  direction: z.enum(['FROM_AIRPORT', 'TO_AIRPORT']),
+  zone: z.enum(AIRPORT_ZONES),
 })
 
 export const estimateSchema = z
@@ -22,6 +32,7 @@ export const estimateSchema = z
     pickupTerminal: z.string().max(40).optional(),
     flightNumber: z.string().max(16).optional(),
     roundTrip: z.boolean().default(false),
+    airport: airportSelectionSchema.optional(),
     // Mise à disposition
     durationHours: z.number().int().min(1).max(24).optional(),
   })
@@ -36,6 +47,14 @@ export const estimateSchema = z
   .refine((d) => d.type !== 'HOURLY' || (d.pickup && d.pickupAddress), {
     message: 'Adresse de départ requise pour une mise à disposition.',
     path: ['pickup'],
+  })
+  .refine((d) => !d.airport || d.type === 'TRANSFER', {
+    message: 'Un transfert aéroport est un trajet simple (type TRANSFER).',
+    path: ['airport'],
+  })
+  .refine((d) => !d.airport || !d.roundTrip, {
+    message: "Pas d'aller-retour sur un transfert aéroport : réservez deux trajets.",
+    path: ['roundTrip'],
   })
 
 export const customerSchema = z.object({

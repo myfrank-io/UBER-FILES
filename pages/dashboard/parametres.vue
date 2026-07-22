@@ -711,6 +711,62 @@ async function saveHourly() {
   )
 }
 
+// ─── Transferts aéroport : 4 forfaits fixes + prix au km hors Paris ────────
+// Champ vide = trajet non proposé ; tout vide = l'onglet « Aéroport » disparaît
+// de la page publique. Les forfaits valent dans les deux sens.
+
+const airport = reactive({
+  orlyRiveDroiteEuros: '',
+  orlyRiveGaucheEuros: '',
+  cdgRiveDroiteEuros: '',
+  cdgRiveGaucheEuros: '',
+  kmRateEuros: '',
+})
+
+watchEffect(() => {
+  if (!me.value) return
+  const d = me.value as Record<string, unknown>
+  const toEuros = (v: unknown) => (v != null ? ((v as number) / 100).toFixed(2) : '')
+  airport.orlyRiveDroiteEuros = toEuros(d.airportOrlyRiveDroiteCents)
+  airport.orlyRiveGaucheEuros = toEuros(d.airportOrlyRiveGaucheCents)
+  airport.cdgRiveDroiteEuros = toEuros(d.airportCdgRiveDroiteCents)
+  airport.cdgRiveGaucheEuros = toEuros(d.airportCdgRiveGaucheCents)
+  airport.kmRateEuros = toEuros(d.airportKmRateCents)
+})
+
+// Récapitulatif en direct : exactement ce que le client verra sur la page.
+const airportRecapItems = computed(() => {
+  const items: string[] = []
+  const forfaits: [string, string][] = [
+    ['Orly ↔ rive droite', airport.orlyRiveDroiteEuros],
+    ['Orly ↔ rive gauche', airport.orlyRiveGaucheEuros],
+    ['Roissy ↔ rive droite', airport.cdgRiveDroiteEuros],
+    ['Roissy ↔ rive gauche', airport.cdgRiveGaucheEuros],
+  ]
+  for (const [label, value] of forfaits) {
+    const cents = eurosToCents(value)
+    if (cents != null) items.push(`${label} : ${formatMoney(cents, currency.value)} (les deux sens)`)
+  }
+  const km = eurosToCents(airport.kmRateEuros)
+  if (km != null) items.push(`Hors Paris : ${formatMoney(km, currency.value)}/km`)
+  return items
+})
+
+async function saveAirport() {
+  await call('airport', () =>
+    $fetch('/api/dashboard/rates/airport', {
+      method: 'PUT',
+      body: {
+        orlyRiveDroiteCents: eurosToCents(airport.orlyRiveDroiteEuros),
+        orlyRiveGaucheCents: eurosToCents(airport.orlyRiveGaucheEuros),
+        cdgRiveDroiteCents: eurosToCents(airport.cdgRiveDroiteEuros),
+        cdgRiveGaucheCents: eurosToCents(airport.cdgRiveGaucheEuros),
+        kmRateCents: eurosToCents(airport.kmRateEuros),
+      },
+    }),
+  )
+}
+
 // ─── Majoration dernière minute ───────────────────────────────────────────
 // Une seule règle, simple : « course réservée moins de X heures avant le départ
 // → +Y € ». Stockée comme un supplément automatique borné par une fenêtre
@@ -1152,6 +1208,99 @@ async function call(key: string, fn: () => Promise<unknown>) {
 
         <button type="submit" class="btn-primary !py-2.5 text-sm" :disabled="hourlySaveDisabled">
           {{ saving === 'hourly' ? '…' : 'Enregistrer' }}
+        </button>
+      </form>
+
+      <!-- Transferts aéroport : 4 forfaits fixes + prix au km hors Paris -->
+      <form class="card space-y-4" @submit.prevent="saveAirport">
+        <div>
+          <h2 class="font-semibold text-slate-900">✈️ Transferts aéroport — forfaits</h2>
+          <p class="mt-1 text-sm text-slate-600">
+            Des prix fixes entre les aéroports et Paris, valables dans les deux sens,
+            que le client voit avant même de saisir son adresse. Laissez un champ vide
+            pour ne pas proposer le trajet.
+          </p>
+        </div>
+
+        <!-- Grille des forfaits : une ligne par aéroport, une colonne par rive. -->
+        <div class="grid grid-cols-[auto,1fr,1fr] items-center gap-x-3 gap-y-2">
+          <span />
+          <span class="text-xs font-semibold text-slate-500">Rive droite (€)</span>
+          <span class="text-xs font-semibold text-slate-500">Rive gauche (€)</span>
+
+          <label class="text-sm font-medium text-slate-700" for="airport-orly-rd">Orly</label>
+          <input
+            id="airport-orly-rd"
+            v-model="airport.orlyRiveDroiteEuros"
+            aria-label="Forfait Orly ↔ rive droite (€)"
+            type="number"
+            step="0.01"
+            min="0.01"
+            class="field"
+            placeholder="65,00"
+          />
+          <input
+            v-model="airport.orlyRiveGaucheEuros"
+            aria-label="Forfait Orly ↔ rive gauche (€)"
+            type="number"
+            step="0.01"
+            min="0.01"
+            class="field"
+            placeholder="70,00"
+          />
+
+          <label class="text-sm font-medium text-slate-700" for="airport-cdg-rd">Roissy CDG</label>
+          <input
+            id="airport-cdg-rd"
+            v-model="airport.cdgRiveDroiteEuros"
+            aria-label="Forfait Roissy CDG ↔ rive droite (€)"
+            type="number"
+            step="0.01"
+            min="0.01"
+            class="field"
+            placeholder="85,00"
+          />
+          <input
+            v-model="airport.cdgRiveGaucheEuros"
+            aria-label="Forfait Roissy CDG ↔ rive gauche (€)"
+            type="number"
+            step="0.01"
+            min="0.01"
+            class="field"
+            placeholder="90,00"
+          />
+        </div>
+
+        <div>
+          <label class="label" for="airport-km">Hors Paris — prix au km (€/km)</label>
+          <input
+            id="airport-km"
+            v-model="airport.kmRateEuros"
+            type="number"
+            step="0.01"
+            min="0.01"
+            class="field !w-36"
+            placeholder="1,10"
+          />
+          <p class="mt-1 text-xs text-slate-500">
+            Adresse hors Paris intra-muros : distance réelle × ce prix (votre course
+            minimum s'applique). Vide = pas de trajet aéroport hors Paris.
+          </p>
+        </div>
+
+        <div v-if="airportRecapItems.length" class="rounded-xl bg-brand-50 px-4 py-3">
+          <p class="text-sm font-medium text-slate-900">Visible sur votre page :</p>
+          <ul class="mt-1 space-y-0.5 text-xs text-slate-600">
+            <li v-for="item in airportRecapItems" :key="item">{{ item }}</li>
+          </ul>
+        </div>
+        <p v-else class="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
+          Renseignez au moins un prix pour faire apparaître l'onglet « Aéroport » sur
+          votre page de réservation.
+        </p>
+
+        <button type="submit" class="btn-primary !py-2.5 text-sm" :disabled="saving === 'airport'">
+          {{ saving === 'airport' ? '…' : 'Enregistrer' }}
         </button>
       </form>
 

@@ -83,6 +83,9 @@ export function newRequestMessage(opts: {
   pickupAddress?: string | null
   dropoffAddress?: string | null
   durationHours?: number | null
+  // Transfert aéroport : trajet en clair (« Orly → Rive gauche ») + n° de vol.
+  airportLabel?: string | null
+  flightNumber?: string | null
   quoteId: string
   hasConflict: boolean
   autoSent?: boolean
@@ -93,6 +96,11 @@ export function newRequestMessage(opts: {
     `Client : ${escHtml(opts.customerName)}`,
     `Quand : ${formatRideDateTime(opts.scheduledAt, opts.timezone)}`,
   ]
+  if (opts.airportLabel) {
+    lines.push(
+      `✈️ <b>Transfert aéroport — ${escHtml(opts.airportLabel)}</b>${opts.flightNumber ? ` · vol ${escHtml(opts.flightNumber)}` : ''}`,
+    )
+  }
   if (opts.type === 'TRANSFER') {
     lines.push(`Trajet : ${opts.pickupAddress ?? '?'} → ${opts.dropoffAddress ?? '?'}`)
   } else {

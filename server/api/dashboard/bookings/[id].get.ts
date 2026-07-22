@@ -3,6 +3,7 @@ import { prisma } from '~/server/utils/prisma'
 import { computeRefund } from '~/lib/cancellation'
 import { googleMapsNavUrl, wazeNavUrl } from '~/lib/nav-links'
 import { terminalLabel } from '~/lib/hubs'
+import { airportLabelFromRide } from '~/lib/airport'
 
 export default defineEventHandler(async (event) => {
   const driverId = await requireDriverId(event)
@@ -53,6 +54,9 @@ export default defineEventHandler(async (event) => {
       distanceMeters: req.distanceMeters,
       durationSeconds: req.durationSeconds,
       notes: req.notes,
+      // « Orly → Rive gauche » + n° de vol — null pour une course classique.
+      airport: airportLabelFromRide(req),
+      flightNumber: req.flightNumber,
       // Liens de navigation « un tap » vers le point de départ (coords exactes si
       // disponibles — celles du terminal choisi le cas échéant).
       mapsUrl: googleMapsNavUrl({ address: req.pickupAddress, lat: req.pickupLat, lng: req.pickupLng }),

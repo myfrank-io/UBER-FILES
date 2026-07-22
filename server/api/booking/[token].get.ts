@@ -2,6 +2,7 @@ import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
 import { computeRefund } from '~/lib/cancellation'
 import { isOnSiteMethod, type PaymentMethod } from '~/lib/payment-methods'
+import { airportLabelFromRide } from '~/lib/airport'
 
 // Consultation d'une réservation par le client via son jeton de gestion signé.
 export default defineEventHandler(async (event) => {
@@ -65,6 +66,8 @@ export default defineEventHandler(async (event) => {
       pickupTerminal: req.pickupTerminal,
       roundTrip: req.roundTrip,
       durationHours: req.durationHours,
+      // « Orly → Rive gauche » — null pour une course classique.
+      airport: airportLabelFromRide(req),
     },
     cancellation: {
       freeUntilHours: policy.freeUntilHours,

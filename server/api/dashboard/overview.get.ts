@@ -3,6 +3,7 @@ import { prisma } from '~/server/utils/prisma'
 import { driverBookingMode } from '~/server/utils/driver'
 import { resolveRequestPayment, type BookingMode } from '~/lib/booking-policy'
 import { PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
+import { airportLabelFromRide } from '~/lib/airport'
 
 // Règlement attendu d'une demande, prêt à afficher en un coup d'œil sur la carte.
 function requestPayment(mode: BookingMode, preferred: PaymentMethod | null) {
@@ -96,6 +97,9 @@ export default defineEventHandler(async (event) => {
           roundTrip: q.rideRequest.roundTrip,
           durationHours: q.rideRequest.durationHours,
           notes: q.rideRequest.notes,
+          // « Orly → Rive gauche » + n° de vol — null pour une course classique.
+          airport: airportLabelFromRide(q.rideRequest),
+          flightNumber: q.rideRequest.flightNumber,
         },
       }
     }),
@@ -118,6 +122,7 @@ export default defineEventHandler(async (event) => {
         dropoffAddress: q.rideRequest.dropoffAddress,
         roundTrip: q.rideRequest.roundTrip,
         durationHours: q.rideRequest.durationHours,
+        airport: airportLabelFromRide(q.rideRequest),
       },
     })),
     upcomingBookings: upcomingBookings.map((b) => ({
@@ -131,6 +136,7 @@ export default defineEventHandler(async (event) => {
       pickupAddress: b.quote.rideRequest.pickupAddress,
       dropoffAddress: b.quote.rideRequest.dropoffAddress,
       durationHours: b.quote.rideRequest.durationHours,
+      airport: airportLabelFromRide(b.quote.rideRequest),
       // Comment la course est (ou sera) réglée — affiché en un coup d'œil.
       payment: b.payments[0]
         ? { method: b.payments[0].method, status: b.payments[0].status }

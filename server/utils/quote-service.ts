@@ -1,10 +1,12 @@
 import type { Driver, Surcharge, TransferRateBand, TransferRateTier } from '@prisma/client'
 import {
+  priceAirport,
   priceHourly,
   priceTransfer,
   type PriceResult,
   type SurchargeInput,
 } from '~/lib/pricing'
+import { airportRatesFromDriver, type AirportSelection } from '~/lib/airport'
 import { computeRoute, type LatLng } from './google-maps'
 
 // `photoUrl` est omis globalement par le client Prisma (blob base64 jamais
@@ -62,6 +64,9 @@ export interface ComputeArgs {
   dropoff?: LatLng
   roundTrip?: boolean
   durationHours?: number
+  // Transfert aéroport (onglet dédié) : tarification au forfait de la zone (ou au
+  // km hors Paris) à la place de la grille kilométrique classique.
+  airport?: AirportSelection
   apiKey?: string
   // Instant de la demande (injectable pour les tests) — sert au calcul du délai
   // de réservation pour les majorations « dernière minute ».
@@ -85,6 +90,26 @@ export async function computeQuote(args: ComputeArgs): Promise<QuoteComputation>
       throw new Error('Adresses requises pour un transfert.')
     }
     const route = await computeRoute(args.pickup, args.dropoff, args.apiKey)
+
+    // Transfert aéroport : forfait de la zone (ou km hors Paris). Le trajet est
+    // tout de même calculé — la durée sert au créneau calendrier, la distance au
+    // prix hors Paris.
+    if (args.airport) {
+      const price = priceAirport({
+        selection: args.airport,
+        rates: airportRatesFromDriver(driver),
+        distanceMeters: route.distanceMeters,
+        surcharges,
+        params,
+      })
+      return {
+        price,
+        distanceMeters: route.distanceMeters,
+        durationSeconds: route.durationSeconds,
+        estimatedRoute: route.estimated,
+      }
+    }
+
     const price = priceTransfer({
       distanceMeters: route.distanceMeters,
       scheduledAt,

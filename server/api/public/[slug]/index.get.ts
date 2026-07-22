@@ -1,6 +1,7 @@
 import { loadActiveDriverBySlug, driverBookingMode, publicPhotoUrl } from '~/server/utils/driver'
 import type { PaymentMethod } from '~/lib/payment-methods'
 import { driverReviewUrl } from '~/lib/review-link'
+import { airportRatesFromDriver, airportTransferEnabled } from '~/lib/airport'
 import { prisma } from '~/server/utils/prisma'
 
 // Profil public d'un chauffeur + résumé tarifaire (pour la page de réservation).
@@ -63,6 +64,10 @@ export default defineEventHandler(async (event) => {
     (s) => s.autoApply && s.maxLeadTimeMinutes != null && s.kind === 'FIXED',
   )
 
+  // Grille des transferts aéroport : les forfaits partent avec le profil pour que
+  // la page affiche les prix instantanément (avant toute saisie d'adresse).
+  const airportRates = airportRatesFromDriver(driver)
+
   return {
     phone: driver.phone,
     contactEmail: driver.contactEmail,
@@ -89,6 +94,11 @@ export default defineEventHandler(async (event) => {
     minLeadTimeMinutes: driver.minLeadTimeMinutes,
     hasTransfer: driver.transferBands.length > 0,
     hasHourly: driver.hourlyRateCents != null,
+    // Onglet « Aéroport » : grille complète (null = trajet non proposé).
+    airportTransfer: {
+      enabled: airportTransferEnabled(airportRates),
+      rates: airportRates,
+    },
     fromKmCents: cheapestKm,
     // « À partir de » : le tarif de base — c'est le prix réellement payé dès la
     // première heure (le tarif heure supplémentaire, plus bas, n'est qu'un

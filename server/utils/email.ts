@@ -109,6 +109,8 @@ export const emailTemplates = {
     dropoffAddress?: string | null
     roundTrip?: boolean
     durationHours?: number | null
+    // Transfert aéroport : trajet en clair (« Orly → Rive gauche »).
+    airportLabel?: string | null
     amountCents: number
     currency: string
     // True si le règlement de cette demande se fera sur place le jour de la course.
@@ -118,6 +120,9 @@ export const emailTemplates = {
       opts.type === 'TRANSFER'
         ? `${esc(opts.pickupAddress ?? '?')} → ${esc(opts.dropoffAddress ?? '?')}${opts.roundTrip ? ' (aller-retour)' : ''}`
         : `Mise à disposition ${opts.durationHours ?? '?'} h${opts.pickupAddress ? ` — départ : ${esc(opts.pickupAddress)}` : ''}`
+    const airportLine = opts.airportLabel
+      ? `✈️ <strong>Transfert aéroport — ${esc(opts.airportLabel)}</strong><br />`
+      : ''
     const nextStep = opts.paymentOnSite
       ? `<p><strong>Prochaine étape :</strong> dès que le chauffeur aura confirmé votre
             réservation, vous recevrez un <strong>email de confirmation</strong>. Le règlement
@@ -134,7 +139,7 @@ export const emailTemplates = {
             <strong>transmise à ${esc(opts.driverName)}</strong>.</p>
          <div style="background:#FBF7F0;border:1px solid #EFE7D8;border-radius:8px;padding:16px;margin:16px 0">
            📅 <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong><br />
-           📍 ${trajet}<br />
+           ${airportLine}📍 ${trajet}<br />
            💶 Montant estimé : <strong>${formatMoney(opts.amountCents, opts.currency)}</strong>
          </div>
          ${nextStep}
@@ -350,6 +355,9 @@ export const emailTemplates = {
     dropoffAddress?: string | null
     roundTrip?: boolean
     durationHours?: number | null
+    // Transfert aéroport : trajet en clair (« Orly → Rive gauche ») + n° de vol.
+    airportLabel?: string | null
+    flightNumber?: string | null
     amountCents: number
     currency: string
     hasConflict: boolean
@@ -366,6 +374,9 @@ export const emailTemplates = {
       opts.type === 'TRANSFER'
         ? `${esc(opts.pickupAddress ?? '?')} → ${esc(opts.dropoffAddress ?? '?')}${opts.roundTrip ? ' (aller-retour)' : ''}`
         : `Mise à disposition ${opts.durationHours ?? '?'} h${opts.pickupAddress ? ` — départ : ${esc(opts.pickupAddress)}` : ''}`
+    const airportLine = opts.airportLabel
+      ? `✈️ <strong>Transfert aéroport — ${esc(opts.airportLabel)}</strong>${opts.flightNumber ? ` · vol ${esc(opts.flightNumber)}` : ''}<br />`
+      : ''
     const action = opts.autoSent
       ? `${button(opts.dashboardUrl, 'Voir la demande')}
          <p style="font-size:13px;color:#6C7889">Paiement immédiat activé : le devis a été envoyé automatiquement au client. Vous serez prévenu dès son paiement — aucune action attendue de votre part.</p>`
@@ -381,7 +392,7 @@ export const emailTemplates = {
         `${helloDriver(opts.driverFirstName)}
          <p><strong>${esc(opts.customerName)}</strong>${opts.customerPhone ? ` (${esc(opts.customerPhone)})` : ''} souhaite réserver :</p>
          <p>📅 <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong><br />
-            📍 ${trajet}</p>
+            ${airportLine}📍 ${trajet}</p>
          <p>Prix calculé : <strong style="font-size:20px">${formatMoney(opts.amountCents, opts.currency)}</strong></p>
          ${opts.paymentLabel ? `<p style="font-size:13px;color:#3C4A5A">💶 Règlement prévu : <strong>${esc(opts.paymentLabel)}</strong></p>` : ''}
          ${opts.notes ? `<p style="font-size:13px;color:#6C7889">Note du client : ${esc(opts.notes)}</p>` : ''}

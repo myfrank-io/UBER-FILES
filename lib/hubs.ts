@@ -147,6 +147,12 @@ export function findHubByText(text: string | null | undefined): Hub | null {
   return HUBS.find((h) => h.aliases.some((a) => t.includes(normalize(a)))) ?? null
 }
 
+/** Retrouve un hub par son identifiant interne ("orly", "cdg"…). */
+export function findHubById(id: string | null | undefined): Hub | null {
+  if (!id) return null
+  return HUBS.find((h) => h.id === id) ?? null
+}
+
 /** Retrouve un terminal par son code dans un hub. */
 export function findTerminal(hub: Hub, code: string | null | undefined): HubTerminal | null {
   if (!code) return null

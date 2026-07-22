@@ -171,6 +171,10 @@ async function respondReschedule(id: string, action: 'accept' | 'refuse') {
               <StatusBadge :status="b.status" />
             </div>
             <p class="mt-1 text-sm text-slate-600">{{ formatDateTime(b.scheduledAt, data?.timezone) }}</p>
+            <!-- Transfert aéroport : trajet en clair au-dessus des adresses. -->
+            <p v-if="b.ride.airport" class="mt-0.5 text-xs font-semibold text-brand-700">
+              ✈️ {{ b.ride.airport }}
+            </p>
             <!-- Adresses en texte simple sur la carte (le tap ouvre la fiche, où les
                  liens de navigation GPS restent disponibles). -->
             <div v-if="b.ride.type === 'TRANSFER'" class="mt-0.5 text-xs text-slate-500">

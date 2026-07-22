@@ -13,6 +13,7 @@ import { sendQuoteToClient } from '~/server/utils/quote-actions'
 import { createQuoteCheckoutUrl } from '~/server/utils/checkout'
 import { confirmQuoteOnSite } from '~/server/utils/booking-onsite'
 import { pickupWithTerminal } from '~/lib/hubs'
+import { airportRideLabel } from '~/lib/airport'
 
 // Soumission d'une demande de course par le client (sans compte).
 // Crée/retrouve le client, enregistre la demande + un devis BROUILLON, puis selon
@@ -55,6 +56,7 @@ export default defineEventHandler(async (event) => {
       dropoff: input.dropoff,
       roundTrip: input.roundTrip,
       durationHours: input.durationHours,
+      airport: input.airport,
       apiKey: config.googleMapsApiKey || undefined,
     })
   } catch (err) {
@@ -123,6 +125,9 @@ export default defineEventHandler(async (event) => {
         durationHours: input.durationHours,
         pickupTerminal: input.pickupTerminal,
         flightNumber: input.flightNumber,
+        airportHub: input.airport?.hub,
+        airportDirection: input.airport?.direction,
+        airportZone: input.airport?.zone,
         notes: input.notes,
         preferredPaymentMethod,
       },
@@ -207,6 +212,9 @@ export default defineEventHandler(async (event) => {
         : undefined
   // Adresse de départ enrichie du terminal/hall choisi, pour l'affichage chauffeur.
   const pickupDisplay = pickupWithTerminal(input.pickupAddress, input.pickupTerminal)
+  // Transfert aéroport : le trajet et le n° de vol sont mis en avant dans les
+  // notifications (« Transfert aéroport — Orly → Rive gauche · vol AF1234 »).
+  const airportLabel = input.airport ? airportRideLabel(input.airport) : undefined
   if (!confirmed) {
     await notifyDriver(driver, {
       email: emailTemplates.newRequestDriver({
@@ -220,6 +228,8 @@ export default defineEventHandler(async (event) => {
         dropoffAddress: input.dropoffAddress,
         roundTrip: input.roundTrip,
         durationHours: input.durationHours,
+        airportLabel,
+        flightNumber: input.flightNumber,
         amountCents: computation.price.amountCents,
         currency: computation.price.currency,
         hasConflict: Boolean(conflict),
@@ -240,6 +250,8 @@ export default defineEventHandler(async (event) => {
         pickupAddress: pickupDisplay,
         dropoffAddress: input.dropoffAddress,
         durationHours: input.durationHours,
+        airportLabel,
+        flightNumber: input.flightNumber,
         quoteId: quote.id,
         hasConflict: Boolean(conflict),
         autoSent,
@@ -265,6 +277,7 @@ export default defineEventHandler(async (event) => {
           dropoffAddress: input.dropoffAddress,
           roundTrip: input.roundTrip,
           durationHours: input.durationHours,
+          airportLabel,
           amountCents: computation.price.amountCents,
           currency: computation.price.currency,
           paymentOnSite: resolved.kind === 'ONSITE',
