@@ -132,7 +132,7 @@ async function confirmOnSite() {
       <template v-else>
         <div class="mt-4 space-y-1 text-sm text-slate-600">
           <div v-if="quote.ride.type === 'TRANSFER'">
-            <p><strong>{{ $t('quote.transfer') }}</strong>{{ quote.ride.roundTrip ? $t('common.roundTripSuffix') : '' }}</p>
+            <p><strong>{{ quote.ride.airport ? `✈️ ${$t('quote.airportTransfer')}` : $t('quote.transfer') }}</strong>{{ quote.ride.roundTrip ? $t('common.roundTripSuffix') : '' }}</p>
             <RideRoute wrap class="mt-1" :pickup="quote.ride.pickupAddress" :dropoff="quote.ride.dropoffAddress" />
           </div>
           <p v-else>

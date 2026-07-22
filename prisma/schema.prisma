@@ -173,6 +173,16 @@ model Driver {
   hourlyOvertime2AfterHours Int? // second seuil, strictement supérieur au premier
   hourlyOvertime2RateCents  Int?
 
+  // Transferts aéroport (onglet dédié de la page publique) : forfaits fixes
+  // Orly/Roissy ↔ Paris intra-muros, valables dans les deux sens, et prix au km
+  // pour une adresse hors Paris (distance réelle × ce prix). null = non proposé ;
+  // aucun des cinq renseigné = l'onglet n'apparaît pas sur la page publique.
+  airportOrlyRiveDroiteCents Int?
+  airportOrlyRiveGaucheCents Int?
+  airportCdgRiveDroiteCents  Int?
+  airportCdgRiveGaucheCents  Int?
+  airportKmRateCents         Int?
+
   // Relations
   user             User?
   transferBands    TransferRateBand[]
@@ -356,6 +366,21 @@ enum ServiceType {
   HOURLY   // mise à disposition
 }
 
+// Transfert aéroport : sens du trajet (l'aéroport est l'origine ou la destination).
+enum AirportDirection {
+  FROM_AIRPORT // l'aéroport → l'adresse du client
+  TO_AIRPORT   // l'adresse du client → l'aéroport
+}
+
+// Transfert aéroport : zone de l'adresse côté ville, choisie par le client.
+// RIVE_DROITE / RIVE_GAUCHE = Paris intra-muros (forfait fixe) ; HORS_PARIS =
+// prix au km du chauffeur (distance réelle × prix).
+enum AirportZone {
+  RIVE_DROITE
+  RIVE_GAUCHE
+  HORS_PARIS
+}
+
 enum RideRequestStatus {
   PENDING   // soumise par le client, en attente de devis chauffeur
   QUOTED    // un devis a été émis
@@ -394,6 +419,12 @@ model RideRequest {
   // Précision aéroport / gare (Niveau 2) : terminal/hall de prise en charge choisi
   // par le client (code du catalogue lib/hubs.ts), affiché au chauffeur.
   pickupTerminal String?
+  // Transfert aéroport (onglet dédié) : aéroport (id du catalogue lib/hubs.ts :
+  // "orly" | "cdg"), sens et zone choisis par le client. Le prix appliqué est le
+  // forfait de la zone, ou le prix au km hors Paris. null = course classique.
+  airportHub       String?
+  airportDirection AirportDirection?
+  airportZone      AirportZone?
   // Connexion au vol (Niveau 3, préparé) : numéro de vol saisi par le client, pour
   // récupérer plus tard terminal + horaire d'arrivée et suivre les retards.
   flightNumber   String?

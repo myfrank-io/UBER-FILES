@@ -2,6 +2,7 @@ import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
 import { driverBookingMode } from '~/server/utils/driver'
 import { isQuotePaymentExpired } from '~/server/utils/quote-status'
+import { airportLabelFromRide } from '~/lib/airport'
 
 // Consultation d'un devis par le client via son jeton signé (sans compte).
 export default defineEventHandler(async (event) => {
@@ -62,6 +63,8 @@ export default defineEventHandler(async (event) => {
       pickupTerminal: quote.rideRequest.pickupTerminal,
       roundTrip: quote.rideRequest.roundTrip,
       durationHours: quote.rideRequest.durationHours,
+      // « Orly → Rive gauche » — null pour une course classique.
+      airport: airportLabelFromRide(quote.rideRequest),
     },
   }
 })

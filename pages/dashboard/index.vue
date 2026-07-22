@@ -164,7 +164,7 @@ async function resend(quoteId: string) {
           </div>
           <div class="flex shrink-0 flex-col items-end gap-1">
             <span class="whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
-              {{ q.ride.type === 'TRANSFER' ? 'Transfert' : 'Mise à dispo' }}
+              {{ q.ride.airport ? '✈️ Aéroport' : q.ride.type === 'TRANSFER' ? 'Transfert' : 'Mise à dispo' }}
             </span>
             <!-- Règlement attendu, en un coup d'œil -->
             <span
@@ -179,6 +179,10 @@ async function resend(quoteId: string) {
 
         <div class="mt-3 space-y-1 text-sm text-slate-600">
           <p>📅 {{ formatDateTime(q.ride.scheduledAt) }}</p>
+          <!-- Transfert aéroport : trajet en clair + n° de vol (suivi du retard). -->
+          <p v-if="q.ride.airport" class="text-xs font-semibold text-brand-700">
+            ✈️ {{ q.ride.airport }}<template v-if="q.ride.flightNumber"> · vol {{ q.ride.flightNumber }}</template>
+          </p>
           <div v-if="q.ride.type === 'TRANSFER'">
             <RideRoute nav wrap :pickup="q.ride.pickupAddress" :dropoff="q.ride.dropoffAddress" />
             <span v-if="q.ride.roundTrip" class="mt-0.5 inline-block text-xs text-slate-400">Aller-retour</span>
@@ -245,6 +249,7 @@ async function resend(quoteId: string) {
           <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</span>
         </div>
         <p class="text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
+        <p v-if="b.airport" class="mt-1 text-xs font-semibold text-brand-700">✈️ {{ b.airport }}</p>
         <RideRoute
           v-if="b.type === 'TRANSFER'"
           class="mt-1 text-xs text-slate-500"
@@ -275,6 +280,7 @@ async function resend(quoteId: string) {
           <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(nextRide.amountCents, nextRide.currency) }}</span>
         </div>
         <p class="text-sm text-slate-600">{{ formatDateTime(nextRide.scheduledAt) }}</p>
+        <p v-if="nextRide.airport" class="mt-1 text-xs font-semibold text-brand-700">✈️ {{ nextRide.airport }}</p>
         <RideRoute
           v-if="nextRide.type === 'TRANSFER'"
           class="mt-1 text-xs text-slate-500"
@@ -340,6 +346,7 @@ async function resend(quoteId: string) {
         </div>
         <div class="mt-2 space-y-1 text-sm text-slate-600">
           <p>📅 {{ formatDateTime(q.ride.scheduledAt) }}</p>
+          <p v-if="q.ride.airport" class="text-xs font-semibold text-brand-700">✈️ {{ q.ride.airport }}</p>
           <div v-if="q.ride.type === 'TRANSFER'">
             <RideRoute nav wrap :pickup="q.ride.pickupAddress" :dropoff="q.ride.dropoffAddress" />
             <span v-if="q.ride.roundTrip" class="mt-0.5 inline-block text-xs text-slate-400">Aller-retour</span>

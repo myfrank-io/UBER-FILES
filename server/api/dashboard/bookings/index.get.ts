@@ -1,5 +1,6 @@
 import { requireDriverId } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
+import { airportLabelFromRide } from '~/lib/airport'
 
 export default defineEventHandler(async (event) => {
   const driverId = await requireDriverId(event)
@@ -60,6 +61,8 @@ export default defineEventHandler(async (event) => {
         durationHours: b.quote.rideRequest.durationHours,
         distanceMeters: b.quote.rideRequest.distanceMeters,
         notes: b.quote.rideRequest.notes,
+        // « Orly → Rive gauche » — null pour une course classique.
+        airport: airportLabelFromRide(b.quote.rideRequest),
       },
       payment: b.payments[0]
         ? { method: b.payments[0].method, status: b.payments[0].status }
