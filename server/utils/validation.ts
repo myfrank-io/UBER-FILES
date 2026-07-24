@@ -33,6 +33,9 @@ export const estimateSchema = z
     flightNumber: z.string().max(16).optional(),
     roundTrip: z.boolean().default(false),
     airport: airportSelectionSchema.optional(),
+    // Nombre de personnes dans le véhicule (supplément 3e/4e personne). Borné à 8
+    // (van) ; le supplément n'est défini que pour la 3e et la 4e.
+    passengers: z.number().int().min(1).max(8).optional(),
     // Mise à disposition
     durationHours: z.number().int().min(1).max(24).optional(),
   })

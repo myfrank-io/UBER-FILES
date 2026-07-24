@@ -68,6 +68,25 @@ export default defineEventHandler(async (event) => {
   // la page affiche les prix instantanément (avant toute saisie d'adresse).
   const airportRates = airportRatesFromDriver(driver)
 
+  // Supplément selon le nombre de personnes : envoyé au client seulement si le
+  // chauffeur a configuré au moins un montant (3e ou 4e personne). Le sélecteur de
+  // nombre de personnes n'apparaît alors sur la page publique que dans ce cas.
+  // Borne haute = capacité de la flotte (sièges du plus grand véhicule), avec un
+  // plancher à 4 (le barème couvre la 3e et la 4e personne) et un plafond à 8.
+  const hasPassengerSurcharge =
+    driver.passengerSurcharge3Cents != null || driver.passengerSurcharge4Cents != null
+  const maxSeats = Math.max(
+    driver.vehicleSeats ?? 0,
+    ...vehicleRows.map((v) => v.seats ?? 0),
+  )
+  const passengerSurcharge = hasPassengerSurcharge
+    ? {
+        thirdCents: driver.passengerSurcharge3Cents,
+        fourthCents: driver.passengerSurcharge4Cents,
+        maxPassengers: Math.min(8, Math.max(4, maxSeats || 4)),
+      }
+    : null
+
   return {
     phone: driver.phone,
     contactEmail: driver.contactEmail,
@@ -107,6 +126,9 @@ export default defineEventHandler(async (event) => {
     lastMinuteSurcharge: lastMinute
       ? { maxLeadTimeMinutes: lastMinute.maxLeadTimeMinutes!, amountCents: lastMinute.amount }
       : null,
+    // Supplément selon le nombre de personnes (null = non proposé). Le client
+    // choisit le nombre de personnes au moment de réserver.
+    passengerSurcharge,
     bookingEnabled: acceptedPaymentMethods.length > 0,
     // Mode de réservation, pour adapter le formulaire et les messages du client :
     // badge « réservation instantanée », choix du règlement, écrans de succès.

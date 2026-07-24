@@ -51,6 +51,8 @@ export default defineEventHandler(async (event) => {
       terminalLabel: terminalLabel(req.pickupAddress, req.pickupTerminal),
       roundTrip: req.roundTrip,
       durationHours: req.durationHours,
+      // Nombre de personnes déclaré par le client (null = non précisé).
+      passengers: req.passengers,
       distanceMeters: req.distanceMeters,
       durationSeconds: req.durationSeconds,
       notes: req.notes,

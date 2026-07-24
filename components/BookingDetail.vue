@@ -179,6 +179,9 @@ async function cancelBooking() {
               🚪 <span class="font-medium">{{ (detail.ride as Record<string, string>).terminalLabel }}</span>
               <span class="text-xs text-slate-400"> (indiqué par le client)</span>
             </p>
+            <p v-if="(detail.ride as Record<string, number>).passengers" class="mt-2 text-sm text-slate-700">
+              👥 <span class="font-medium">{{ (detail.ride as Record<string, number>).passengers }} personne(s)</span>
+            </p>
             <!-- Lancement navigation à la demande (juste avant la course). -->
             <div v-if="(detail.ride as Record<string, string>).wazeUrl" class="mt-3 flex gap-2">
               <a

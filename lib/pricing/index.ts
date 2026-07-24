@@ -4,6 +4,7 @@ export * from './types'
 export { priceTransfer, applySurcharges, PricingError, tierSegments } from './transfer'
 export { priceHourly } from './hourly'
 export { priceAirport } from './airport'
+export { passengerSurcharges, PASSENGER_SURCHARGE_LABELS } from './passengers'
 export { selectBand, localMoment, minuteInRange } from './timeband'
 
 /**

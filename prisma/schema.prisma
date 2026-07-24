@@ -183,6 +183,15 @@ model Driver {
   airportCdgRiveGaucheCents  Int?
   airportKmRateCents         Int?
 
+  // Supplément selon le nombre de personnes dans le véhicule. Deux montants
+  // cumulatifs (centimes) : celui de la 3e personne s'ajoute dès 3 passagers,
+  // celui de la 4e s'ajoute en plus dès 4 passagers (ex : +5 € puis +5 € →
+  // 3 pers. = +5 €, 4 pers. = +10 €). null = pas de supplément (1 et 2 pers.
+  // n'en portent jamais). Le client choisit le nombre de personnes au moment de
+  // réserver ; le sélecteur n'apparaît que si au moins un montant est renseigné.
+  passengerSurcharge3Cents Int?
+  passengerSurcharge4Cents Int?
+
   // Relations
   user             User?
   transferBands    TransferRateBand[]
@@ -431,6 +440,11 @@ model RideRequest {
 
   // Mise à disposition
   durationHours Int?
+
+  // Nombre de personnes dans le véhicule, choisi par le client à la réservation
+  // (sert au supplément « 3e / 4e personne » du chauffeur). null = non précisé
+  // (ancien formulaire, ou chauffeur sans supplément passager configuré).
+  passengers Int?
 
   notes String? @db.Text
 

@@ -87,6 +87,9 @@ export default defineEventHandler(async (event) => {
     airportCdgRiveDroiteCents: driver.airportCdgRiveDroiteCents,
     airportCdgRiveGaucheCents: driver.airportCdgRiveGaucheCents,
     airportKmRateCents: driver.airportKmRateCents,
+    // Supplément selon le nombre de personnes (3e et 4e personne, cumulatif).
+    passengerSurcharge3Cents: driver.passengerSurcharge3Cents,
+    passengerSurcharge4Cents: driver.passengerSurcharge4Cents,
     cancellationPolicy: driver.cancellationPolicy,
     surcharges: driver.surcharges,
   }
