@@ -38,6 +38,13 @@ export interface TransferRateBandInput {
   isDefault: boolean
 }
 
+export interface PassengerSurchargeConfig {
+  /** Supplément (centimes) ajouté dès qu'une 3e personne monte. null = aucun. */
+  thirdPassengerCents: number | null
+  /** Supplément (centimes) ajouté EN PLUS dès qu'une 4e personne monte (cumulatif). null = aucun. */
+  fourthPassengerCents: number | null
+}
+
 export interface HourlyRateInput {
   /** Tarif horaire de base (centimes). */
   pricePerHourCents: number

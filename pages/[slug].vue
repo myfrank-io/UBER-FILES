@@ -66,6 +66,13 @@ interface DriverPublic {
   airportTransfer?: { enabled: boolean; rates: AirportRates }
   // Majoration appliquée aux réservations faites moins de X minutes avant le départ.
   lastMinuteSurcharge: { maxLeadTimeMinutes: number; amountCents: number } | null
+  // Supplément selon le nombre de personnes (null = non proposé). thirdCents /
+  // fourthCents sont cumulatifs ; maxPassengers borne le sélecteur (capacité flotte).
+  passengerSurcharge?: {
+    thirdCents: number | null
+    fourthCents: number | null
+    maxPassengers: number
+  } | null
   acceptedPaymentMethods: PaymentMethod[]
   bookingMode: BookingModePublic
 }
@@ -157,6 +164,25 @@ const pickupTerminal = ref<string | null>(null)
 const terminalCoords = ref<{ lat: number; lng: number } | null>(null)
 const roundTrip = ref(false)
 const durationHours = ref(2)
+
+// ─── Nombre de personnes (supplément 3e / 4e personne) ───
+// Le sélecteur n'apparaît (étape coordonnées) que si le chauffeur a configuré un
+// supplément. Le prix se recalcule côté serveur à chaque changement — l'aperçu
+// client ci-dessous n'est qu'informatif.
+const passengerConfig = computed(() => driver.value?.passengerSurcharge ?? null)
+const maxPassengers = computed(() => passengerConfig.value?.maxPassengers ?? 4)
+const passengers = ref(1)
+
+// Supplément (centimes) pour un nombre de personnes donné — miroir exact du
+// barème serveur (cumulatif : 3e puis 4e personne, rien avant 3 ni après 4).
+function passengerSurchargeCents(count: number): number {
+  const c = passengerConfig.value
+  if (!c) return 0
+  let sum = 0
+  if (count >= 3 && c.thirdCents) sum += c.thirdCents
+  if (count >= 4 && c.fourthCents) sum += c.fourthCents
+  return sum
+}
 
 // ─── Onglet Aéroport ───
 // Parcours : aéroport → sens → zone (prix affiché sur les cartes, avant toute
@@ -425,10 +451,12 @@ async function buildPayload() {
       // Pas de champ « terminal d'arrivée » : le libellé part dans l'adresse.
       base.dropoffAddress = terminal ? `${hub.name} · ${terminal.label}` : hub.name
     }
+    if (passengerConfig.value) base.passengers = passengers.value
     return base
   }
 
   const base: Record<string, unknown> = { type: type.value, scheduledAt: isoScheduledAt() }
+  if (passengerConfig.value) base.passengers = passengers.value
   // Le terminal choisi (hub) fournit la coordonnée de prise en charge la plus précise.
   const pickupResolved = terminalCoords.value ?? pickupCoords.value
   if (pickupTerminal.value) base.pickupTerminal = pickupTerminal.value
@@ -455,22 +483,32 @@ async function buildPayload() {
 // l'estimation apparaît sinon sous la ligne de flottaison sans aucun indice.
 const estimateBox = ref<HTMLElement | null>(null)
 
-async function getEstimate() {
+// `silent` : recalcul en place (changement du nombre de personnes à l'étape
+// coordonnées) — on ne vide pas le prix affiché et on ne refait pas défiler.
+async function getEstimate({ silent = false }: { silent?: boolean } = {}) {
   errorMsg.value = ''
   estimating.value = true
-  estimate.value = null
+  if (!silent) estimate.value = null
   try {
     const payload = await buildPayload()
     estimate.value = await $fetch(`/api/public/${slug}/estimate`, { method: 'POST', body: payload })
-    await nextTick()
-    // 'nearest' : ne défile que si le résultat est réellement hors écran.
-    estimateBox.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    if (!silent) {
+      await nextTick()
+      // 'nearest' : ne défile que si le résultat est réellement hors écran.
+      estimateBox.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
   } catch (e) {
     errorMsg.value = errMessage(e)
   } finally {
     estimating.value = false
   }
 }
+
+// Changement du nombre de personnes : le prix (supplément 3e/4e personne inclus)
+// est recalculé en place, sans quitter l'étape coordonnées ni masquer le montant.
+watch(passengers, () => {
+  if (estimate.value) getEstimate({ silent: true })
+})
 
 async function submit() {
   errorMsg.value = ''
@@ -936,7 +974,7 @@ async function airportContinue() {
               type="button"
               class="btn-ghost w-full"
               :disabled="!canEstimate || estimating"
-              @click="getEstimate"
+              @click="getEstimate()"
             >
               {{ estimating ? $t('public.estimating') : $t('public.estimateButton') }}
             </button>
@@ -987,7 +1025,10 @@ async function airportContinue() {
             <div v-if="estimate" class="rounded-xl bg-slate-50 p-4">
               <div class="flex items-baseline justify-between">
                 <span class="text-sm text-slate-600">{{ estimateBoxLabel }}</span>
-                <span class="font-serif text-2xl font-medium tracking-tight text-slate-900">
+                <span
+                  class="font-serif text-2xl font-medium tracking-tight text-slate-900 transition-opacity"
+                  :class="{ 'opacity-40': estimating }"
+                >
                   {{ formatMoney(estimate.amountCents, estimate.currency) }}
                 </span>
               </div>
@@ -998,6 +1039,45 @@ async function airportContinue() {
               >
                 ← {{ $t('public.modifyTrip') }}
               </button>
+            </div>
+
+            <!-- Nombre de personnes : n'apparaît que si le chauffeur facture un
+                 supplément 3e / 4e personne. Le prix ci-dessus se recalcule à
+                 chaque changement (supplément inclus dans le détail). -->
+            <div v-if="passengerConfig">
+              <p class="label">{{ $t('public.passengersLabel') }}</p>
+              <div class="mt-1 flex items-center gap-3">
+                <div class="inline-flex items-center overflow-hidden rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    class="flex h-11 w-11 items-center justify-center text-xl font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-30"
+                    :disabled="passengers <= 1"
+                    :aria-label="$t('public.passengersDecrease')"
+                    @click="passengers = Math.max(1, passengers - 1)"
+                  >
+                    −
+                  </button>
+                  <span class="min-w-[3rem] text-center text-base font-semibold tabular-nums text-slate-900" aria-live="polite">
+                    {{ passengers }}
+                  </span>
+                  <button
+                    type="button"
+                    class="flex h-11 w-11 items-center justify-center text-xl font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-30"
+                    :disabled="passengers >= maxPassengers"
+                    :aria-label="$t('public.passengersIncrease')"
+                    @click="passengers = Math.min(maxPassengers, passengers + 1)"
+                  >
+                    ＋
+                  </button>
+                </div>
+                <span class="text-xs text-slate-500">{{ $t('public.passengersHint') }}</span>
+              </div>
+              <p
+                v-if="passengerSurchargeCents(passengers) > 0"
+                class="mt-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
+              >
+                ＋ {{ $t('public.passengersSurchargeNotice', { count: passengers, amount: formatMoney(passengerSurchargeCents(passengers), driver.currency) }) }}
+              </p>
             </div>
 
             <!-- Coordonnées client -->

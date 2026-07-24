@@ -1,5 +1,6 @@
 import type { Driver, Surcharge, TransferRateBand, TransferRateTier } from '@prisma/client'
 import {
+  passengerSurcharges,
   priceAirport,
   priceHourly,
   priceTransfer,
@@ -64,6 +65,9 @@ export interface ComputeArgs {
   dropoff?: LatLng
   roundTrip?: boolean
   durationHours?: number
+  // Nombre de personnes dans le véhicule (déclenche le supplément 3e/4e personne
+  // du chauffeur). Absent ou < 3 = aucun supplément passager.
+  passengers?: number
   // Transfert aéroport (onglet dédié) : tarification au forfait de la zone (ou au
   // km hors Paris) à la place de la grille kilométrique classique.
   airport?: AirportSelection
@@ -83,7 +87,16 @@ export async function computeQuote(args: ComputeArgs): Promise<QuoteComputation>
   }
   const now = args.now ?? new Date()
   const leadTimeMinutes = (scheduledAt.getTime() - now.getTime()) / 60_000
-  const surcharges = applicableSurcharges(driver.surcharges, leadTimeMinutes)
+  // Majorations automatiques (dernière minute…) puis, en plus, le supplément lié
+  // au nombre de personnes dans le véhicule. Toutes s'appliquent de la même façon
+  // sur le sous-total, quel que soit le type de course.
+  const surcharges: SurchargeInput[] = [
+    ...applicableSurcharges(driver.surcharges, leadTimeMinutes),
+    ...passengerSurcharges(args.passengers ?? 1, {
+      thirdPassengerCents: driver.passengerSurcharge3Cents,
+      fourthPassengerCents: driver.passengerSurcharge4Cents,
+    }),
+  ]
 
   if (type === 'TRANSFER') {
     if (!args.pickup || !args.dropoff) {

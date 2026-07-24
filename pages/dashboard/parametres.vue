@@ -767,6 +767,46 @@ async function saveAirport() {
   )
 }
 
+// ─── Supplément par personne (3e et 4e personne, cumulatif) ────────────────
+// Deux montants : celui de la 3e personne s'applique dès 3 passagers, celui de
+// la 4e s'ajoute EN PLUS dès 4 passagers. Champ vide = pas de supplément. Le
+// sélecteur de nombre de personnes n'apparaît sur la page publique que si au
+// moins un montant est renseigné.
+
+const passengerSurcharge = reactive({ thirdEuros: '', fourthEuros: '' })
+
+watchEffect(() => {
+  if (!me.value) return
+  const d = me.value as Record<string, unknown>
+  const toEuros = (v: unknown) => (v != null ? ((v as number) / 100).toFixed(2) : '')
+  passengerSurcharge.thirdEuros = toEuros(d.passengerSurcharge3Cents)
+  passengerSurcharge.fourthEuros = toEuros(d.passengerSurcharge4Cents)
+})
+
+// Récapitulatif en clair, avec le total cumulé à 4 personnes (ce que le client paie).
+const passengerRecap = computed(() => {
+  const third = eurosToCents(passengerSurcharge.thirdEuros)
+  const fourth = eurosToCents(passengerSurcharge.fourthEuros)
+  if (third == null && fourth == null) return ''
+  const parts: string[] = []
+  if (third != null) parts.push(`dès 3 personnes : +${formatMoney(third, currency.value)}`)
+  if (fourth != null)
+    parts.push(`dès 4 personnes : +${formatMoney((third ?? 0) + fourth, currency.value)} au total`)
+  return parts.join(', ') + '.'
+})
+
+async function savePassengers() {
+  await call('passengers', () =>
+    $fetch('/api/dashboard/rates/passengers', {
+      method: 'PUT',
+      body: {
+        thirdPassengerCents: eurosToCents(passengerSurcharge.thirdEuros),
+        fourthPassengerCents: eurosToCents(passengerSurcharge.fourthEuros),
+      },
+    }),
+  )
+}
+
 // ─── Majoration dernière minute ───────────────────────────────────────────
 // Une seule règle, simple : « course réservée moins de X heures avant le départ
 // → +Y € ». Stockée comme un supplément automatique borné par une fenêtre
@@ -1328,6 +1368,61 @@ async function call(key: string, fn: () => Promise<unknown>) {
             {{ saving === 'minimum' ? '…' : 'Enregistrer' }}
           </button>
         </div>
+      </form>
+
+      <!-- Supplément selon le nombre de personnes (3e et 4e personne, cumulatif) -->
+      <form class="card space-y-4" @submit.prevent="savePassengers">
+        <div>
+          <h2 class="font-semibold text-slate-900">Supplément par personne</h2>
+          <p class="mt-1 text-sm text-slate-600">
+            Facturez un supplément quand une 3e puis une 4e personne monte à bord.
+            Le client indique le nombre de personnes au moment de réserver et le
+            supplément s'ajoute à son prix. Laissez un champ vide pour ne rien facturer.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="label" for="pax-3">3e personne (€)</label>
+            <input
+              id="pax-3"
+              v-model="passengerSurcharge.thirdEuros"
+              type="number"
+              step="0.01"
+              min="0.01"
+              class="field"
+              placeholder="5,00"
+            />
+          </div>
+          <div>
+            <label class="label" for="pax-4">4e personne (€)</label>
+            <input
+              id="pax-4"
+              v-model="passengerSurcharge.fourthEuros"
+              type="number"
+              step="0.01"
+              min="0.01"
+              class="field"
+              placeholder="5,00"
+            />
+          </div>
+        </div>
+
+        <div v-if="passengerRecap" class="rounded-xl bg-brand-50 px-4 py-3">
+          <p class="text-sm font-medium text-slate-900">{{ passengerRecap }}</p>
+          <p class="mt-1 text-xs text-slate-500">
+            Le supplément de la 4e personne s'ajoute à celui de la 3e (barème cumulatif).
+            Le sélecteur du nombre de personnes n'apparaît sur votre page que si un
+            montant est renseigné.
+          </p>
+        </div>
+        <p v-else class="text-sm text-slate-500">
+          Aucun supplément : le prix ne dépend pas du nombre de personnes.
+        </p>
+
+        <button type="submit" class="btn-primary !py-2.5 text-sm" :disabled="saving === 'passengers'">
+          {{ saving === 'passengers' ? '…' : 'Enregistrer' }}
+        </button>
       </form>
 
       <!-- Majoration dernière minute -->
