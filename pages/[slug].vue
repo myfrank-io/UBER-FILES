@@ -6,15 +6,14 @@ import { timezoneLabel } from '~/lib/datetime'
 import {
   AIRPORT_HUB_IDS,
   AIRPORT_HUB_LABELS,
-  AIRPORT_ZONES,
   airportHubAvailable,
   airportPackageCents,
-  airportZoneAvailable,
-  type AirportHubId,
   type AirportRates,
+  type AirportSelection,
   type AirportZone,
 } from '~/lib/airport'
-import { findHubById, findTerminal } from '~/lib/hubs'
+import { detectAirportRide } from '~/lib/airport-detect'
+import { findHubByText, findTerminal } from '~/lib/hubs'
 
 const route = useRoute()
 const slug = route.params.slug as string
@@ -140,14 +139,15 @@ useHead(() => {
 })
 
 // ─── État du formulaire ───
-// Prestations proposées, dans l'ordre des onglets : transfert, aéroport, mise à
-// disposition. Le premier disponible est présélectionné (transfert par défaut).
-type BookingType = 'TRANSFER' | 'AIRPORT' | 'HOURLY'
+// Deux prestations : les courses (trajet A → B, transferts aéroport compris) et
+// la mise à disposition. Le transfert aéroport n'a plus d'onglet : il est reconnu
+// automatiquement dès qu'une des deux adresses est un aéroport tarifé.
+type BookingType = 'TRANSFER' | 'HOURLY'
 function computeAvailableTypes(d: DriverPublic | null | undefined): BookingType[] {
   if (!d) return ['TRANSFER']
   const list: BookingType[] = []
-  if (d.hasTransfer) list.push('TRANSFER')
-  if (d.airportTransfer?.enabled) list.push('AIRPORT')
+  // Une grille kilométrique OU des forfaits aéroport suffisent à proposer des courses.
+  if (d.hasTransfer || d.airportTransfer?.enabled) list.push('TRANSFER')
   if (d.hasHourly) list.push('HOURLY')
   return list.length ? list : ['TRANSFER']
 }
@@ -159,14 +159,18 @@ const dropoff = ref('')
 // Details). null tant que l'utilisateur tape librement → repli géocodage du texte.
 const pickupCoords = ref<{ lat: number; lng: number } | null>(null)
 const dropoffCoords = ref<{ lat: number; lng: number } | null>(null)
-// Terminal/hall de prise en charge choisi (hubs) + coords précises de ce terminal.
+// Terminal/hall choisi (hubs) + coords précises de ce terminal, aux deux bouts.
 const pickupTerminal = ref<string | null>(null)
 const terminalCoords = ref<{ lat: number; lng: number } | null>(null)
+const dropoffTerminal = ref<string | null>(null)
+const dropoffTerminalCoords = ref<{ lat: number; lng: number } | null>(null)
 const roundTrip = ref(false)
 const durationHours = ref(2)
+// N° de vol : demandé uniquement sur un transfert aéroport reconnu.
+const airportFlight = ref('')
 
 // ─── Nombre de personnes (supplément 3e / 4e personne) ───
-// Le sélecteur n'apparaît (étape coordonnées) que si le chauffeur a configuré un
+// Le sélecteur n'apparaît (étape course) que si le chauffeur a configuré un
 // supplément. Le prix se recalcule côté serveur à chaque changement — l'aperçu
 // client ci-dessous n'est qu'informatif.
 const passengerConfig = computed(() => driver.value?.passengerSurcharge ?? null)
@@ -184,75 +188,107 @@ function passengerSurchargeCents(count: number): number {
   return sum
 }
 
-// ─── Onglet Aéroport ───
-// Parcours : aéroport → sens → zone (prix affiché sur les cartes, avant toute
-// adresse) → terminal / n° de vol / adresse → date. Les forfaits arrivent avec le
-// profil public : l'affichage des prix est instantané.
+// ─── Transfert aéroport : reconnu, plus déclaré ───
+// Le client saisit simplement son départ et son arrivée. Dès qu'un des deux bouts
+// est un aéroport tarifé par le chauffeur, le forfait de la zone (ou le prix au km
+// hors Paris) remplace la grille kilométrique, et l'écran s'enrichit de ce qui est
+// propre à l'aéroport : forfait annoncé, contenu de la prestation, n° de vol.
+// Même fonction de détection que le serveur (lib/airport-detect) — mais c'est
+// TOUJOURS le calcul serveur qui fait foi : ici, on ne fait qu'anticiper l'affichage.
 const airportRates = computed(() => driver.value?.airportTransfer?.rates ?? null)
-const airportHub = ref<AirportHubId | null>(null)
-const airportDirection = ref<'FROM_AIRPORT' | 'TO_AIRPORT'>('FROM_AIRPORT')
-const airportZone = ref<AirportZone | null>(null)
-const airportTerminal = ref('') // code terminal ('' = non précisé)
-const airportFlight = ref('')
-const airportAddress = ref('') // adresse côté ville (l'autre bout du trajet)
-const airportAddressCoords = ref<{ lat: number; lng: number } | null>(null)
 
-const airportHubs = computed(() =>
-  airportRates.value
-    ? AIRPORT_HUB_IDS.filter((h) => airportHubAvailable(airportRates.value!, h))
-    : [],
-)
-const airportZones = computed(() =>
-  airportRates.value && airportHub.value
-    ? AIRPORT_ZONES.filter((z) => airportZoneAvailable(airportRates.value!, airportHub.value!, z))
-    : [],
-)
-// Détail (nom complet, terminaux) de l'aéroport choisi, depuis le catalogue des hubs.
-const airportHubData = computed(() => findHubById(airportHub.value))
+// Un bout de trajet = son texte + les coordonnées les plus précises dont on dispose
+// (terminal choisi > lieu résolu dans l'autocomplétion).
+const pickupPoint = computed(() => ({
+  address: pickup.value,
+  coords: terminalCoords.value ?? pickupCoords.value,
+}))
+const dropoffPoint = computed(() => ({
+  address: dropoff.value,
+  coords: dropoffTerminalCoords.value ?? dropoffCoords.value,
+}))
 
-// Forfait de la zone sélectionnée (null hors Paris : tarifé au km, prix après l'adresse).
+const airportRide = computed(() =>
+  type.value === 'TRANSFER'
+    ? detectAirportRide({
+        rates: airportRates.value,
+        pickup: pickupPoint.value,
+        dropoff: dropoffPoint.value,
+      })
+    : null,
+)
+const airportSelection = computed<AirportSelection | null>(() => airportRide.value?.selection ?? null)
+
+// Forfait applicable (null hors Paris : tarifé au km, prix connu après calcul).
 const airportPackagePrice = computed(() =>
-  airportRates.value && airportHub.value && airportZone.value
-    ? airportPackageCents(airportRates.value, airportHub.value, airportZone.value)
+  airportRates.value && airportSelection.value
+    ? airportPackageCents(
+        airportRates.value,
+        airportSelection.value.hub,
+        airportSelection.value.zone,
+      )
     : null,
 )
 
-function airportZonePrice(zone: AirportZone): number | null {
-  if (!airportRates.value || !airportHub.value) return null
-  return airportPackageCents(airportRates.value, airportHub.value, zone)
-}
-
-// Un seul aéroport proposé → présélectionné (zéro clic inutile). Idem pour la zone.
-watchEffect(() => {
-  if (type.value !== 'AIRPORT') return
-  if (!airportHub.value && airportHubs.value.length === 1) airportHub.value = airportHubs.value[0]!
-  if (!airportZone.value && airportZones.value.length === 1) airportZone.value = airportZones.value[0]!
-})
-// Changement d'aéroport : la zone choisie peut ne plus être proposée, le terminal
-// n'a plus de sens — on repart proprement.
-watch(airportHub, () => {
-  if (airportZone.value && !airportZones.value.includes(airportZone.value)) airportZone.value = null
-  airportTerminal.value = ''
+// Un forfait aéroport couvre un trajet simple : l'aller-retour n'a pas de sens ici
+// (le client réserve deux courses). La case disparaît, et on la décoche au cas où
+// elle aurait été cochée avant la saisie des adresses.
+watch(airportRide, (ride) => {
+  if (ride) roundTrip.value = false
 })
 
-// Libellés des onglets ; « Mise à dispo » en version courte quand trois onglets
-// se partagent la largeur d'un écran mobile.
 function typeTabLabel(bt: BookingType): string {
-  if (bt === 'TRANSFER') return t('public.typeTransfer')
-  if (bt === 'AIRPORT') return t('public.typeAirport')
-  return availableTypes.value.length === 3 ? t('public.typeHourlyShort') : t('public.typeHourly')
+  return bt === 'TRANSFER' ? t('public.typeRides') : t('public.typeHourly')
 }
 
-const airportZoneHints: Record<AirportZone, () => string> = {
-  RIVE_DROITE: () => t('public.airportZoneRightHint'),
-  RIVE_GAUCHE: () => t('public.airportZoneLeftHint'),
-  HORS_PARIS: () => t('public.airportZoneOutsideHint'),
-}
 const airportZoneNames: Record<AirportZone, () => string> = {
   RIVE_DROITE: () => t('public.airportZoneRight'),
   RIVE_GAUCHE: () => t('public.airportZoneLeft'),
   HORS_PARIS: () => t('public.airportZoneOutside'),
 }
+
+// « Orly → Paris rive gauche » : le trajet reconnu, dans le sens du déplacement.
+const airportRouteLabel = computed(() => {
+  const selection = airportSelection.value
+  if (!selection) return ''
+  const hub = AIRPORT_HUB_LABELS[selection.hub]
+  const zone = airportZoneNames[selection.zone]()
+  return selection.direction === 'FROM_AIRPORT' ? `${hub} → ${zone}` : `${zone} → ${hub}`
+})
+
+// ─── Annonce des forfaits aéroport ───
+// L'onglet dédié disparu, plus rien ne dirait au client que des forfaits existent
+// tant qu'il n'a pas tapé une adresse d'aéroport. Ce rappel prend le relais : il
+// nomme les aéroports couverts et le meilleur forfait, puis s'efface dès que la
+// course est reconnue (le bloc aéroport, plus précis, prend sa place).
+const airportHubNames = computed(() => {
+  const rates = airportRates.value
+  if (!rates) return ''
+  return AIRPORT_HUB_IDS.filter((hub) => airportHubAvailable(rates, hub))
+    .map((hub) => AIRPORT_HUB_LABELS[hub])
+    .join(' · ')
+})
+const airportFromPrice = computed(() => {
+  const rates = airportRates.value
+  if (!rates) return null
+  const packages = [
+    rates.orlyRiveDroiteCents,
+    rates.orlyRiveGaucheCents,
+    rates.cdgRiveDroiteCents,
+    rates.cdgRiveGaucheCents,
+  ].filter((cents): cents is number => cents != null)
+  return packages.length ? Math.min(...packages) : null
+})
+
+// Terminal d'arrivée : il n'existe pas de colonne dédiée côté demande (seul le
+// terminal de PRISE EN CHARGE est stocké), on l'ajoute donc au libellé de l'adresse.
+const dropoffTerminalData = computed(() => {
+  const hub = findHubByText(dropoff.value)
+  return hub ? findTerminal(hub, dropoffTerminal.value) : null
+})
+const dropoffAddressLabel = computed(() =>
+  dropoffTerminalData.value ? `${dropoff.value} · ${dropoffTerminalData.value.label}` : dropoff.value,
+)
 // Fuseau du lieu de prise en charge (chauffeur). TOUTE heure saisie/affichée est
 // ancrée dessus, jamais sur le fuseau du navigateur du client — sinon un client
 // dans un autre fuseau (ex : Antilles) verrait/enverrait une heure décalée.
@@ -366,22 +402,10 @@ const selectedIsOnline = computed(() => selectedPayment.value === 'STRIPE_PREPAY
 const step = ref<'details' | 'contact'>('details')
 
 // Toute modification de la course invalide l'estimation (et ramène à l'étape 1) :
-// on ne peut pas réserver sur un prix périmé. Le terminal aéroport en fait partie
-// (il déplace le point de départ, donc la distance facturée hors Paris).
+// on ne peut pas réserver sur un prix périmé. Les terminaux en font partie (ils
+// déplacent le point de prise en charge, donc la distance facturée).
 watch(
-  [
-    type,
-    pickup,
-    dropoff,
-    roundTrip,
-    durationHours,
-    scheduledAt,
-    airportHub,
-    airportDirection,
-    airportZone,
-    airportTerminal,
-    airportAddress,
-  ],
+  [type, pickup, dropoff, pickupTerminal, dropoffTerminal, roundTrip, durationHours, scheduledAt],
   () => {
     estimate.value = null
     step.value = 'details'
@@ -413,66 +437,28 @@ function isoScheduledAt(): string {
 }
 
 async function buildPayload() {
-  // Transfert aéroport : un TRANSFER classique côté API, enrichi du choix
-  // aéroport/sens/zone. Le bout « aéroport » du trajet est ancré sur le terminal
-  // choisi (à défaut, le premier terminal du catalogue), le bout « ville » sur
-  // l'adresse saisie.
-  if (type.value === 'AIRPORT') {
-    const hub = airportHubData.value
-    if (!hub || !airportHub.value || !airportZone.value) {
-      throw new Error(t('common.genericError'))
-    }
-    const terminal = findTerminal(hub, airportTerminal.value || null)
-    const hubPoint = terminal ?? hub.terminals[0]!
-    const hubCoords = { lat: hubPoint.lat, lng: hubPoint.lng }
-    const cityCoords = await resolveCoords(airportAddress.value, airportAddressCoords.value)
-    const base: Record<string, unknown> = {
-      type: 'TRANSFER',
-      scheduledAt: isoScheduledAt(),
-      airport: {
-        hub: airportHub.value,
-        direction: airportDirection.value,
-        zone: airportZone.value,
-      },
-      roundTrip: false,
-    }
-    if (airportFlight.value.trim()) base.flightNumber = airportFlight.value.trim().slice(0, 16)
-    if (airportDirection.value === 'FROM_AIRPORT') {
-      base.pickup = hubCoords
-      base.pickupAddress = hub.name
-      // Le terminal est stocké en code (affiché « Aéroport … · Terminal 2E » au chauffeur).
-      if (terminal) base.pickupTerminal = terminal.code
-      base.dropoff = cityCoords
-      base.dropoffAddress = airportAddress.value
-    } else {
-      base.pickup = cityCoords
-      base.pickupAddress = airportAddress.value
-      base.dropoff = hubCoords
-      // Pas de champ « terminal d'arrivée » : le libellé part dans l'adresse.
-      base.dropoffAddress = terminal ? `${hub.name} · ${terminal.label}` : hub.name
-    }
-    if (passengerConfig.value) base.passengers = passengers.value
-    return base
-  }
-
   const base: Record<string, unknown> = { type: type.value, scheduledAt: isoScheduledAt() }
   if (passengerConfig.value) base.passengers = passengers.value
   // Le terminal choisi (hub) fournit la coordonnée de prise en charge la plus précise.
-  const pickupResolved = terminalCoords.value ?? pickupCoords.value
   if (pickupTerminal.value) base.pickupTerminal = pickupTerminal.value
   if (type.value === 'TRANSFER') {
     const [p, d] = await Promise.all([
-      resolveCoords(pickup.value, pickupResolved),
-      resolveCoords(dropoff.value, dropoffCoords.value),
+      resolveCoords(pickup.value, pickupPoint.value.coords),
+      resolveCoords(dropoff.value, dropoffPoint.value.coords),
     ])
     base.pickup = p
     base.dropoff = d
+    // Les adresses en clair partent avec les coordonnées : le serveur s'en sert
+    // pour reconnaître le transfert aéroport et sa zone (code postal parisien).
     base.pickupAddress = pickup.value
-    base.dropoffAddress = dropoff.value
+    base.dropoffAddress = dropoffAddressLabel.value
     base.roundTrip = roundTrip.value
+    if (airportRide.value && airportFlight.value.trim()) {
+      base.flightNumber = airportFlight.value.trim().slice(0, 16)
+    }
   } else {
     // Mise à disposition : le lieu de prise en charge est requis aussi.
-    base.pickup = await resolveCoords(pickup.value, pickupResolved)
+    base.pickup = await resolveCoords(pickup.value, pickupPoint.value.coords)
     base.pickupAddress = pickup.value
     base.durationHours = durationHours.value
   }
@@ -566,14 +552,11 @@ function errMessage(e: unknown): string {
   return err?.data?.statusMessage || err?.data?.message || err?.statusMessage || t('common.genericError')
 }
 
-const canEstimate = computed(() => {
-  if (type.value === 'AIRPORT') {
-    return Boolean(airportHub.value && airportZone.value) && airportAddress.value.length > 3
-  }
-  return type.value === 'TRANSFER'
+const canEstimate = computed(() =>
+  type.value === 'TRANSFER'
     ? pickup.value.length > 3 && dropoff.value.length > 3
-    : pickup.value.length > 3 && durationHours.value >= 1
-})
+    : pickup.value.length > 3 && durationHours.value >= 1,
+)
 const canSubmit = computed(
   () => Boolean(estimate.value) && customer.name.length >= 2 && customer.phone.length >= 6 && customer.email.includes('@'),
 )
@@ -596,29 +579,30 @@ function goToContact() {
 // Libellé de l'encadré de prix : « Prix du trajet » quand c'est le forfait
 // aéroport tel quel (prix fixe, pas une estimation), « Estimation » sinon.
 const estimateBoxLabel = computed(() =>
-  type.value === 'AIRPORT' &&
-  airportPackagePrice.value != null &&
-  estimate.value?.amountCents === airportPackagePrice.value
+  airportPackagePrice.value != null && estimate.value?.amountCents === airportPackagePrice.value
     ? t('public.airportPriceLabel')
     : t('public.estimateLabel'),
 )
 
-// ─── CTA de l'onglet Aéroport ───
-// Forfait : « Réserver — 65,00 € » en un seul geste. Le prix serveur est vérifié
-// au clic ; s'il diffère du forfait (majoration dernière minute…), le détail
-// s'affiche d'abord pour que le client valide en connaissance de cause. Hors
-// Paris : « Voir le prix exact », puis le flux d'estimation classique.
-const airportCtaLabel = computed(() => {
+// ─── Bouton principal de l'étape 1 ───
+// Forfait aéroport reconnu : « Réserver — 65,00 € » en un seul geste — le prix est
+// déjà connu, autant l'annoncer. Le calcul serveur est tout de même vérifié au
+// clic ; s'il diffère du forfait (majoration dernière minute…), le détail s'affiche
+// d'abord pour que le client valide en connaissance de cause.
+// Sinon (course classique, ou aéroport hors Paris tarifé au km) : « Estimer le prix ».
+const priceCtaLabel = computed(() => {
   if (estimating.value) return t('public.estimating')
   if (airportPackagePrice.value != null && driver.value) {
     return `${reserveLabel.value} — ${formatMoney(airportPackagePrice.value, driver.value.currency)}`
   }
-  return t('public.airportSeePrice')
+  return airportRide.value ? t('public.airportSeePrice') : t('public.estimateButton')
 })
 
-async function airportContinue() {
+async function priceCtaClick() {
   await getEstimate()
   if (!estimate.value) return
+  // Le montant annoncé sur le bouton est confirmé par le serveur : on enchaîne
+  // directement sur les coordonnées, sans faire relire un prix déjà lu.
   if (
     airportPackagePrice.value != null &&
     estimate.value.amountCents === airportPackagePrice.value
@@ -737,15 +721,13 @@ async function airportContinue() {
         <form v-else class="card space-y-3.5 !p-4" @submit.prevent="submit">
           <!-- Étape 1 : course + estimation (les coordonnées ne sont pas encore demandées) -->
           <template v-if="step === 'details'">
-            <!-- Type de prestation — transfert d'abord, puis aéroport et mise à
-                 disposition ; sélecteur masqué quand une seule prestation est proposée. -->
+            <!-- Type de prestation — les courses d'abord (transferts aéroport
+                 compris), puis la mise à disposition ; sélecteur masqué quand une
+                 seule prestation est proposée. -->
             <div
               v-if="availableTypes.length > 1"
-              class="grid gap-1 rounded-xl bg-slate-100 p-1"
-              :class="availableTypes.length === 3 ? 'grid-cols-3' : 'grid-cols-2'"
+              class="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1"
             >
-              <!-- text-[13px] sur mobile : chaque libellé doit tenir sur une seule ligne
-                   (« Mise à dispo » en version courte quand trois onglets cohabitent). -->
               <button
                 v-for="bt in availableTypes"
                 :key="bt"
@@ -759,7 +741,8 @@ async function airportContinue() {
               </button>
             </div>
 
-            <!-- Transfert -->
+            <!-- Course : départ → arrivée. Si l'un des deux bouts est un aéroport
+                 tarifé, le forfait s'applique et le bloc aéroport apparaît. -->
             <template v-if="type === 'TRANSFER'">
               <div>
                 <label class="label" for="pickup">{{ $t('public.pickupLabel') }}</label>
@@ -769,171 +752,97 @@ async function airportContinue() {
               <div>
                 <label class="label" for="dropoff">{{ $t('public.dropoffLabel') }}</label>
                 <AddressField id="dropoff" v-model="dropoff" :placeholder="$t('public.dropoffPlaceholder')" @resolve="dropoffCoords = $event" />
-              </div>
-              <label class="flex items-center gap-2.5 py-1 text-sm text-slate-700">
-                <input v-model="roundTrip" type="checkbox" class="h-5 w-5 shrink-0 rounded border-slate-300" />
-                {{ $t('public.roundTrip') }}
-              </label>
-            </template>
-
-            <!-- Transfert aéroport : aéroport → sens → zone (prix affiché avant
-                 l'adresse) → terminal / vol / adresse. -->
-            <template v-else-if="type === 'AIRPORT'">
-              <div>
-                <p class="label">{{ $t('public.airportWhich') }}</p>
-                <div class="grid gap-2" :class="airportHubs.length > 1 ? 'grid-cols-2' : 'grid-cols-1'">
-                  <button
-                    v-for="h in airportHubs"
-                    :key="h"
-                    type="button"
-                    class="min-h-[60px] rounded-xl border p-3 text-left transition"
-                    :class="airportHub === h
-                      ? 'border-brand-600 bg-brand-50 shadow-sm'
-                      : 'border-slate-200 hover:border-brand-300'"
-                    :aria-pressed="airportHub === h"
-                    @click="airportHub = h"
-                  >
-                    <span class="block text-sm font-semibold text-slate-900">✈️ {{ AIRPORT_HUB_LABELS[h] }}</span>
-                    <span class="mt-0.5 block truncate text-[11px] text-slate-500">{{ findHubById(h)?.name }}</span>
-                  </button>
-                </div>
+                <TerminalPicker
+                  class="mt-3"
+                  :address="dropoff"
+                  v-model="dropoffTerminal"
+                  arrival
+                  @coords="dropoffTerminalCoords = $event"
+                />
               </div>
 
-              <template v-if="airportHub">
-                <!-- Sens du trajet -->
-                <div class="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
-                  <button
-                    type="button"
-                    class="whitespace-nowrap rounded-lg px-1.5 py-2.5 text-[13px] font-semibold transition sm:text-sm"
-                    :class="airportDirection === 'FROM_AIRPORT' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
-                    :aria-pressed="airportDirection === 'FROM_AIRPORT'"
-                    @click="airportDirection = 'FROM_AIRPORT'"
-                  >
-                    {{ $t('public.airportFromOption') }}
-                  </button>
-                  <button
-                    type="button"
-                    class="whitespace-nowrap rounded-lg px-1.5 py-2.5 text-[13px] font-semibold transition sm:text-sm"
-                    :class="airportDirection === 'TO_AIRPORT' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
-                    :aria-pressed="airportDirection === 'TO_AIRPORT'"
-                    @click="airportDirection = 'TO_AIRPORT'"
-                  >
-                    {{ $t('public.airportToOption') }}
-                  </button>
-                </div>
-
-                <!-- Zone : le prix se lit sur la carte, avant toute saisie d'adresse. -->
-                <div>
-                  <p class="label">
-                    {{ airportDirection === 'FROM_AIRPORT' ? $t('public.airportZoneQuestionFrom') : $t('public.airportZoneQuestionTo') }}
-                  </p>
-                  <div class="space-y-2">
-                    <button
-                      v-for="z in airportZones"
-                      :key="z"
-                      type="button"
-                      class="flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left transition"
-                      :class="airportZone === z
-                        ? 'border-brand-600 bg-brand-50 shadow-sm'
-                        : 'border-slate-200 hover:border-brand-300'"
-                      :aria-pressed="airportZone === z"
-                      @click="airportZone = z"
-                    >
-                      <span class="min-w-0">
-                        <span class="block text-sm font-semibold text-slate-900">{{ airportZoneNames[z]() }}</span>
-                        <span class="mt-0.5 block text-[11px] leading-snug text-slate-500">{{ airportZoneHints[z]() }}</span>
-                      </span>
-                      <span class="shrink-0 text-right">
-                        <template v-if="z !== 'HORS_PARIS'">
-                          <span class="block font-serif text-lg font-medium tracking-tight text-slate-900">
-                            {{ formatMoney(airportZonePrice(z)!, driver.currency) }}
-                          </span>
-                          <span class="block text-[10px] font-semibold uppercase tracking-wide text-green-700">
-                            {{ $t('public.airportFixedPrice') }}
-                          </span>
-                        </template>
-                        <span v-else class="block font-serif text-lg font-medium tracking-tight text-slate-900">
-                          {{ formatMoney(airportRates!.kmRateCents!, driver.currency) }}<span class="font-sans text-xs text-slate-500">/km</span>
-                        </span>
-                      </span>
-                    </button>
+              <!-- Transfert aéroport reconnu : le client n'a rien eu à déclarer.
+                   Tout ce qui est propre à l'aéroport tient dans ce seul bloc —
+                   trajet, prix, contenu du forfait, n° de vol. -->
+              <div v-if="airportRide" class="space-y-3 rounded-xl border border-brand-200 bg-brand-50/60 p-3.5">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-700">
+                      ✈️ {{ $t('public.airportDetected') }}
+                    </p>
+                    <p class="mt-0.5 text-sm font-semibold leading-snug text-slate-900">{{ airportRouteLabel }}</p>
                   </div>
+                  <span class="shrink-0 text-right">
+                    <template v-if="airportPackagePrice != null">
+                      <span class="block font-serif text-xl font-medium tracking-tight text-slate-900">
+                        {{ formatMoney(airportPackagePrice, driver.currency) }}
+                      </span>
+                      <span class="block text-[10px] font-semibold uppercase tracking-wide text-green-700">
+                        {{ $t('public.airportFixedPrice') }}
+                      </span>
+                    </template>
+                    <span v-else-if="airportRates?.kmRateCents" class="block font-serif text-xl font-medium tracking-tight text-slate-900">
+                      {{ formatMoney(airportRates.kmRateCents, driver.currency) }}<span class="font-sans text-xs text-slate-500">/km</span>
+                    </span>
+                  </span>
                 </div>
 
-                <!-- Détails : côté aéroport (terminal, vol) et côté ville (adresse),
-                     dans l'ordre du trajet selon le sens choisi. -->
-                <template v-if="airportZone">
-                  <template v-if="airportDirection === 'FROM_AIRPORT'">
-                    <div class="grid gap-3 sm:grid-cols-2">
-                      <div v-if="airportHubData && airportHubData.terminals.length > 1">
-                        <label class="label" for="airport-terminal">
-                          {{ $t('public.airportTerminalLabel') }}
-                          <span class="font-normal text-slate-400">{{ $t('public.airportOptional') }}</span>
-                        </label>
-                        <select id="airport-terminal" v-model="airportTerminal" class="field">
-                          <option value="">{{ $t('public.airportTerminalAny') }}</option>
-                          <option v-for="term in airportHubData.terminals" :key="term.code" :value="term.code">
-                            {{ term.label }}
-                          </option>
-                        </select>
-                      </div>
-                      <div>
-                        <label class="label" for="airport-flight">
-                          {{ $t('public.airportFlightLabel') }}
-                          <span class="font-normal text-slate-400">{{ $t('public.airportOptional') }}</span>
-                        </label>
-                        <input
-                          id="airport-flight"
-                          v-model="airportFlight"
-                          type="text"
-                          class="field"
-                          maxlength="16"
-                          placeholder="AF 1234"
-                          autocapitalize="characters"
-                        />
-                        <p class="mt-1 text-xs text-slate-500">{{ $t('public.airportFlightHint') }}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <label class="label" for="airport-address">{{ $t('public.dropoffLabel') }}</label>
-                      <AddressField
-                        id="airport-address"
-                        v-model="airportAddress"
-                        :placeholder="$t('public.airportAddressPlaceholder')"
-                        @resolve="airportAddressCoords = $event"
-                      />
-                      <p v-if="airportZone !== 'HORS_PARIS'" class="mt-1 text-xs text-slate-500">
-                        {{ $t('public.airportAddressHint') }}
-                      </p>
-                    </div>
-                  </template>
-                  <template v-else>
-                    <div>
-                      <label class="label" for="airport-address">{{ $t('public.pickupLabel') }}</label>
-                      <AddressField
-                        id="airport-address"
-                        v-model="airportAddress"
-                        :placeholder="$t('public.airportAddressPlaceholder')"
-                        @resolve="airportAddressCoords = $event"
-                      />
-                      <p v-if="airportZone !== 'HORS_PARIS'" class="mt-1 text-xs text-slate-500">
-                        {{ $t('public.airportAddressHint') }}
-                      </p>
-                    </div>
-                    <div v-if="airportHubData && airportHubData.terminals.length > 1">
-                      <label class="label" for="airport-terminal-to">
-                        {{ $t('public.airportTerminalLabel') }}
-                        <span class="font-normal text-slate-400">{{ $t('public.airportOptional') }}</span>
-                      </label>
-                      <select id="airport-terminal-to" v-model="airportTerminal" class="field">
-                        <option value="">{{ $t('public.airportTerminalAny') }}</option>
-                        <option v-for="term in airportHubData.terminals" :key="term.code" :value="term.code">
-                          {{ term.label }}
-                        </option>
-                      </select>
-                    </div>
-                  </template>
-                </template>
+                <!-- Ce que comprend la prestation : annoncé avant de réserver,
+                     pas découvert le jour de la course. -->
+                <ul class="space-y-1.5 border-t border-brand-200/70 pt-3 text-xs leading-snug text-slate-600">
+                  <li class="flex gap-2">
+                    <span aria-hidden="true">👥</span><span>{{ $t('public.airportIncludedPassengers') }}</span>
+                  </li>
+                  <li class="flex gap-2">
+                    <span aria-hidden="true">🧳</span><span>{{ $t('public.airportIncludedLuggage') }}</span>
+                  </li>
+                  <li class="flex gap-2">
+                    <span aria-hidden="true">🚫</span><span>{{ $t('public.airportIncludedNoTrunk') }}</span>
+                  </li>
+                  <li class="flex gap-2">
+                    <span aria-hidden="true">⏱</span><span>{{ $t('public.airportWaitingNotice') }}</span>
+                  </li>
+                </ul>
+
+                <div class="border-t border-brand-200/70 pt-3">
+                  <label class="label" for="airport-flight">
+                    {{ $t('public.airportFlightLabel') }}
+                    <span class="font-normal text-slate-400">{{ $t('public.airportOptional') }}</span>
+                  </label>
+                  <input
+                    id="airport-flight"
+                    v-model="airportFlight"
+                    type="text"
+                    class="field"
+                    maxlength="16"
+                    placeholder="AF 1234"
+                    autocapitalize="characters"
+                  />
+                  <p class="mt-1 text-xs text-slate-500">{{ $t('public.airportFlightHint') }}</p>
+                </div>
+              </div>
+
+              <!-- Aucun aéroport reconnu pour l'instant : on annonce quand même les
+                   forfaits, sinon plus rien ne dit au client qu'ils existent. -->
+              <template v-else>
+                <p
+                  v-if="airportHubNames"
+                  class="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-snug text-slate-600"
+                >
+                  ✈️
+                  {{
+                    airportFromPrice != null
+                      ? $t('public.airportHintFrom', {
+                          hubs: airportHubNames,
+                          amount: formatMoney(airportFromPrice, driver.currency),
+                        })
+                      : $t('public.airportHint', { hubs: airportHubNames })
+                  }}
+                </p>
+                <label class="flex items-center gap-2.5 py-1 text-sm text-slate-700">
+                  <input v-model="roundTrip" type="checkbox" class="h-5 w-5 shrink-0 rounded border-slate-300" />
+                  {{ $t('public.roundTrip') }}
+                </label>
               </template>
             </template>
 
@@ -950,9 +859,49 @@ async function airportContinue() {
               </div>
             </template>
 
-            <!-- Date/heure — sur l'onglet Aéroport, seulement une fois la zone choisie
-                 (l'écran d'entrée reste concentré sur aéroport → sens → zone). -->
-            <div v-if="type !== 'AIRPORT' || airportZone">
+            <!-- Nombre de personnes — remonté ici (et non à l'étape coordonnées) :
+                 le forfait aéroport est annoncé pour 2 personnes juste au-dessus,
+                 c'est donc le moment où l'on se demande si l'on est plus nombreux.
+                 N'apparaît que si le chauffeur facture un supplément 3e / 4e personne. -->
+            <div v-if="passengerConfig">
+              <p class="label">{{ $t('public.passengersLabel') }}</p>
+              <div class="mt-1 flex items-center gap-3">
+                <div class="inline-flex items-center overflow-hidden rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    class="flex h-11 w-11 items-center justify-center text-xl font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-30"
+                    :disabled="passengers <= 1"
+                    :aria-label="$t('public.passengersDecrease')"
+                    @click="passengers = Math.max(1, passengers - 1)"
+                  >
+                    −
+                  </button>
+                  <span class="min-w-[3rem] text-center text-base font-semibold tabular-nums text-slate-900" aria-live="polite">
+                    {{ passengers }}
+                  </span>
+                  <button
+                    type="button"
+                    class="flex h-11 w-11 items-center justify-center text-xl font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-30"
+                    :disabled="passengers >= maxPassengers"
+                    :aria-label="$t('public.passengersIncrease')"
+                    @click="passengers = Math.min(maxPassengers, passengers + 1)"
+                  >
+                    ＋
+                  </button>
+                </div>
+                <span class="text-xs text-slate-500">
+                  {{ airportRide ? $t('public.passengersAirportHint') : $t('public.passengersHint') }}
+                </span>
+              </div>
+              <p
+                v-if="passengerSurchargeCents(passengers) > 0"
+                class="mt-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
+              >
+                ＋ {{ $t('public.passengersSurchargeNotice', { count: passengers, amount: formatMoney(passengerSurchargeCents(passengers), driver.currency) }) }}
+              </p>
+            </div>
+
+            <div>
               <label class="label" for="datetime">
                 {{ $t('public.datetimeLabel') }}
                 <span class="font-normal text-slate-400">({{ tzHint }})</span>
@@ -967,30 +916,19 @@ async function airportContinue() {
               </p>
             </div>
 
-            <!-- Estimation — masquée dès qu'un prix est affiché (toute modification
-                 de la course le réinitialise et fait réapparaître le bouton). -->
+            <!-- Bouton principal — masqué dès qu'un prix est affiché (toute
+                 modification de la course le réinitialise et le fait réapparaître).
+                 Au forfait aéroport il porte directement le montant et enchaîne sur
+                 les coordonnées ; sinon il estime le prix. -->
             <button
-              v-if="!estimate && type !== 'AIRPORT'"
-              type="button"
-              class="btn-ghost w-full"
-              :disabled="!canEstimate || estimating"
-              @click="getEstimate()"
-            >
-              {{ estimating ? $t('public.estimating') : $t('public.estimateButton') }}
-            </button>
-
-            <!-- CTA aéroport : au forfait, « Réserver — 65,00 € » d'un seul geste
-                 (le prix serveur est vérifié au clic, le détail s'affiche s'il
-                 diffère) ; hors Paris, « Voir le prix exact ». -->
-            <button
-              v-if="!estimate && type === 'AIRPORT' && airportZone"
+              v-if="!estimate"
               type="button"
               class="w-full"
               :class="airportPackagePrice != null ? 'btn-primary' : 'btn-ghost'"
               :disabled="!canEstimate || estimating"
-              @click="airportContinue"
+              @click="priceCtaClick"
             >
-              {{ airportCtaLabel }}
+              {{ priceCtaLabel }}
             </button>
 
             <p v-if="errorMsg" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorMsg }}</p>
@@ -1039,45 +977,6 @@ async function airportContinue() {
               >
                 ← {{ $t('public.modifyTrip') }}
               </button>
-            </div>
-
-            <!-- Nombre de personnes : n'apparaît que si le chauffeur facture un
-                 supplément 3e / 4e personne. Le prix ci-dessus se recalcule à
-                 chaque changement (supplément inclus dans le détail). -->
-            <div v-if="passengerConfig">
-              <p class="label">{{ $t('public.passengersLabel') }}</p>
-              <div class="mt-1 flex items-center gap-3">
-                <div class="inline-flex items-center overflow-hidden rounded-xl border border-slate-200">
-                  <button
-                    type="button"
-                    class="flex h-11 w-11 items-center justify-center text-xl font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-30"
-                    :disabled="passengers <= 1"
-                    :aria-label="$t('public.passengersDecrease')"
-                    @click="passengers = Math.max(1, passengers - 1)"
-                  >
-                    −
-                  </button>
-                  <span class="min-w-[3rem] text-center text-base font-semibold tabular-nums text-slate-900" aria-live="polite">
-                    {{ passengers }}
-                  </span>
-                  <button
-                    type="button"
-                    class="flex h-11 w-11 items-center justify-center text-xl font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-30"
-                    :disabled="passengers >= maxPassengers"
-                    :aria-label="$t('public.passengersIncrease')"
-                    @click="passengers = Math.min(maxPassengers, passengers + 1)"
-                  >
-                    ＋
-                  </button>
-                </div>
-                <span class="text-xs text-slate-500">{{ $t('public.passengersHint') }}</span>
-              </div>
-              <p
-                v-if="passengerSurchargeCents(passengers) > 0"
-                class="mt-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
-              >
-                ＋ {{ $t('public.passengersSurchargeNotice', { count: passengers, amount: formatMoney(passengerSurchargeCents(passengers), driver.currency) }) }}
-              </p>
             </div>
 
             <!-- Coordonnées client -->

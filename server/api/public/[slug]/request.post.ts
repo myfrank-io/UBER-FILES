@@ -54,15 +54,19 @@ export default defineEventHandler(async (event) => {
       scheduledAt,
       pickup: input.pickup,
       dropoff: input.dropoff,
+      pickupAddress: input.pickupAddress,
+      dropoffAddress: input.dropoffAddress,
       roundTrip: input.roundTrip,
       durationHours: input.durationHours,
       passengers: input.passengers,
-      airport: input.airport,
       apiKey: config.googleMapsApiKey || undefined,
     })
   } catch (err) {
     throw createError({ statusCode: 422, statusMessage: (err as Error).message })
   }
+  // Transfert aéroport reconnu par le moteur de devis (déduit des adresses) :
+  // c'est lui qui est enregistré sur la demande et repris dans les notifications.
+  const airport = computation.airport
 
   // Client (upsert sur driver + email)
   const customer = await prisma.customer.upsert({
@@ -127,9 +131,9 @@ export default defineEventHandler(async (event) => {
         passengers: input.passengers,
         pickupTerminal: input.pickupTerminal,
         flightNumber: input.flightNumber,
-        airportHub: input.airport?.hub,
-        airportDirection: input.airport?.direction,
-        airportZone: input.airport?.zone,
+        airportHub: airport?.hub,
+        airportDirection: airport?.direction,
+        airportZone: airport?.zone,
         notes: input.notes,
         preferredPaymentMethod,
       },
@@ -216,7 +220,7 @@ export default defineEventHandler(async (event) => {
   const pickupDisplay = pickupWithTerminal(input.pickupAddress, input.pickupTerminal)
   // Transfert aéroport : le trajet et le n° de vol sont mis en avant dans les
   // notifications (« Transfert aéroport — Orly → Rive gauche · vol AF1234 »).
-  const airportLabel = input.airport ? airportRideLabel(input.airport) : undefined
+  const airportLabel = airport ? airportRideLabel(airport) : undefined
   if (!confirmed) {
     await notifyDriver(driver, {
       email: emailTemplates.newRequestDriver({
