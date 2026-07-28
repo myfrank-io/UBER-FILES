@@ -24,10 +24,11 @@ export default defineEventHandler(async (event) => {
       scheduledAt,
       pickup: input.pickup,
       dropoff: input.dropoff,
+      pickupAddress: input.pickupAddress,
+      dropoffAddress: input.dropoffAddress,
       roundTrip: input.roundTrip,
       durationHours: input.durationHours,
       passengers: input.passengers,
-      airport: input.airport,
       apiKey: config.googleMapsApiKey || undefined,
     })
     return {
@@ -37,6 +38,9 @@ export default defineEventHandler(async (event) => {
       distanceMeters: result.distanceMeters,
       durationSeconds: result.durationSeconds,
       estimatedRoute: result.estimatedRoute,
+      // Transfert aéroport reconnu sur ce trajet : la page publique s'en sert pour
+      // confirmer au client que le forfait s'applique (et lequel).
+      airport: result.airport ?? null,
     }
   } catch (err) {
     throw createError({ statusCode: 422, statusMessage: (err as Error).message })

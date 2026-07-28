@@ -1,6 +1,5 @@
 import { z } from 'zod'
 import { PAYMENT_METHODS } from '~/lib/payment-methods'
-import { AIRPORT_HUB_IDS, AIRPORT_ZONES } from '~/lib/airport'
 
 // Schémas de validation partagés (toutes les entrées API passent par Zod).
 
@@ -9,14 +8,9 @@ export const latLngSchema = z.object({
   lng: z.number().min(-180).max(180),
 })
 
-// Transfert aéroport (onglet dédié) : aéroport, sens et zone choisis par le
-// client. Complète un type TRANSFER classique — le prix devient le forfait de la
-// zone (ou le prix au km hors Paris) au lieu de la grille kilométrique.
-export const airportSelectionSchema = z.object({
-  hub: z.enum(AIRPORT_HUB_IDS),
-  direction: z.enum(['FROM_AIRPORT', 'TO_AIRPORT']),
-  zone: z.enum(AIRPORT_ZONES),
-})
+// Note : le transfert aéroport (aéroport, sens, zone) n'est PAS une entrée du
+// client. Il est déduit des adresses par le serveur (lib/airport-detect.ts) —
+// sinon n'importe quel appel pourrait réclamer le forfait le moins cher.
 
 export const estimateSchema = z
   .object({
@@ -32,7 +26,6 @@ export const estimateSchema = z
     pickupTerminal: z.string().max(40).optional(),
     flightNumber: z.string().max(16).optional(),
     roundTrip: z.boolean().default(false),
-    airport: airportSelectionSchema.optional(),
     // Nombre de personnes dans le véhicule (supplément 3e/4e personne). Borné à 8
     // (van) ; le supplément n'est défini que pour la 3e et la 4e.
     passengers: z.number().int().min(1).max(8).optional(),
@@ -50,14 +43,6 @@ export const estimateSchema = z
   .refine((d) => d.type !== 'HOURLY' || (d.pickup && d.pickupAddress), {
     message: 'Adresse de départ requise pour une mise à disposition.',
     path: ['pickup'],
-  })
-  .refine((d) => !d.airport || d.type === 'TRANSFER', {
-    message: 'Un transfert aéroport est un trajet simple (type TRANSFER).',
-    path: ['airport'],
-  })
-  .refine((d) => !d.airport || !d.roundTrip, {
-    message: "Pas d'aller-retour sur un transfert aéroport : réservez deux trajets.",
-    path: ['roundTrip'],
   })
 
 export const customerSchema = z.object({

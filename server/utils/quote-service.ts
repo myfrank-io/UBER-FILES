@@ -8,6 +8,7 @@ import {
   type SurchargeInput,
 } from '~/lib/pricing'
 import { airportRatesFromDriver, type AirportSelection } from '~/lib/airport'
+import { detectAirportRide } from '~/lib/airport-detect'
 import { computeRoute, type LatLng } from './google-maps'
 
 // `photoUrl` est omis globalement par le client Prisma (blob base64 jamais
@@ -22,6 +23,12 @@ export interface QuoteComputation {
   distanceMeters?: number
   durationSeconds?: number
   estimatedRoute?: boolean
+  /**
+   * Transfert aéroport reconnu sur ce trajet (aéroport, sens, zone), déduit des
+   * adresses — absent sur une course classique. C'est cette valeur, et non une
+   * donnée du client, qui est enregistrée sur la demande et affichée au chauffeur.
+   */
+  airport?: AirportSelection
 }
 
 /**
@@ -63,14 +70,15 @@ export interface ComputeArgs {
   scheduledAt: Date
   pickup?: LatLng
   dropoff?: LatLng
+  // Adresses en clair : elles complètent les coordonnées pour reconnaître un
+  // transfert aéroport (code postal parisien → rive droite / rive gauche).
+  pickupAddress?: string | null
+  dropoffAddress?: string | null
   roundTrip?: boolean
   durationHours?: number
   // Nombre de personnes dans le véhicule (déclenche le supplément 3e/4e personne
   // du chauffeur). Absent ou < 3 = aucun supplément passager.
   passengers?: number
-  // Transfert aéroport (onglet dédié) : tarification au forfait de la zone (ou au
-  // km hors Paris) à la place de la grille kilométrique classique.
-  airport?: AirportSelection
   apiKey?: string
   // Instant de la demande (injectable pour les tests) — sert au calcul du délai
   // de réservation pour les majorations « dernière minute ».
@@ -104,12 +112,20 @@ export async function computeQuote(args: ComputeArgs): Promise<QuoteComputation>
     }
     const route = await computeRoute(args.pickup, args.dropoff, args.apiKey)
 
-    // Transfert aéroport : forfait de la zone (ou km hors Paris). Le trajet est
-    // tout de même calculé — la durée sert au créneau calendrier, la distance au
-    // prix hors Paris.
-    if (args.airport) {
+    // Transfert aéroport : reconnu automatiquement quand un bout du trajet est un
+    // aéroport tarifé par le chauffeur (détection serveur, jamais déclarée par le
+    // client). Le prix devient le forfait de la zone — ou le prix au km hors Paris.
+    // Le trajet est tout de même calculé : la durée sert au créneau calendrier, la
+    // distance au prix hors Paris.
+    const airport = detectAirportRide({
+      rates: airportRatesFromDriver(driver),
+      pickup: { address: args.pickupAddress, coords: args.pickup },
+      dropoff: { address: args.dropoffAddress, coords: args.dropoff },
+      roundTrip: args.roundTrip,
+    })
+    if (airport) {
       const price = priceAirport({
-        selection: args.airport,
+        selection: airport.selection,
         rates: airportRatesFromDriver(driver),
         distanceMeters: route.distanceMeters,
         surcharges,
@@ -120,6 +136,7 @@ export async function computeQuote(args: ComputeArgs): Promise<QuoteComputation>
         distanceMeters: route.distanceMeters,
         durationSeconds: route.durationSeconds,
         estimatedRoute: route.estimated,
+        airport: airport.selection,
       }
     }
 
