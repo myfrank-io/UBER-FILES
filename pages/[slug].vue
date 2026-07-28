@@ -4,9 +4,7 @@ import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
 import { timezoneLabel } from '~/lib/datetime'
 import {
-  AIRPORT_HUB_IDS,
   AIRPORT_HUB_LABELS,
-  airportHubAvailable,
   airportPackageCents,
   type AirportRates,
   type AirportSelection,
@@ -254,30 +252,6 @@ const airportRouteLabel = computed(() => {
   const hub = AIRPORT_HUB_LABELS[selection.hub]
   const zone = airportZoneNames[selection.zone]()
   return selection.direction === 'FROM_AIRPORT' ? `${hub} → ${zone}` : `${zone} → ${hub}`
-})
-
-// ─── Annonce des forfaits aéroport ───
-// L'onglet dédié disparu, plus rien ne dirait au client que des forfaits existent
-// tant qu'il n'a pas tapé une adresse d'aéroport. Ce rappel prend le relais : il
-// nomme les aéroports couverts et le meilleur forfait, puis s'efface dès que la
-// course est reconnue (le bloc aéroport, plus précis, prend sa place).
-const airportHubNames = computed(() => {
-  const rates = airportRates.value
-  if (!rates) return ''
-  return AIRPORT_HUB_IDS.filter((hub) => airportHubAvailable(rates, hub))
-    .map((hub) => AIRPORT_HUB_LABELS[hub])
-    .join(' · ')
-})
-const airportFromPrice = computed(() => {
-  const rates = airportRates.value
-  if (!rates) return null
-  const packages = [
-    rates.orlyRiveDroiteCents,
-    rates.orlyRiveGaucheCents,
-    rates.cdgRiveDroiteCents,
-    rates.cdgRiveGaucheCents,
-  ].filter((cents): cents is number => cents != null)
-  return packages.length ? Math.min(...packages) : null
 })
 
 // Terminal d'arrivée : il n'existe pas de colonne dédiée côté demande (seul le
@@ -822,28 +796,12 @@ async function priceCtaClick() {
                 </div>
               </div>
 
-              <!-- Aucun aéroport reconnu pour l'instant : on annonce quand même les
-                   forfaits, sinon plus rien ne dit au client qu'ils existent. -->
-              <template v-else>
-                <p
-                  v-if="airportHubNames"
-                  class="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-snug text-slate-600"
-                >
-                  ✈️
-                  {{
-                    airportFromPrice != null
-                      ? $t('public.airportHintFrom', {
-                          hubs: airportHubNames,
-                          amount: formatMoney(airportFromPrice, driver.currency),
-                        })
-                      : $t('public.airportHint', { hubs: airportHubNames })
-                  }}
-                </p>
-                <label class="flex items-center gap-2.5 py-1 text-sm text-slate-700">
-                  <input v-model="roundTrip" type="checkbox" class="h-5 w-5 shrink-0 rounded border-slate-300" />
-                  {{ $t('public.roundTrip') }}
-                </label>
-              </template>
+              <!-- Course classique : rien qui parle d'aéroport tant qu'aucun des deux
+                   bouts n'en est un. L'aller-retour, lui, n'existe qu'ici. -->
+              <label v-else class="flex items-center gap-2.5 py-1 text-sm text-slate-700">
+                <input v-model="roundTrip" type="checkbox" class="h-5 w-5 shrink-0 rounded border-slate-300" />
+                {{ $t('public.roundTrip') }}
+              </label>
             </template>
 
             <!-- Mise à disposition -->
@@ -859,48 +817,6 @@ async function priceCtaClick() {
               </div>
             </template>
 
-            <!-- Nombre de personnes — remonté ici (et non à l'étape coordonnées) :
-                 le forfait aéroport est annoncé pour 2 personnes juste au-dessus,
-                 c'est donc le moment où l'on se demande si l'on est plus nombreux.
-                 N'apparaît que si le chauffeur facture un supplément 3e / 4e personne. -->
-            <div v-if="passengerConfig">
-              <p class="label">{{ $t('public.passengersLabel') }}</p>
-              <div class="mt-1 flex items-center gap-3">
-                <div class="inline-flex items-center overflow-hidden rounded-xl border border-slate-200">
-                  <button
-                    type="button"
-                    class="flex h-11 w-11 items-center justify-center text-xl font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-30"
-                    :disabled="passengers <= 1"
-                    :aria-label="$t('public.passengersDecrease')"
-                    @click="passengers = Math.max(1, passengers - 1)"
-                  >
-                    −
-                  </button>
-                  <span class="min-w-[3rem] text-center text-base font-semibold tabular-nums text-slate-900" aria-live="polite">
-                    {{ passengers }}
-                  </span>
-                  <button
-                    type="button"
-                    class="flex h-11 w-11 items-center justify-center text-xl font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-30"
-                    :disabled="passengers >= maxPassengers"
-                    :aria-label="$t('public.passengersIncrease')"
-                    @click="passengers = Math.min(maxPassengers, passengers + 1)"
-                  >
-                    ＋
-                  </button>
-                </div>
-                <span class="text-xs text-slate-500">
-                  {{ airportRide ? $t('public.passengersAirportHint') : $t('public.passengersHint') }}
-                </span>
-              </div>
-              <p
-                v-if="passengerSurchargeCents(passengers) > 0"
-                class="mt-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
-              >
-                ＋ {{ $t('public.passengersSurchargeNotice', { count: passengers, amount: formatMoney(passengerSurchargeCents(passengers), driver.currency) }) }}
-              </p>
-            </div>
-
             <div>
               <label class="label" for="datetime">
                 {{ $t('public.datetimeLabel') }}
@@ -913,6 +829,47 @@ async function priceCtaClick() {
               <!-- Majoration dernière minute : annoncée avant même l'estimation. -->
               <p v-if="lastMinuteNotice" class="mt-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
                 ⏱ {{ lastMinuteNotice }}
+              </p>
+            </div>
+
+            <!-- Nombre de personnes — dernier réglage, en version discrète : c'est un
+                 ajustement, pas une décision. Une seule personne dans l'immense
+                 majorité des cas, et le tarif ne bouge qu'à partir de la troisième.
+                 N'apparaît que si le chauffeur facture un supplément 3e / 4e personne. -->
+            <div v-if="passengerConfig">
+              <div class="flex items-center justify-between gap-3">
+                <!-- Pas de rappel « forfait pour 2 personnes » ici : le bloc aéroport
+                     le dit déjà juste au-dessus. -->
+                <span class="text-xs text-slate-500">{{ $t('public.passengersLabel') }}</span>
+                <div class="inline-flex shrink-0 items-center overflow-hidden rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    class="flex h-9 w-9 items-center justify-center text-base font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-30"
+                    :disabled="passengers <= 1"
+                    :aria-label="$t('public.passengersDecrease')"
+                    @click="passengers = Math.max(1, passengers - 1)"
+                  >
+                    −
+                  </button>
+                  <span class="min-w-[2rem] text-center text-sm font-semibold tabular-nums text-slate-900" aria-live="polite">
+                    {{ passengers }}
+                  </span>
+                  <button
+                    type="button"
+                    class="flex h-9 w-9 items-center justify-center text-base font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-30"
+                    :disabled="passengers >= maxPassengers"
+                    :aria-label="$t('public.passengersIncrease')"
+                    @click="passengers = Math.min(maxPassengers, passengers + 1)"
+                  >
+                    ＋
+                  </button>
+                </div>
+              </div>
+              <p
+                v-if="passengerSurchargeCents(passengers) > 0"
+                class="mt-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] font-medium text-amber-800"
+              >
+                ＋ {{ $t('public.passengersSurchargeNotice', { count: passengers, amount: formatMoney(passengerSurchargeCents(passengers), driver.currency) }) }}
               </p>
             </div>
 
