@@ -538,6 +538,30 @@ model Booking {
   pendingScheduledAt DateTime?
   pendingRequestedAt DateTime?
 
+  // ── Suivi de course jour J (« votre chauffeur arrive ») ──
+  // Étapes horodatées, déclenchées par le chauffeur (bouton Telegram ou dashboard).
+  departedAt DateTime? // parti vers le lieu de prise en charge
+  arrivedAt  DateTime? // sur place, attend le client
+  pickedUpAt DateTime? // client à bord, en route vers la destination
+
+  // Heure d'arrivée estimée (vers la prise en charge avant l'à-bord, vers la
+  // destination ensuite), recalculée avec trafic à chaque position reçue.
+  // `trackingEtaComputedAt` sert de throttle des appels Google Routes.
+  trackingEtaAt         DateTime?
+  trackingEtaComputedAt DateTime?
+
+  // Dernière position connue du chauffeur (partage Telegram « position en
+  // direct »). ÉPHÉMÈRE : uniquement la dernière, jamais d'historique, et
+  // purgée à la fin de la course (terminée ou annulée) — voir clearTracking().
+  driverLat        Float?
+  driverLng        Float?
+  driverHeading    Float? // cap en degrés (fourni par Telegram, sinon calculé)
+  driverPositionAt DateTime?
+
+  // Itinéraire courant du chauffeur (polyline encodée Google), affiché sur la
+  // carte client. Recalculé avec l'ETA ; purgé avec la position.
+  trackingPolyline String? @db.Text
+
   // Jeton signé permettant au client de modifier/annuler depuis son email.
   manageToken String @unique @default(cuid())
 

@@ -64,6 +64,14 @@ export default defineEventHandler(async (event) => {
       mapsUrl: googleMapsNavUrl({ address: req.pickupAddress, lat: req.pickupLat, lng: req.pickupLng }),
       wazeUrl: wazeNavUrl({ address: req.pickupAddress, lat: req.pickupLat, lng: req.pickupLng }),
     },
+    // Suivi de course jour J : étapes signalées + position en direct reçue ou non.
+    tracking: {
+      departedAt: booking.departedAt,
+      arrivedAt: booking.arrivedAt,
+      pickedUpAt: booking.pickedUpAt,
+      etaAt: booking.trackingEtaAt,
+      hasLivePosition: booking.driverPositionAt != null,
+    },
     payments: booking.payments.map((p) => ({
       id: p.id,
       status: p.status,

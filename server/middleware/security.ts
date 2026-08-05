@@ -121,10 +121,16 @@ export default defineEventHandler((event) => {
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline'",   // Nuxt hydration nécessite unsafe-inline
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https:",
-      "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://api.resend.com",
+      "img-src 'self' data: blob: https:",
+      // tiles.openfreemap.org : style + tuiles vectorielles + glyphes de la
+      // carte de suivi de course (chargés en fetch par MapLibre).
+      "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://api.resend.com https://tiles.openfreemap.org",
       "frame-src https://js.stripe.com https://hooks.stripe.com",
       "font-src 'self'",
+      // MapLibre exécute son parsing de tuiles dans un Web Worker créé via blob:
+      // (child-src : repli des navigateurs sans worker-src).
+      "worker-src 'self' blob:",
+      "child-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
     ].join('; '),

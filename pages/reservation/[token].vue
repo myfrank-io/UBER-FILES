@@ -108,8 +108,16 @@ async function submitReschedule() {
         class="mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold"
         :class="booking.status === 'CONFIRMED' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'"
       >
-        {{ booking.status === 'CONFIRMED' ? $t('reservation.statusConfirmed') : booking.status === 'CANCELLED' ? $t('reservation.statusCancelled') : booking.status }}
+        {{ booking.status === 'CONFIRMED' ? $t('reservation.statusConfirmed') : booking.status === 'CANCELLED' ? $t('reservation.statusCancelled') : booking.status === 'COMPLETED' ? $t('reservation.statusCompleted') : booking.status }}
       </div>
+
+      <!-- Suivi de course live (carte, ETA, timeline) : visible pendant la course,
+           dans les 24 h qui la précèdent, et une fois terminée. -->
+      <RideTracking
+        v-if="booking.status === 'CONFIRMED' || booking.status === 'COMPLETED'"
+        :token="token"
+        class="mt-4"
+      />
 
       <div class="mt-4 space-y-1 text-sm text-slate-600">
         <div v-if="booking.ride.type === 'TRANSFER'">

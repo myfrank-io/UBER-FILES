@@ -121,6 +121,8 @@ export async function sendPreRideAlerts(now: Date = new Date()): Promise<{ sent:
         mapsUrl,
         wazeUrl,
         paymentNote: paymentNoteEmoji,
+        // Active le bouton « 🚗 Je pars » (suivi de course côté client).
+        bookingId: b.id,
       }),
     })
     await prisma.webhookEvent.create({
