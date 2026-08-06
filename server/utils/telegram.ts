@@ -185,6 +185,8 @@ export function preRideAlertMessage(opts: {
   wazeUrl?: string | null
   // Note de règlement : « déjà payée en ligne » ou « X € à encaisser (espèces) »
   paymentNote?: string
+  // Id de la course : active le bouton « Je pars » (suivi de course client).
+  bookingId?: string
 }): { text: string; buttons: InlineButton[][] } {
   const lines = [
     hello(opts.driverDisplayName),
@@ -199,12 +201,71 @@ export function preRideAlertMessage(opts: {
     if (opts.pickupAddress) lines.push(`📍 Départ : ${escHtml(opts.pickupAddress)}`)
   }
   if (opts.paymentNote) lines.push(opts.paymentNote)
+  if (opts.bookingId) {
+    lines.push(`Au moment de partir, touchez <b>« Je pars »</b> : le client est prévenu et peut vous suivre.`)
+  }
 
   const navButtons: InlineButton[] = []
   if (opts.mapsUrl) navButtons.push({ text: '🧭 Google Maps', url: opts.mapsUrl })
   if (opts.wazeUrl) navButtons.push({ text: '🚗 Waze', url: opts.wazeUrl })
 
-  return { text: lines.join('\n'), buttons: navButtons.length ? [navButtons] : [] }
+  const buttons: InlineButton[][] = []
+  if (opts.bookingId) {
+    buttons.push([{ text: '🚗 Je pars — prévenir le client', callback_data: `track:depart:${opts.bookingId}` }])
+  }
+  if (navButtons.length) buttons.push(navButtons)
+
+  return { text: lines.join('\n'), buttons }
+}
+
+// ── Suivi de course : messages d'accompagnement des étapes chauffeur ──
+
+/**
+ * Après « Je pars » : confirme l'envoi de l'email client et guide le chauffeur
+ * vers le partage de position en direct Telegram (c'est lui qui alimente la
+ * carte du client — Telegram gère le GPS en arrière-plan, même avec Waze devant).
+ */
+export function departAckMessage(opts: { customerName: string; bookingId: string }): {
+  text: string
+  buttons: InlineButton[][]
+} {
+  return {
+    text: [
+      `🚗 <b>C'est parti !</b> ${escHtml(opts.customerName)} est prévenu que vous êtes en route.`,
+      ``,
+      `📍 Pour qu'il vous suive sur la carte : partagez votre <b>position en direct</b> dans cette conversation — 📎 → <b>Position</b> → <b>Partager ma position en direct</b> (1 h).`,
+      `Vous pouvez ensuite repasser sur Waze/Maps : Telegram continue le partage en arrière-plan.`,
+    ].join('\n'),
+    buttons: [
+      [{ text: '🅿️ Je suis sur place', callback_data: `track:arrive:${opts.bookingId}` }],
+      [{ text: '🧍 Client à bord', callback_data: `track:pickup:${opts.bookingId}` }],
+    ],
+  }
+}
+
+/** Après « Je suis sur place » : le client le voit sur sa page de suivi. */
+export function arriveAckMessage(opts: { bookingId: string }): {
+  text: string
+  buttons: InlineButton[][]
+} {
+  return {
+    text: `🅿️ Bien noté — vous êtes sur place. Le client le voit sur sa page de suivi.`,
+    buttons: [[{ text: '🧍 Client à bord', callback_data: `track:pickup:${opts.bookingId}` }]],
+  }
+}
+
+/** Après « Client à bord » : le suivi continue vers la destination. */
+export function pickupAckMessage(): { text: string } {
+  return {
+    text: `🧍 Client à bord — bonne route ! Le suivi continue vers la destination (le client peut partager sa course à ses proches). Pensez à « Marquer comme terminée » dans votre espace à l'arrivée.`,
+  }
+}
+
+/** Première position en direct reçue et rattachée à une course. */
+export function liveLocationAckMessage(): { text: string } {
+  return {
+    text: `📡 <b>Position en direct reçue</b> — votre client vous suit maintenant sur la carte. Vous pouvez basculer sur Waze/Maps, le partage continue en arrière-plan.`,
+  }
 }
 
 /**

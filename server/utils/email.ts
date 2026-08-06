@@ -292,6 +292,8 @@ export const emailTemplates = {
          <p>Prise en charge le <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong>.</p>
          ${contactBlock('Votre chauffeur', { name: opts.driverName, phone: opts.driverPhone, email: opts.driverEmail })}
          ${button(opts.manageUrl, 'Gérer ma réservation')}
+         <p style="font-size:13px;color:#6C7889">📍 Le jour de la course, cette même page vous permettra de
+            <strong>suivre votre chauffeur en direct</strong> sur la carte, dès qu'il sera en route.</p>
          <hr style="border:none;border-top:1px solid #EFE7D8;margin:16px 0" />
          <p style="font-size:11px;color:#9A8B72">${legalLines}</p>
          <p style="font-size:11px;color:#9A8B72">Conformément à l'art. L221-28 du Code de la consommation, le droit de rétractation de 14 jours ne s'applique pas à ce service de transport daté.</p>`,
@@ -337,9 +339,41 @@ export const emailTemplates = {
          <p>Prise en charge le <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong>.</p>
          ${contactBlock('Votre chauffeur', { name: opts.driverName, phone: opts.driverPhone, email: opts.driverEmail })}
          ${button(opts.manageUrl, 'Gérer ma réservation')}
+         <p style="font-size:13px;color:#6C7889">📍 Le jour de la course, cette même page vous permettra de
+            <strong>suivre votre chauffeur en direct</strong> sur la carte, dès qu'il sera en route.</p>
          <hr style="border:none;border-top:1px solid #EFE7D8;margin:16px 0" />
          <p style="font-size:11px;color:#9A8B72">${legalLines}</p>
          <p style="font-size:11px;color:#9A8B72">Conformément à l'art. L221-28 du Code de la consommation, le droit de rétractation de 14 jours ne s'applique pas à ce service de transport daté.</p>`,
+      ),
+    }
+  },
+  /**
+   * « Votre chauffeur est en route » — envoyé quand le chauffeur signale son
+   * départ vers le lieu de prise en charge. Le bouton mène à la page de suivi
+   * live (carte, position du chauffeur, heure d'arrivée estimée).
+   */
+  driverEnRoute(opts: {
+    customerName: string
+    driverName: string
+    etaAt: Date
+    timezone: string
+    trackUrl: string
+    driverPhone?: string | null
+  }) {
+    return {
+      subject: `🚗 Votre chauffeur est en route — ${opts.driverName}`,
+      html: wrap(
+        'Votre chauffeur est en route 🚗',
+        `<p>Bonjour ${esc(opts.customerName)},</p>
+         <p><strong>${esc(opts.driverName)}</strong> vient de partir vers votre lieu de prise en charge.</p>
+         <div style="background:#FBF7F0;border:1px solid #EFE7D8;border-radius:12px;padding:18px;margin:16px 0;text-align:center">
+           <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9A8B72">Arrivée estimée</p>
+           <p style="margin:6px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:34px;color:#0E1B2C">${formatRideTime(opts.etaAt, opts.timezone)}</p>
+         </div>
+         ${button(opts.trackUrl, '📍 Suivre mon chauffeur en direct')}
+         <p style="font-size:13px;color:#6C7889">La carte se met à jour en temps réel : position du
+            chauffeur, itinéraire et heure d'arrivée affinée avec le trafic.</p>
+         ${contactBlock('Votre chauffeur', { name: opts.driverName, phone: opts.driverPhone })}`,
       ),
     }
   },

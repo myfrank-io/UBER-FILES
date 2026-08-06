@@ -81,6 +81,59 @@ export async function computeRoute(
   return { distanceMeters: route.distanceMeters, durationSeconds, estimated: false }
 }
 
+export interface LiveRouteResult extends RouteResult {
+  // Polyline encodée Google du tracé — absente en repli haversine (la carte
+  // client trace alors une ligne droite).
+  encodedPolyline?: string
+}
+
+/**
+ * Variante « suivi de course » de computeRoute : même appel Routes (trafic
+ * inclus) mais avec le tracé de l'itinéraire en plus, pour la carte client.
+ * Un seul appel par recalcul d'ETA — le tracé ne coûte rien de plus.
+ */
+export async function computeLiveRoute(
+  from: LatLng,
+  to: LatLng,
+  apiKey: string | undefined,
+): Promise<LiveRouteResult> {
+  if (!apiKey) return haversineRoute(from, to)
+
+  const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
+    },
+    body: JSON.stringify({
+      origin: { location: { latLng: { latitude: from.lat, longitude: from.lng } } },
+      destination: { location: { latLng: { latitude: to.lat, longitude: to.lng } } },
+      travelMode: 'DRIVE',
+      routingPreference: 'TRAFFIC_AWARE',
+    }),
+  })
+  if (!res.ok) return haversineRoute(from, to)
+
+  const data = (await res.json()) as {
+    routes?: {
+      distanceMeters?: number
+      duration?: string
+      polyline?: { encodedPolyline?: string }
+    }[]
+  }
+  const route = data.routes?.[0]
+  if (!route?.distanceMeters) return haversineRoute(from, to)
+
+  const durationSeconds = route.duration ? parseInt(route.duration.replace('s', ''), 10) : 0
+  return {
+    distanceMeters: route.distanceMeters,
+    durationSeconds,
+    estimated: false,
+    encodedPolyline: route.polyline?.encodedPolyline,
+  }
+}
+
 /**
  * Autocomplétion d'adresse. Utilise Google Places si une clé est configurée,
  * sinon se rabat sur la Base Adresse Nationale (api-adresse.data.gouv.fr) —

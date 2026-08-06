@@ -1,5 +1,6 @@
 import { requireDriverId } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
+import { TRACKING_CLEAR_DATA } from '~/server/utils/tracking'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { PAYMENT_METHOD_SHORT_LABELS, isOnSiteMethod, type PaymentMethod } from '~/lib/payment-methods'
 import { driverReviewUrl, reviewFunnelPath } from '~/lib/review-link'
@@ -29,7 +30,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 422, statusMessage: 'Impossible de terminer une course dont la date est dans le futur.' })
   }
 
-  await prisma.booking.update({ where: { id }, data: { status: 'COMPLETED' } })
+  // Fin de course : purge des données de suivi (position, itinéraire, ETA) — RGPD.
+  await prisma.booking.update({ where: { id }, data: { status: 'COMPLETED', ...TRACKING_CLEAR_DATA } })
 
   // Reçu client — l'échec d'envoi ne doit pas empêcher la clôture de la course.
   try {

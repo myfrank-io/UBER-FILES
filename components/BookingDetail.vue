@@ -4,6 +4,7 @@
 // actions d'une course : contacter, naviguer (Waze/Maps), encaisser, terminer,
 // annuler — pour ne plus dépendre de l'onglet depuis lequel on l'ouvre.
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
+import { formatRideTime } from '~/lib/datetime'
 
 const props = defineProps<{ bookingId: string }>()
 const emit = defineEmits<{ close: []; changed: [] }>()
@@ -49,6 +50,57 @@ const detailPayment = computed(() => {
 const completing = ref(false)
 const markingPaid = ref(false)
 const cancelling = ref(false)
+const progressing = ref(false)
+
+// ── Suivi de course (jour J) ──
+// Étapes signalées par le chauffeur : « je pars » prévient le client par email
+// (lien de suivi live) ; « sur place » et « à bord » mettent sa page à jour.
+interface TrackingInfo {
+  departedAt: string | null
+  arrivedAt: string | null
+  pickedUpAt: string | null
+  etaAt: string | null
+  hasLivePosition: boolean
+}
+const tracking = computed(() => (detail.value?.tracking as TrackingInfo | undefined) ?? null)
+
+// Visible sur une course confirmée dont la prise en charge est dans moins de
+// 24 h (ou dont le suivi est déjà entamé).
+const showTracking = computed(() => {
+  const d = detail.value
+  if (!d || d.status !== 'CONFIRMED') return false
+  if (tracking.value?.departedAt) return true
+  return new Date(d.scheduledAt as string).getTime() - Date.now() < 24 * 3_600_000
+})
+
+function trackTime(value: string | null): string {
+  if (!value) return ''
+  return formatRideTime(value, (detail.value?.timezone as string) ?? 'Europe/Paris')
+}
+
+async function progress(action: 'depart' | 'arrive' | 'pickup') {
+  if (action === 'depart' && !confirm('Prévenir le client que vous êtes en route ?')) return
+  progressing.value = true
+  try {
+    await $fetch(`/api/dashboard/bookings/${props.bookingId}/progress`, {
+      method: 'POST',
+      body: { action },
+    })
+    toastSuccess(
+      action === 'depart'
+        ? 'Client prévenu — il peut vous suivre en direct.'
+        : action === 'arrive'
+          ? 'Arrivée signalée.'
+          : 'Client à bord.',
+    )
+    await load()
+    emit('changed')
+  } catch (e) {
+    toastError((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.')
+  } finally {
+    progressing.value = false
+  }
+}
 
 // Le chauffeur peut annuler une course à venir (non terminée, non déjà annulée).
 const canCancel = computed(() => {
@@ -201,6 +253,52 @@ async function cancelBooking() {
             <p v-if="(detail.ride as Record<string, string>).notes" class="mt-2 text-xs italic text-slate-400">
               « {{ (detail.ride as Record<string, string>).notes }} »
             </p>
+          </div>
+
+          <!-- Suivi de course jour J : le client suit la progression en direct
+               sur sa page de réservation (mêmes actions que les boutons Telegram). -->
+          <div v-if="showTracking" class="card !p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Suivi de course</p>
+            <p class="mt-1.5 text-xs text-slate-500">
+              Prévenez votre client en un geste : il suit votre progression en direct depuis sa page de réservation.
+            </p>
+            <div class="mt-3 space-y-2">
+              <button
+                v-if="!tracking?.departedAt"
+                class="btn-primary w-full"
+                :disabled="progressing"
+                @click="progress('depart')"
+              >
+                {{ progressing ? '…' : '🚗 Je pars — prévenir le client' }}
+              </button>
+              <template v-else>
+                <p class="text-xs font-medium text-green-700">🚗 En route — signalé à {{ trackTime(tracking.departedAt) }}</p>
+                <p v-if="!tracking.hasLivePosition && !tracking.pickedUpAt" class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  📍 Partagez votre <strong>position en direct</strong> dans la conversation du bot Telegram
+                  (📎 → Position) : le client vous verra avancer sur la carte, avec l'heure d'arrivée recalculée.
+                </p>
+                <button
+                  v-if="!tracking.arrivedAt"
+                  class="btn-primary w-full"
+                  :disabled="progressing"
+                  @click="progress('arrive')"
+                >
+                  {{ progressing ? '…' : '🅿️ Je suis sur place' }}
+                </button>
+                <p v-else class="text-xs font-medium text-green-700">🅿️ Sur place — signalé à {{ trackTime(tracking.arrivedAt) }}</p>
+                <button
+                  v-if="tracking.arrivedAt && !tracking.pickedUpAt"
+                  class="btn-primary w-full"
+                  :disabled="progressing"
+                  @click="progress('pickup')"
+                >
+                  {{ progressing ? '…' : '🧍 Client à bord' }}
+                </button>
+                <p v-else-if="tracking.pickedUpAt" class="text-xs font-medium text-green-700">
+                  🧍 Client à bord à {{ trackTime(tracking.pickedUpAt) }} — pensez à « Marquer comme terminée » à l'arrivée.
+                </p>
+              </template>
+            </div>
           </div>
 
           <div class="card !p-4">

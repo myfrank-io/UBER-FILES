@@ -1,5 +1,6 @@
 import { verifyClientToken } from '~/server/utils/tokens'
 import { prisma } from '~/server/utils/prisma'
+import { TRACKING_CLEAR_DATA } from '~/server/utils/tracking'
 import { computeRefund } from '~/lib/cancellation'
 import { createRefund } from '~/server/utils/stripe'
 import { getValidAccessToken, refundTransaction } from '~/server/utils/sumup'
@@ -85,7 +86,7 @@ export default defineEventHandler(async (event) => {
   // Annulation + libération du créneau + clôture des encaissements sur place en
   // attente (sinon la course annulée resterait « à encaisser » côté chauffeur).
   await prisma.$transaction([
-    prisma.booking.update({ where: { id: booking.id }, data: { status: 'CANCELLED' } }),
+    prisma.booking.update({ where: { id: booking.id }, data: { status: 'CANCELLED', ...TRACKING_CLEAR_DATA } }),
     prisma.quote.update({ where: { id: booking.quoteId }, data: { status: 'CANCELLED' } }),
     prisma.payment.updateMany({
       where: { bookingId: booking.id, status: 'PENDING' },
