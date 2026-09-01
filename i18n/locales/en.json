@@ -191,5 +191,14 @@
     "sentBody": "It has been passed on to {name}, who will take it on board for future rides.",
     "sentFiveTitle": "Thank you so much!",
     "sentFiveBody": "Your rating will mean a lot to them."
+  },
+  "card": {
+    "saveContact": "Save to contacts",
+    "poweredBy": "Made with Ridewiz",
+    "empty": "This card has no blocks yet.",
+    "noVehicle": "No vehicle registered yet.",
+    "metaTitle": "{name} — digital card",
+    "metaDescription": "Contact details, booking and links for {name}.",
+    "notFound": "Card not found"
   }
 }

@@ -11,6 +11,9 @@ const createPrismaClient = () =>
     omit: {
       driver: { photoUrl: true },
       vehicle: { photoUrl: true },
+      // Images de la carte de visite : même règle, le blob n'est lu que par
+      // l'endpoint image via un select explicite.
+      cardImage: { data: true },
     },
   })
 

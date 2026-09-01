@@ -205,6 +205,7 @@ model Driver {
   calendarEvents   CalendarEvent[]
   payments         Payment[]
   subscription     Subscription?
+  cardProfile      CardProfile?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -722,4 +723,84 @@ model Subscription {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Carte de visite digitale du chauffeur (/carte/{slug})
+//
+// Modèle en BLOCS plutôt qu'en colonnes : chaque nouveau type de contenu
+// (réseau social, lien, CTA…) est du code, jamais une migration. La contrepartie
+// est que la validation vit dans l'application — schéma zod par `kind` dans
+// lib/card-blocks.ts, partagé client/serveur et testé.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum CardBlockKind {
+  LINK        // lien libre (site, réservation externe…)
+  SOCIAL      // réseau social (data.network porte l'icône)
+  PHONE
+  EMAIL
+  WHATSAPP
+  ADDRESS
+  TEXT        // paragraphe libre (« À propos »)
+  BOOKING_CTA // bouton « Réserver une course » → page publique du chauffeur
+  REVIEW_CTA  // bouton « Laisser un avis » → tunnel de notation Ridewiz
+  VEHICLES    // vitrine des véhicules déjà enregistrés (aucune image en double)
+}
+
+model CardProfile {
+  id       String @id @default(cuid())
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String @unique
+
+  // Une carte existe dès que le chauffeur ouvre l'éditeur, mais reste invisible
+  // du public tant qu'il n'a pas publié.
+  published   Boolean   @default(false)
+  publishedAt DateTime?
+
+  // Preset de charte (cf. CARD_THEMES dans lib/card-blocks.ts).
+  theme    String  @default("signature")
+  headline String? // « Chauffeur VTC · Paris »
+  company  String?
+
+  blocks CardBlock[]
+  images CardImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CardBlock {
+  id        String      @id @default(cuid())
+  profile   CardProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId String
+
+  kind     CardBlockKind
+  label    String?
+  value    String?       @db.Text
+  data     Json?         // options propres au type (ex : { network: "instagram" })
+  position Int           @default(0)
+  visible  Boolean       @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId])
+}
+
+// Images de la carte (couverture, avatar). Table dédiée pour que le blob base64
+// ne soit jamais chargé avec le profil : `data` est omis globalement par le
+// client Prisma et n'est lu que par l'endpoint image, via un select explicite.
+model CardImage {
+  id        String      @id @default(cuid())
+  profile   CardProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId String
+
+  role String // "cover" | "avatar"
+  data String @db.Text
+  mime String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([profileId, role])
 }
