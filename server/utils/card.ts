@@ -133,6 +133,19 @@ export function cardImageUrl(
   return img ? `/api/public/carte/${slug}/image/${role}?v=${img.updatedAt.getTime()}` : null
 }
 
+/**
+ * URL d'une image pour L'ÉDITEUR. Distincte de l'URL publique : elle passe par
+ * une route authentifiée, seule capable de servir une carte encore en
+ * brouillon — l'état de tout chauffeur qui configure sa carte.
+ */
+export function dashboardCardImageUrl(
+  images: { role: string; updatedAt: Date }[],
+  role: CardImageRole,
+): string | null {
+  const img = images.find((i) => i.role === role)
+  return img ? `/api/dashboard/card/image/${role}?v=${img.updatedAt.getTime()}` : null
+}
+
 /** Forme JSON commune d'un bloc (dashboard et page publique). */
 export function serializeBlock(b: {
   id: string

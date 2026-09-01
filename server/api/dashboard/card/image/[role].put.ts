@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { requireDriverId } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
-import { loadOrCreateCardProfile, isCardImageRole, cardImageUrl } from '~/server/utils/card'
+import { loadOrCreateCardProfile, isCardImageRole, dashboardCardImageUrl } from '~/server/utils/card'
 
 // Import d'une image de carte (couverture ou avatar). L'image arrive déjà
 // compressée par le navigateur (composables/useImageResize) en data URL ; on
@@ -46,15 +46,13 @@ export default defineEventHandler(async (event) => {
   }
 
   const profile = await loadOrCreateCardProfile(driverId)
-  const [driver, image] = await Promise.all([
-    prisma.driver.findUniqueOrThrow({ where: { id: driverId }, select: { slug: true } }),
-    prisma.cardImage.upsert({
-      where: { profileId_role: { profileId: profile.id, role } },
-      create: { profileId: profile.id, role, data, mime },
-      update: { data, mime },
-      select: { role: true, updatedAt: true },
-    }),
-  ])
+  const image = await prisma.cardImage.upsert({
+    where: { profileId_role: { profileId: profile.id, role } },
+    create: { profileId: profile.id, role, data, mime },
+    update: { data, mime },
+    select: { role: true, updatedAt: true },
+  })
 
-  return { ok: true, url: cardImageUrl(driver.slug, [image], role) }
+  // URL d'éditeur : elle doit fonctionner même si la carte est en brouillon.
+  return { ok: true, url: dashboardCardImageUrl([image], role) }
 })
