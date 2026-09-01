@@ -2,13 +2,8 @@
 // Rendu de la carte de visite. UTILISÉ TEL QUEL par la page publique ET par
 // l'aperçu de l'éditeur : c'est ce qui garantit que l'aperçu ne ment jamais.
 // En mode `preview`, les liens sont inertes (on ne navigue pas depuis l'éditeur).
-import {
-  themeCssVars,
-  blockHref,
-  blockLabel,
-  isExternalHref,
-  type CardBlockKind,
-} from '~/lib/card-blocks'
+import { blockHref, blockLabel, isExternalHref, type CardBlockKind } from '~/lib/card-blocks'
+import { themeCssVars } from '~/lib/card-themes'
 import type { CardView, CardBlockView } from '~/lib/card-view'
 
 const props = defineProps<{ card: CardView; preview?: boolean }>()

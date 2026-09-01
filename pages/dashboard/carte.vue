@@ -7,13 +7,13 @@
 // mentir. Le réordonnancement se fait aux flèches et non en glisser-déposer :
 // c'est fiable au doigt sur mobile, là où le drag&drop déçoit.
 import {
-  CARD_THEMES,
   SOCIAL_NETWORKS,
   SINGLETON_KINDS,
   defaultBlockLabel,
   CARD_BLOCK_KINDS,
   type CardBlockKind,
 } from '~/lib/card-blocks'
+import { CARD_THEMES, THEME_GROUPS, QUICK_THEME_KEYS } from '~/lib/card-themes'
 import type { CardBlockEdit, CardEditorState, CardVehicle, CardView } from '~/lib/card-view'
 
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
@@ -110,6 +110,25 @@ async function saveSettings(patch: Record<string, unknown>, message?: string) {
     toastError(apiError(e))
     await refresh()
   }
+}
+
+// Banque de thèmes : quatre en accès direct, le reste derrière un bouton.
+// Choisir dans la banque ne la referme pas — on essaie plusieurs palettes en
+// regardant l'aperçu, ce qui est tout l'intérêt de l'avoir sous les yeux.
+const themeBankOpen = ref(false)
+
+const quickThemes = computed(() => {
+  const quick = CARD_THEMES.filter((t) => QUICK_THEME_KEYS.includes(t.key))
+  const current = CARD_THEMES.find((t) => t.key === theme.value)
+  // Un thème choisi dans la banque reste visible dans la rangée du haut,
+  // sinon la sélection courante disparaîtrait une fois la banque refermée.
+  return current && !quick.some((t) => t.key === current.key) ? [...quick, current] : quick
+})
+
+const extraThemeCount = computed(() => CARD_THEMES.length - quickThemes.value.length)
+
+function themesInGroup(group: string) {
+  return CARD_THEMES.filter((t) => t.group === group)
 }
 
 async function setLogoPlate(value: boolean) {
@@ -466,7 +485,7 @@ const reviewWarning = computed(
             <span class="label">Thème</span>
             <div class="flex flex-wrap gap-2">
               <button
-                v-for="t in CARD_THEMES"
+                v-for="t in quickThemes"
                 :key="t.key"
                 type="button"
                 class="flex items-center gap-2 rounded-xl border-[1.5px] px-3 py-2 text-sm font-medium transition"
@@ -479,6 +498,52 @@ const reviewWarning = computed(
                 </span>
                 {{ t.label }}
               </button>
+
+              <button
+                type="button"
+                class="flex items-center gap-1.5 rounded-xl border-[1.5px] border-dashed px-3 py-2 text-sm font-medium transition"
+                :class="themeBankOpen ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'"
+                :aria-expanded="themeBankOpen"
+                @click="themeBankOpen = !themeBankOpen"
+              >
+                <CardIcon :name="themeBankOpen ? 'up' : 'plus'" :size="16" />
+                {{ themeBankOpen ? 'Réduire' : `${extraThemeCount} autres thèmes` }}
+              </button>
+            </div>
+
+            <!-- Banque étendue. Chaque vignette est une MINIATURE de la carte
+                 (titre, sous-titre, bouton) plutôt qu'une pastille de couleur :
+                 on voit le rendu, pas seulement la teinte. -->
+            <div v-if="themeBankOpen" class="mt-3 space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <div v-for="g in THEME_GROUPS" :key="g.key">
+                <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  {{ g.label }}
+                </p>
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <button
+                    v-for="t in themesInGroup(g.key)"
+                    :key="t.key"
+                    type="button"
+                    class="rounded-xl border-[1.5px] p-1.5 text-left transition"
+                    :class="theme === t.key ? 'border-brand-600 bg-white' : 'border-transparent bg-white hover:border-slate-300'"
+                    :aria-pressed="theme === t.key"
+                    @click="pickTheme(t.key)"
+                  >
+                    <span
+                      class="block rounded-lg px-2 py-2"
+                      :style="{ background: t.tokens.bg, boxShadow: `inset 0 0 0 1px ${t.tokens.border}` }"
+                    >
+                      <span class="block h-1.5 w-9 rounded-full" :style="{ background: t.tokens.text }" />
+                      <span class="mt-1 block h-1.5 w-6 rounded-full opacity-80" :style="{ background: t.tokens.muted }" />
+                      <span class="mt-2 block h-3.5 w-full rounded" :style="{ background: t.tokens.accent }" />
+                    </span>
+                    <span class="mt-1.5 flex items-center gap-1 px-0.5 text-xs font-medium text-slate-700">
+                      <CardIcon v-if="theme === t.key" name="check" :size="13" class="text-brand-600" />
+                      {{ t.label }}
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
