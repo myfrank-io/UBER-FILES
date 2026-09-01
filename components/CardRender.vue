@@ -76,7 +76,7 @@ const initial = computed(() => props.card.displayName.trim().charAt(0).toUpperCa
 <template>
   <div :style="styleVars" class="rw-card min-h-full w-full pb-10">
     <!-- Couverture : image importée, ou dégradé dérivé du thème -->
-    <div class="rw-cover relative h-32 w-full sm:h-40">
+    <div class="rw-cover h-32 w-full sm:h-40">
       <img
         v-if="card.coverUrl"
         :src="card.coverUrl"
@@ -87,8 +87,10 @@ const initial = computed(() => props.card.displayName.trim().charAt(0).toUpperCa
     </div>
 
     <div class="mx-auto w-full max-w-md px-5">
-      <!-- Avatar, à cheval sur la couverture -->
-      <div class="-mt-12 flex justify-center">
+      <!-- Avatar, à cheval sur la couverture. `relative z-10` est nécessaire :
+           sans empilement explicite, un élément positionné au-dessus (ou l'ordre
+           de peinture par défaut) rognerait sa moitié haute. -->
+      <div class="relative z-10 -mt-12 flex justify-center">
         <img
           v-if="card.avatarUrl"
           :src="card.avatarUrl"
@@ -210,8 +212,10 @@ const initial = computed(() => props.card.displayName.trim().charAt(0).toUpperCa
                 {{ row.block.value }}
               </span>
             </span>
-            <span class="rw-muted shrink-0 opacity-60">
-              <CardIcon :name="isExternalHref(hrefOf(row.block)) ? 'external' : 'link'" :size="16" />
+            <!-- Chevron de sortie réservé aux vrais liens externes : une icône
+                 de chaîne sur « Appeler » ou « Envoyer un email » ne veut rien dire. -->
+            <span v-if="isExternalHref(hrefOf(row.block))" class="rw-muted shrink-0 opacity-60">
+              <CardIcon name="external" :size="16" />
             </span>
           </component>
         </template>
