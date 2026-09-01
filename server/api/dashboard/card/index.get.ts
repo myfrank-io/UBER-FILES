@@ -1,6 +1,6 @@
 import { requireDriverId } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
-import { loadOrCreateCardProfile, cardImageUrl, serializeBlock } from '~/server/utils/card'
+import { loadOrCreateCardProfile, dashboardCardImageUrl, serializeBlock } from '~/server/utils/card'
 import { publicPhotoUrl } from '~/server/utils/driver'
 import { driverReviewUrl } from '~/lib/review-link'
 
@@ -38,9 +38,11 @@ export default defineEventHandler(async (event) => {
     // Photo de profil du chauffeur : sert d'avatar par défaut si aucun avatar
     // spécifique n'a été importé pour la carte.
     profilePhotoUrl: publicPhotoUrl(driver, photoCount > 0),
-    coverUrl: cardImageUrl(driver.slug, profile.images, 'cover'),
-    avatarUrl: cardImageUrl(driver.slug, profile.images, 'avatar'),
-    logoUrl: cardImageUrl(driver.slug, profile.images, 'logo'),
+    // URL d'éditeur (authentifiées) : les images doivent s'afficher AVANT
+    // publication, ce que la route publique refuse par conception.
+    coverUrl: dashboardCardImageUrl(profile.images, 'cover'),
+    avatarUrl: dashboardCardImageUrl(profile.images, 'avatar'),
+    logoUrl: dashboardCardImageUrl(profile.images, 'logo'),
     logoPlate: profile.logoPlate,
     // Le bouton « Ajouter à mes contacts » n'apparaît que s'il y a de quoi
     // remplir une fiche ; l'aperçu doit le refléter.
