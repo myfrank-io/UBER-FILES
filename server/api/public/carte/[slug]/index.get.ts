@@ -2,7 +2,7 @@ import { prisma } from '~/server/utils/prisma'
 import { loadPublishedCard, cardImageUrl, serializeBlock } from '~/server/utils/card'
 import { publicPhotoUrl } from '~/server/utils/driver'
 import { driverReviewUrl } from '~/lib/review-link'
-import { cardTheme } from '~/lib/card-blocks'
+import { cardTheme } from '~/lib/card-themes'
 
 // Carte de visite publique d'un chauffeur. Mêmes conventions de cache que la
 // page publique de réservation : cache CDN court + revalidation en arrière-plan,

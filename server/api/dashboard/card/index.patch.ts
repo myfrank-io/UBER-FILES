@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { requireDriverId } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import { loadOrCreateCardProfile } from '~/server/utils/card'
-import { CARD_THEMES } from '~/lib/card-blocks'
+import { CARD_THEMES } from '~/lib/card-themes'
 
 const schema = z.object({
   theme: z

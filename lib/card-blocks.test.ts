@@ -9,9 +9,6 @@ import {
   isExternalHref,
   blockLabel,
   buildDefaultBlocks,
-  cardTheme,
-  themeCssVars,
-  CARD_THEMES,
   SOCIAL_NETWORKS,
 } from './card-blocks'
 
@@ -280,31 +277,9 @@ describe('buildDefaultBlocks', () => {
   })
 })
 
-describe('thèmes', () => {
-  it('retombe sur Signature pour une clé inconnue', () => {
-    expect(cardTheme('nawak').key).toBe('signature')
-    expect(cardTheme(null).key).toBe('signature')
-    expect(cardTheme('nuit').key).toBe('nuit')
-  })
-
-  it('expose toutes les variables CSS attendues', () => {
-    const vars = themeCssVars('nuit')
-    expect(Object.keys(vars).sort()).toEqual([
-      '--card-accent',
-      '--card-accent-text',
-      '--card-bg',
-      '--card-border',
-      '--card-muted',
-      '--card-surface',
-      '--card-text',
-    ])
-    expect(vars['--card-accent']).toBe('#E0B579')
-  })
-
-  it('n’a ni thème ni réseau en double', () => {
-    const themeKeys = CARD_THEMES.map((t) => t.key)
-    expect(new Set(themeKeys).size).toBe(themeKeys.length)
-    const netKeys = SOCIAL_NETWORKS.map((n) => n.key)
-    expect(new Set(netKeys).size).toBe(netKeys.length)
+describe('réseaux sociaux', () => {
+  it('n’a pas de clé en double', () => {
+    const keys = SOCIAL_NETWORKS.map((n) => n.key)
+    expect(new Set(keys).size).toBe(keys.length)
   })
 })

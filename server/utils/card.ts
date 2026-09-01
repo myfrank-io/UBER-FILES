@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
-import { buildDefaultBlocks, DEFAULT_THEME, type CardBlockKind } from '~/lib/card-blocks'
+import { buildDefaultBlocks, type CardBlockKind } from '~/lib/card-blocks'
+import { DEFAULT_THEME } from '~/lib/card-themes'
 import { driverReviewUrl } from '~/lib/review-link'
 
 // Accès à la carte de visite d'un chauffeur. Le blob des images n'est jamais
