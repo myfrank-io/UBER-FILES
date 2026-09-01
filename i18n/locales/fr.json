@@ -191,5 +191,14 @@
     "sentBody": "Il a été transmis à {name}, qui en tiendra compte pour ses prochaines courses.",
     "sentFiveTitle": "Merci beaucoup !",
     "sentFiveBody": "Votre note lui fera très plaisir."
+  },
+  "card": {
+    "saveContact": "Ajouter à mes contacts",
+    "poweredBy": "Créé avec Ridewiz",
+    "empty": "Cette carte ne contient encore aucun bloc.",
+    "noVehicle": "Aucun véhicule enregistré pour le moment.",
+    "metaTitle": "{name} — carte de visite",
+    "metaDescription": "Coordonnées, réservation et liens de {name}.",
+    "notFound": "Carte introuvable"
   }
 }

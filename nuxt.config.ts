@@ -29,6 +29,11 @@ export default defineNuxtConfig({
     // arrière-plan, aligné sur le s-maxage de /api/public/[slug]. Les visites
     // suivantes ne repaient ni le démarrage serverless ni les requêtes SQL.
     '/*': { swr: 60 },
+    // Cartes de visite publiques /carte/{slug} : même politique que les pages
+    // chauffeur — cache CDN court + régénération en arrière-plan, aligné sur le
+    // s-maxage de /api/public/carte/[slug]. (Non couvert par '/*', qui ne matche
+    // qu'un seul segment.)
+    '/carte/**': { swr: 60 },
     // Back-office : rendu client uniquement (SPA). Le shell HTML statique
     // arrive instantanément du CDN, les données étaient déjà chargées côté
     // client — et plus aucune invocation lambda pour le HTML. Pas d'enjeu SEO

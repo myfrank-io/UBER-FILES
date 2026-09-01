@@ -53,6 +53,7 @@ const nav = [
   { to: '/dashboard', label: 'Accueil', icon: '🏠' },
   { to: '/dashboard/courses', label: 'Courses', icon: '🚗' },
   { to: '/dashboard/profil', label: 'Profil', icon: '👤' },
+  { to: '/dashboard/carte', label: 'Carte', icon: '🪪' },
   { to: '/dashboard/parametres', label: 'Réglages', icon: '⚙️' },
 ]
 

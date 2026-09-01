@@ -140,6 +140,7 @@ async function resend(quoteId: string) {
 
     <!-- Onboarding guidé : disparaît une fois la configuration obligatoire faite. -->
     <DashboardOnboarding class="mt-5" />
+    <DashboardCardPromo class="mt-5" />
 
     <p v-if="pending && !data" class="mt-4 text-sm text-slate-400">Chargement…</p>
 

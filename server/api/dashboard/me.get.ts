@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'Accès réservé aux chauffeurs.' })
   }
   const driverId = sessionUser.driverId
-  const [driver, account, vehicleCount, photoCount] = await Promise.all([
+  const [driver, account, vehicleCount, photoCount, cardProfile] = await Promise.all([
     prisma.driver.findUniqueOrThrow({
       where: { id: driverId },
       include: {
@@ -25,6 +25,9 @@ export default defineEventHandler(async (event) => {
     prisma.vehicle.count({ where: { driverId } }),
     // Présence de la photo de profil sans rapatrier le blob base64.
     prisma.driver.count({ where: { id: driverId, photoUrl: { not: null } } }),
+    // État de la carte de visite. Lecture seule : la carte n'est créée qu'à
+    // l'ouverture de son éditeur, jamais par un simple passage sur l'accueil.
+    prisma.cardProfile.findUnique({ where: { driverId }, select: { published: true } }),
   ])
   return {
     id: driver.id,
@@ -75,6 +78,8 @@ export default defineEventHandler(async (event) => {
       viaApiKey: Boolean(driver.sumupApiKey),
     },
     telegramLinked: Boolean(driver.telegramChatId),
+    // Carte de visite : existe / publiée (pilote l'invitation sur l'accueil).
+    card: { exists: Boolean(cardProfile), published: Boolean(cardProfile?.published) },
     transferBands: driver.transferBands,
     hourlyRateCents: driver.hourlyRateCents,
     hourlyOvertimeAfterHours: driver.hourlyOvertimeAfterHours,
