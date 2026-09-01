@@ -762,6 +762,12 @@ model CardProfile {
   headline String? // « Chauffeur VTC · Paris »
   company  String?
 
+  // Pastille claire derrière le logo. Un logo sombre sur fond transparent
+  // devient invisible sur les thèmes sombres : ce réglage le repose sur une
+  // plaque claire. Choix explicite du chauffeur plutôt qu'une détection
+  // automatique, qui se tromperait sur les logos bicolores.
+  logoPlate Boolean @default(false)
+
   blocks CardBlock[]
   images CardImage[]
 

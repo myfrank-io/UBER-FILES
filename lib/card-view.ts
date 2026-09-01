@@ -33,6 +33,10 @@ export interface CardView {
   theme: string
   avatarUrl: string | null
   coverUrl: string | null
+  /** Logo de l'entreprise. Affiché tel quel (jamais recadré) sous l'identité. */
+  logoUrl: string | null
+  /** Pose le logo sur une pastille claire (lisibilité sur thème sombre). */
+  logoPlate: boolean
   hasContactCard: boolean
   blocks: CardBlockView[]
   vehicles: CardVehicle[]
@@ -50,6 +54,8 @@ export interface CardEditorState {
   profilePhotoUrl: string | null
   coverUrl: string | null
   avatarUrl: string | null
+  logoUrl: string | null
+  logoPlate: boolean
   hasContactCard: boolean
   hasReviewLink: boolean
   blocks: CardBlockEdit[]

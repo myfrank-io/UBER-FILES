@@ -64,6 +64,8 @@ const previewCard = computed<CardView>(() => ({
   theme: theme.value,
   avatarUrl: state.value?.avatarUrl ?? state.value?.profilePhotoUrl ?? null,
   coverUrl: state.value?.coverUrl ?? null,
+  logoUrl: state.value?.logoUrl ?? null,
+  logoPlate: state.value?.logoPlate ?? false,
   hasContactCard: state.value?.hasContactCard ?? false,
   // L'aperçu montre exactement ce que verra un visiteur : les blocs masqués
   // sont absents, et « Laisser un avis » disparaît sans dépôt configuré.
@@ -110,6 +112,11 @@ async function saveSettings(patch: Record<string, unknown>, message?: string) {
   }
 }
 
+async function setLogoPlate(value: boolean) {
+  await saveSettings({ logoPlate: value })
+  await refresh()
+}
+
 async function pickTheme(key: string) {
   theme.value = key
   await saveSettings({ theme: key })
@@ -127,11 +134,20 @@ onBeforeUnmount(() => clearTimeout(identityTimer))
 
 // ─── Images ──────────────────────────────────────────────────────────────────
 
-const imageBusy = ref<'cover' | 'avatar' | null>(null)
+type ImageRole = 'cover' | 'avatar' | 'logo'
+
+const imageBusy = ref<ImageRole | null>(null)
 const coverInput = ref<HTMLInputElement | null>(null)
 const avatarInput = ref<HTMLInputElement | null>(null)
+const logoInput = ref<HTMLInputElement | null>(null)
 
-async function onImageSelected(e: Event, role: 'cover' | 'avatar') {
+const IMAGE_DONE: Record<ImageRole, string> = {
+  cover: 'Couverture mise à jour.',
+  avatar: 'Photo mise à jour.',
+  logo: 'Logo mis à jour.',
+}
+
+async function onImageSelected(e: Event, role: ImageRole) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = '' // permet de re-sélectionner le même fichier
@@ -148,11 +164,16 @@ async function onImageSelected(e: Event, role: 'cover' | 'avatar') {
 
   imageBusy.value = role
   try {
-    // Couverture plus large que l'avatar : on ne compresse pas de la même façon.
-    const dataUrl = await resizeImageToDataUrl(file, role === 'cover' ? 1200 : 512)
+    // Couverture plus large que l'avatar ; le logo sort en PNG pour conserver
+    // son fond transparent — en JPEG il reviendrait cerné de noir.
+    const dataUrl = await resizeImageToDataUrl(
+      file,
+      role === 'cover' ? 1200 : 512,
+      role === 'logo' ? { mimeType: 'image/png' } : {},
+    )
     await $fetch(`/api/dashboard/card/image/${role}`, { method: 'PUT', body: { dataUrl } })
     await refresh()
-    toastSuccess(role === 'cover' ? 'Couverture mise à jour.' : 'Photo mise à jour.')
+    toastSuccess(IMAGE_DONE[role])
   } catch (err) {
     toastError(apiError(err))
   } finally {
@@ -160,7 +181,7 @@ async function onImageSelected(e: Event, role: 'cover' | 'avatar') {
   }
 }
 
-async function removeImage(role: 'cover' | 'avatar') {
+async function removeImage(role: ImageRole) {
   imageBusy.value = role
   try {
     await $fetch(`/api/dashboard/card/image/${role}`, { method: 'DELETE' })
@@ -461,9 +482,8 @@ const reviewWarning = computed(
             </div>
           </div>
 
-          <div class="grid gap-4 sm:grid-cols-2">
-            <!-- Couverture -->
-            <div>
+          <!-- Couverture -->
+          <div>
               <span class="label">Image de couverture</span>
               <div
                 class="flex h-24 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
@@ -480,9 +500,10 @@ const reviewWarning = computed(
                   Retirer
                 </button>
               </div>
-            </div>
+          </div>
 
-            <!-- Avatar -->
+          <div class="grid gap-4 sm:grid-cols-2">
+            <!-- Photo -->
             <div>
               <span class="label">Photo</span>
               <div class="flex h-24 items-center gap-3">
@@ -508,6 +529,51 @@ const reviewWarning = computed(
               <p v-if="!state.avatarUrl && state.profilePhotoUrl" class="mt-1 text-xs text-slate-500">
                 Votre photo de profil est utilisée par défaut.
               </p>
+            </div>
+
+            <!-- Logo -->
+            <div>
+              <span class="label">Logo (optionnel)</span>
+              <!-- Damier discret : rend visible la transparence d'un logo PNG,
+                   et évite qu'un logo blanc paraisse absent sur fond blanc. -->
+              <div class="rw-checker flex h-24 items-center justify-center overflow-hidden rounded-xl border border-slate-200 p-2">
+                <img
+                  v-if="state.logoUrl"
+                  :src="state.logoUrl"
+                  alt="Votre logo"
+                  class="max-h-full max-w-full object-contain"
+                />
+                <CardIcon v-else name="image" :size="24" class="text-slate-400" />
+              </div>
+              <input ref="logoInput" type="file" accept="image/*" class="sr-only" @change="onImageSelected($event, 'logo')" />
+              <div class="mt-2 flex items-center gap-3">
+                <button type="button" class="btn-ghost !min-h-0 px-3 py-1.5 text-sm" :disabled="imageBusy === 'logo'" @click="logoInput?.click()">
+                  {{ imageBusy === 'logo' ? 'Chargement…' : state.logoUrl ? 'Changer' : 'Importer' }}
+                </button>
+                <button v-if="state.logoUrl && imageBusy !== 'logo'" type="button" class="text-sm font-medium text-red-600 hover:underline" @click="removeImage('logo')">
+                  Retirer
+                </button>
+              </div>
+              <p class="mt-1 text-xs text-slate-500">
+                Affiché sous votre nom, sans recadrage, transparence conservée.
+              </p>
+              <!-- Sans ce réglage, un logo sombre à fond transparent devient
+                   invisible sur les thèmes Nuit et Ardoise. L'aperçu à droite
+                   montre l'effet immédiatement. -->
+              <label v-if="state.logoUrl" class="mt-2 flex cursor-pointer items-start gap-2">
+                <input
+                  type="checkbox"
+                  class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                  :checked="state.logoPlate"
+                  @change="setLogoPlate(($event.target as HTMLInputElement).checked)"
+                />
+                <span class="text-xs text-slate-600">
+                  Poser le logo sur une pastille claire
+                  <span class="block text-slate-400">
+                    Utile si votre logo est sombre et que vous choisissez un thème sombre.
+                  </span>
+                </span>
+              </label>
             </div>
           </div>
         </section>
@@ -766,3 +832,18 @@ const reviewWarning = computed(
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Damier de transparence : sans lui, un logo blanc à fond transparent
+   paraîtrait vide dans l'aperçu du champ. */
+.rw-checker {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #EFE7D8 25%, transparent 25%),
+    linear-gradient(-45deg, #EFE7D8 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #EFE7D8 75%),
+    linear-gradient(-45deg, transparent 75%, #EFE7D8 75%);
+  background-size: 14px 14px;
+  background-position: 0 0, 0 7px, 7px -7px, -7px 0;
+}
+</style>

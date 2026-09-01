@@ -40,6 +40,8 @@ export default defineEventHandler(async (event) => {
     profilePhotoUrl: publicPhotoUrl(driver, photoCount > 0),
     coverUrl: cardImageUrl(driver.slug, profile.images, 'cover'),
     avatarUrl: cardImageUrl(driver.slug, profile.images, 'avatar'),
+    logoUrl: cardImageUrl(driver.slug, profile.images, 'logo'),
+    logoPlate: profile.logoPlate,
     // Le bouton « Ajouter à mes contacts » n'apparaît que s'il y a de quoi
     // remplir une fiche ; l'aperçu doit le refléter.
     hasContactCard: Boolean(driver.phone || driver.contactEmail),

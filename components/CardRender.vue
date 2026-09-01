@@ -112,6 +112,22 @@ const initial = computed(() => props.card.displayName.trim().charAt(0).toUpperCa
         </h1>
         <p v-if="card.headline" class="rw-muted mt-1 text-[15px]">{{ card.headline }}</p>
         <p v-if="card.company" class="rw-muted mt-0.5 text-[13px] opacity-80">{{ card.company }}</p>
+
+        <!-- Logo de l'entreprise. `object-contain` + hauteur fixe / largeur auto :
+             un logo n'est JAMAIS recadré ni déformé, quel que soit son format
+             (carré, bandeau très large, vertical). La pastille claire est un
+             choix du chauffeur : sans elle, un logo sombre à fond transparent
+             disparaît sur les thèmes Nuit et Ardoise. -->
+        <div v-if="card.logoUrl" class="mt-3 flex justify-center">
+          <span :class="card.logoPlate ? 'rw-logo-plate rounded-xl px-3 py-2' : ''">
+            <img
+              :src="card.logoUrl"
+              :alt="card.company || card.displayName"
+              class="block h-10 w-auto max-w-full object-contain"
+              loading="lazy"
+            />
+          </span>
+        </div>
       </div>
 
       <!-- Ajouter à mes contacts : le geste le plus utile de la page -->
@@ -265,6 +281,11 @@ const initial = computed(() => props.card.displayName.trim().charAt(0).toUpperCa
 }
 a.rw-surface:hover {
   border-color: var(--card-accent);
+}
+.rw-logo-plate {
+  background: #ffffff;
+  box-shadow: 0 2px 10px -6px rgb(0 0 0 / 35%);
+  max-width: 78%;
 }
 .rw-placeholder {
   background: var(--card-bg);

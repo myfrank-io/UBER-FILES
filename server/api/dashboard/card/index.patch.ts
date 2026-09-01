@@ -12,6 +12,7 @@ const schema = z.object({
   headline: z.string().max(120).nullable().optional(),
   company: z.string().max(120).nullable().optional(),
   published: z.boolean().optional(),
+  logoPlate: z.boolean().optional(),
 })
 
 /** Chaîne vide (ou blanche) = champ effacé. */
@@ -33,7 +34,7 @@ export default defineEventHandler(async (event) => {
       statusMessage: body.error.errors.map((e) => e.message).join(' '),
     })
   }
-  const { theme, headline, company, published } = body.data
+  const { theme, headline, company, published, logoPlate } = body.data
 
   const updated = await prisma.cardProfile.update({
     where: { id: profile.id },
@@ -41,6 +42,7 @@ export default defineEventHandler(async (event) => {
       ...(theme !== undefined ? { theme } : {}),
       ...(headline !== undefined ? { headline: blankToNull(headline) } : {}),
       ...(company !== undefined ? { company: blankToNull(company) } : {}),
+      ...(logoPlate !== undefined ? { logoPlate } : {}),
       ...(published !== undefined
         ? {
             published,
@@ -50,7 +52,14 @@ export default defineEventHandler(async (event) => {
           }
         : {}),
     },
-    select: { published: true, publishedAt: true, theme: true, headline: true, company: true },
+    select: {
+      published: true,
+      publishedAt: true,
+      theme: true,
+      headline: true,
+      company: true,
+      logoPlate: true,
+    },
   })
 
   return { ok: true, ...updated }

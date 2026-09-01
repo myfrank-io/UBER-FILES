@@ -85,6 +85,8 @@ export default defineEventHandler(async (event) => {
       cardImageUrl(driver.slug, profile.images, 'avatar')
       ?? publicPhotoUrl(driver, photoCount > 0),
     coverUrl: cardImageUrl(driver.slug, profile.images, 'cover'),
+    logoUrl: cardImageUrl(driver.slug, profile.images, 'logo'),
+    logoPlate: profile.logoPlate,
     hasContactCard: Boolean(driver.phone || driver.contactEmail),
     blocks,
     vehicles,

@@ -7,7 +7,7 @@ import { driverReviewUrl } from '~/lib/review-link'
 // rapatrié ici (omit global sur CardImage.data) : seules leur présence et leur
 // date de mise à jour circulent, l'endpoint image sert les octets.
 
-export const CARD_IMAGE_ROLES = ['cover', 'avatar'] as const
+export const CARD_IMAGE_ROLES = ['cover', 'avatar', 'logo'] as const
 export type CardImageRole = (typeof CARD_IMAGE_ROLES)[number]
 
 export function isCardImageRole(v: unknown): v is CardImageRole {
