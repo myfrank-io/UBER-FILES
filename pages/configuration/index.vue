@@ -129,7 +129,16 @@ async function stopImpersonation() {
             <p class="truncate font-serif text-lg text-slate-950">Ridewiz</p>
             <span class="hidden text-sm text-slate-400 sm:inline">· Configuration</span>
           </div>
-          <div class="flex shrink-0 items-center gap-2">
+          <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <!-- Retour au sommaire (liste de toutes les étapes) depuis n'importe quel écran. -->
+            <button
+              v-if="current !== 'intro'"
+              type="button"
+              class="inline-flex min-h-[32px] items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:border-brand-300 hover:bg-brand-50"
+              title="Revenir au sommaire des étapes"
+              data-testid="setup-summary"
+              @click="goTo('intro')"
+            >☰ Sommaire</button>
             <span
               v-if="result"
               class="rounded-full bg-brand-600 px-2.5 py-0.5 text-xs font-semibold text-white"
@@ -137,7 +146,7 @@ async function stopImpersonation() {
             >{{ result.percent }} %</span>
             <NuxtLink
               to="/dashboard"
-              class="rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+              class="hidden rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800 sm:inline"
               title="Aller à mon espace complet"
             >Mon espace ↗</NuxtLink>
           </div>
@@ -157,6 +166,13 @@ async function stopImpersonation() {
           class="-mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4 pb-2.5 sm:-mx-6 sm:px-6 [scrollbar-width:none]"
           aria-label="Étapes"
         >
+          <button
+            type="button"
+            class="flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition"
+            :class="current === 'intro' ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-500 hover:border-brand-300'"
+            title="Sommaire des étapes"
+            @click="goTo('intro')"
+          ><span aria-hidden="true">☰</span> Sommaire</button>
           <button
             v-for="(s, i) in rail"
             :key="s.key"
