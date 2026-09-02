@@ -10,6 +10,10 @@ export default defineEventHandler(async (event) => {
       orderBy: { createdAt: 'desc' },
       include: {
         _count: { select: { bookings: true } },
+        // Présence d'un compte de connexion : sans lui, « accéder à son espace »
+        // n'a pas de session à ouvrir (le chauffeur n'a pas encore activé son
+        // invitation). Le bouton est masqué plutôt que d'échouer en 404.
+        user: { select: { id: true } },
       },
     }),
     prisma.booking.count({ where: { status: 'CONFIRMED' } }),
@@ -32,6 +36,7 @@ export default defineEventHandler(async (event) => {
       // Encaissement en ligne : on n'utilise que SumUp (chauffeur = merchant of record).
       sumupConnected: d.sumupConnected,
       bookings: d._count.bookings,
+      hasAccount: Boolean(d.user),
       createdAt: d.createdAt,
     })),
   }
