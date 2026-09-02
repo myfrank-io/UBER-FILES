@@ -1,6 +1,6 @@
 import { requireAdmin } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
-import { setupLinkUrl } from '~/server/utils/setup'
+import { setupLinkUrl, setupProgress } from '~/server/utils/setup'
 import { setupLinkStatus } from '~/lib/setup-flow'
 
 export default defineEventHandler(async (event) => {
@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
 
   if (!driver) throw createError({ statusCode: 404, statusMessage: 'Chauffeur introuvable.' })
 
-  const [revenue, upcoming] = await Promise.all([
+  const [revenue, upcoming, progress] = await Promise.all([
     prisma.payment.aggregate({
       where: { driverId: id, status: 'PAID' },
       _sum: { amountCents: true },
@@ -26,6 +26,9 @@ export default defineEventHandler(async (event) => {
     prisma.booking.count({
       where: { driverId: id, status: 'CONFIRMED', scheduledAt: { gte: new Date() } },
     }),
+    // Avancement du parcours (même calcul que l'écran du chauffeur), même sans
+    // lien : un chauffeur existant a déjà une partie de sa configuration faite.
+    driver.user ? setupProgress(id) : Promise.resolve(null),
   ])
 
   return {
@@ -56,6 +59,7 @@ export default defineEventHandler(async (event) => {
       expiresAt: driver.setupTokenExpiresAt,
       startedAt: driver.setupStartedAt,
       completedAt: driver.setupCompletedAt,
+      progress,
     },
     stats: {
       bookings: driver._count.bookings,

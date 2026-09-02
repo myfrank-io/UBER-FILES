@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { SETUP_STEP_LABELS } from '~/lib/setup-flow'
+
 definePageMeta({ layout: 'default', middleware: 'admin' })
 
 const route = useRoute()
@@ -245,6 +247,32 @@ const statusLabels: Record<string, string> = {
         </p>
         <p v-if="data.setup.completedAt" class="mt-1 text-xs text-slate-500">Terminée le {{ formatDateTime(data.setup.completedAt) }}.</p>
         <p v-else-if="data.setup.startedAt" class="mt-1 text-xs text-slate-500">Ouverte le {{ formatDateTime(data.setup.startedAt) }}.</p>
+
+        <!-- Avancement : même pourcentage que celui affiché au chauffeur. -->
+        <div v-if="data.setup.progress" class="mt-4 rounded-xl border border-slate-200 bg-white p-4" data-testid="setup-progress">
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-sm font-semibold text-slate-900">
+              Avancement
+              <span class="ml-1 font-normal text-slate-500">{{ data.setup.progress.requiredDone }} / {{ data.setup.progress.requiredTotal }} étapes obligatoires</span>
+            </p>
+            <span class="rounded-full px-2.5 py-0.5 text-sm font-bold" :class="data.setup.progress.complete ? 'bg-green-100 text-green-800' : 'bg-brand-600 text-white'" data-testid="setup-progress-percent">
+              {{ data.setup.progress.percent }} %
+            </span>
+          </div>
+          <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+            <div class="h-full rounded-full transition-all" :class="data.setup.progress.complete ? 'bg-green-600' : 'bg-brand-600'" :style="{ width: `${data.setup.progress.percent}%` }" />
+          </div>
+          <ul class="mt-3 grid gap-1.5 sm:grid-cols-2">
+            <li v-for="s in data.setup.progress.steps" :key="s.key" class="flex items-center gap-2 text-sm" :data-step="s.key" :data-done="s.done">
+              <span
+                class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+                :class="s.done ? 'bg-green-100 text-green-700' : s.optional ? 'bg-slate-100 text-slate-400' : 'bg-amber-100 text-amber-800'"
+              >{{ s.done ? '✓' : s.optional ? '–' : '!' }}</span>
+              <span :class="s.done ? 'text-slate-500' : 'text-slate-900'">{{ SETUP_STEP_LABELS[s.key] }}</span>
+              <span v-if="s.optional && !s.done" class="text-xs text-slate-400">(optionnel)</span>
+            </li>
+          </ul>
+        </div>
 
         <div v-if="setupUrl" class="mt-3">
           <input
