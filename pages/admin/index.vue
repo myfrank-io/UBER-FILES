@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// Back-office admin (Chams) : pilotage des chauffeurs, activité, facturation.
+// Back-office admin : pilotage des chauffeurs, activité, facturation.
 definePageMeta({ layout: 'default', middleware: 'admin' })
-useHead({ title: 'Administration — Chams' })
+useHead({ title: 'Administration' })
 const { formatMoney, formatDateTime } = useFormat()
 
 const { data, refresh } = await useFetch('/api/admin/overview')
@@ -196,7 +196,7 @@ const filteredDrivers = computed(() => {
 <template>
   <div class="mx-auto max-w-5xl px-5 py-8">
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Administration — Chams</h1>
+      <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Administration</h1>
       <button class="-mr-3 rounded-lg px-3 py-2.5 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-700" @click="logout">
         Déconnexion
       </button>
