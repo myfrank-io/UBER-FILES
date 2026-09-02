@@ -56,6 +56,12 @@ export interface HourlyRateInput {
   overtime2AfterHours?: number | null
   /** Tarif des heures au-delà du second seuil (centimes). */
   overtime2PricePerHourCents?: number | null
+  /**
+   * Durée minimale acceptée par le chauffeur (heures). Une demande plus courte
+   * est refusée — on ne facture pas un minimum en douce. null / absent = pas de
+   * minimum.
+   */
+  minHours?: number | null
 }
 
 export interface BreakdownLine {

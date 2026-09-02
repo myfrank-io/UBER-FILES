@@ -3,6 +3,8 @@ import {
   formatRideDate,
   formatRideDateTime,
   formatRideTime,
+  isRideToday,
+  rideDayKey,
   timezoneCity,
   timezoneLabel,
 } from './datetime'
@@ -54,5 +56,36 @@ describe('timezoneLabel / timezoneCity', () => {
     expect(timezoneCity('America/Port-au-Prince')).toBe('Port-au-Prince')
     expect(timezoneLabel('Europe/Paris', 'fr')).toBe('heure de Paris')
     expect(timezoneLabel('Europe/Paris', 'en')).toBe('Paris time')
+  })
+})
+
+describe('rideDayKey / isRideToday', () => {
+  it('rend la clé de jour du fuseau du chauffeur, pas celle du navigateur', () => {
+    expect(rideDayKey(summer, 'Europe/Paris')).toBe('2026-07-24')
+    expect(rideDayKey(summer, 'America/Guadeloupe')).toBe('2026-07-24')
+  })
+
+  it('bascule de jour selon le fuseau (00h30 à Paris = la veille aux Antilles)', () => {
+    // 2026-07-23T22:30:00Z → Paris 24/07 00:30 ; Guadeloupe 23/07 18:30.
+    const nightRide = new Date('2026-07-23T22:30:00Z')
+    expect(rideDayKey(nightRide, 'Europe/Paris')).toBe('2026-07-24')
+    expect(rideDayKey(nightRide, 'America/Guadeloupe')).toBe('2026-07-23')
+  })
+
+  it('gère l’heure d’hiver', () => {
+    expect(rideDayKey(winter, 'Europe/Paris')).toBe('2026-01-24')
+  })
+
+  it('accepte une chaîne ISO', () => {
+    expect(rideDayKey('2026-07-24T09:30:00Z', 'Europe/Paris')).toBe('2026-07-24')
+  })
+
+  it('isRideToday compare les jours dans le fuseau du chauffeur', () => {
+    // Même instant de référence : la course de 00h30 à Paris est « aujourd'hui »
+    // pour le chauffeur parisien, alors que le navigateur antillais est encore la veille.
+    const nightRide = new Date('2026-07-23T22:30:00Z')
+    expect(isRideToday(nightRide, 'Europe/Paris', new Date('2026-07-24T08:00:00Z'))).toBe(true)
+    expect(isRideToday(nightRide, 'America/Guadeloupe', new Date('2026-07-24T08:00:00Z'))).toBe(false)
+    expect(isRideToday(summer, 'Europe/Paris', new Date('2026-07-25T09:30:00Z'))).toBe(false)
   })
 })

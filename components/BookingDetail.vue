@@ -187,7 +187,7 @@ async function cancelBooking() {
               :status="detailPayment.status"
               :booking-status="(detail.status as string)"
             />
-            <span class="text-sm text-slate-500">{{ formatDateTime(detail.scheduledAt as string) }}</span>
+            <span class="text-sm text-slate-500">{{ formatDateTime(detail.scheduledAt as string, detail.timezone as string) }}</span>
           </div>
 
           <div class="card !p-4">
@@ -309,10 +309,10 @@ async function cancelBooking() {
             <p v-for="p in (detail.payments as Record<string, unknown>[])" :key="p.id as string" class="mt-1 text-xs">
               <template v-if="p.status === 'PAID'">
                 <span class="text-green-700">Réglé</span>
-                <span class="text-slate-500"> ({{ methodLabel(p.method) }}) — le {{ formatDateTime(p.createdAt as string) }}</span>
+                <span class="text-slate-500"> ({{ methodLabel(p.method) }}) — le {{ formatDateTime(p.createdAt as string, detail.timezone as string) }}</span>
               </template>
               <span v-else-if="p.status === 'PENDING'" class="text-amber-600">À encaisser sur place — {{ shortMethodLabel(p.method) }}</span>
-              <span v-else class="text-slate-500">{{ p.status }} — le {{ formatDateTime(p.createdAt as string) }}</span>
+              <span v-else class="text-slate-500">{{ p.status }} — le {{ formatDateTime(p.createdAt as string, detail.timezone as string) }}</span>
             </p>
 
             <button

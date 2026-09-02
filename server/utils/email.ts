@@ -878,6 +878,9 @@ export const emailTemplates = {
     paymentLabel: string // "Payé en ligne le …" / "Réglé sur place (Espèces)"
     bookingRef: string
     reviewUrl?: string | null // lien d'avis du chauffeur (facultatif)
+    // Page publique du chauffeur : « réserver ma prochaine course ». Boucle le
+    // cycle sans geste manuel — ce reçu part déjà tout seul en fin de course.
+    bookingUrl?: string | null
   }) {
     const lines = opts.breakdown
       .map(
@@ -910,6 +913,16 @@ export const emailTemplates = {
                   <p style="margin:0 0 4px;font-size:14px;color:#16283D">Votre trajet vous a plu ?</p>
                   <p style="margin:0 0 10px;font-size:13px;color:#6C7889">Votre avis aide énormément ${esc(opts.driverName)}.</p>
                   ${button(opts.reviewUrl, '⭐ Laisser un avis')}
+                </div>`
+             : ''
+         }
+         ${
+           // Prochaine course : CTA secondaire sous l'avis, primaire quand aucun
+           // dépôt d'avis n'est configuré — le reçu ne finit jamais en cul-de-sac.
+           opts.bookingUrl
+             ? `<div style="margin:${opts.reviewUrl ? '12px' : '22px'} 0 4px;padding:16px;background:#FBF7F0;border:1px solid #EFE7D8;border-radius:12px;text-align:center">
+                  <p style="margin:0 0 10px;font-size:13px;color:#6C7889">Besoin d'un prochain trajet ? Réservez directement auprès de ${esc(opts.driverName)}.</p>
+                  ${button(opts.bookingUrl, 'Réserver ma prochaine course')}
                 </div>`
              : ''
          }

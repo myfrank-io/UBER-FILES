@@ -4,9 +4,10 @@ import { prisma } from '~/server/utils/prisma'
 
 // Tarif de mise à disposition, remplacé d'un bloc : tarif horaire de base et,
 // en option, tarif réduit au-delà d'un seuil d'heures, puis une seconde tranche
-// au-delà d'un second seuil. `enabled: false` retire la mise à disposition de
-// la page publique. Les champs de la seconde tranche sont `nullish` : un client
-// antérieur à leur ajout peut encore enregistrer sans les envoyer.
+// au-delà d'un second seuil, plus la durée minimale acceptée. `enabled: false`
+// retire la mise à disposition de la page publique. Les champs ajoutés après
+// coup (seconde tranche, durée minimale) sont `nullish` : un client antérieur
+// à leur ajout peut encore enregistrer sans les envoyer.
 const schema = z
   .discriminatedUnion('enabled', [
     z.object({ enabled: z.literal(false) }),
@@ -17,6 +18,8 @@ const schema = z
       overtimeRateCents: z.number().int().min(1).nullable(),
       overtime2AfterHours: z.number().int().min(2).max(23).nullish(),
       overtime2RateCents: z.number().int().min(1).nullish(),
+      // Durée minimale acceptée (heures). null / 1 = pas de minimum.
+      minHours: z.number().int().min(1).max(24).nullish(),
     }),
   ])
   .refine(
@@ -58,6 +61,10 @@ export default defineEventHandler(async (event) => {
         hourlyOvertimeRateCents: body.data.overtimeRateCents,
         hourlyOvertime2AfterHours: body.data.overtime2AfterHours ?? null,
         hourlyOvertime2RateCents: body.data.overtime2RateCents ?? null,
+        // « 1 h » n'est pas une contrainte : on stocke null pour ne pas afficher
+        // un minimum qui ne restreint rien.
+        hourlyMinHours:
+          body.data.minHours != null && body.data.minHours > 1 ? body.data.minHours : null,
       }
     : {
         hourlyRateCents: null,
@@ -65,6 +72,7 @@ export default defineEventHandler(async (event) => {
         hourlyOvertimeRateCents: null,
         hourlyOvertime2AfterHours: null,
         hourlyOvertime2RateCents: null,
+        hourlyMinHours: null,
       }
 
   const driver = await prisma.driver.update({ where: { id: driverId }, data })
@@ -75,5 +83,6 @@ export default defineEventHandler(async (event) => {
     hourlyOvertimeRateCents: driver.hourlyOvertimeRateCents,
     hourlyOvertime2AfterHours: driver.hourlyOvertime2AfterHours,
     hourlyOvertime2RateCents: driver.hourlyOvertime2RateCents,
+    hourlyMinHours: driver.hourlyMinHours,
   }
 })

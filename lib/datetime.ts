@@ -68,3 +68,27 @@ export function formatRideTime(
     timeZone,
   }).format(toDate(value))
 }
+
+/**
+ * Clé de jour civil (« 2026-07-24 ») d'un instant **dans le fuseau du chauffeur**.
+ * Sert à regrouper des courses par journée (agenda, « courses du jour ») sans
+ * jamais retomber sur le fuseau du navigateur : une course du 24 à 00h30 à Paris
+ * doit rester au 24 même si le chauffeur consulte son espace depuis les Antilles.
+ */
+export function rideDayKey(value: Date | string, timeZone: string): string {
+  // formatToParts plutôt qu'un format localisé : la sortie ne dépend d'aucune
+  // convention de locale, seulement du fuseau demandé.
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(toDate(value))
+  const get = (type: 'year' | 'month' | 'day') => parts.find((p) => p.type === type)?.value ?? ''
+  return `${get('year')}-${get('month')}-${get('day')}`
+}
+
+/** L'instant tombe-t-il aujourd'hui, au sens du fuseau du chauffeur ? */
+export function isRideToday(value: Date | string, timeZone: string, now: Date = new Date()): boolean {
+  return rideDayKey(value, timeZone) === rideDayKey(now, timeZone)
+}

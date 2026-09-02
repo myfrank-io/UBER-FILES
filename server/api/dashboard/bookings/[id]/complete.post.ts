@@ -78,6 +78,8 @@ export default defineEventHandler(async (event) => {
       paymentLabel,
       bookingRef,
       reviewUrl,
+      // Page publique du chauffeur : le client peut re-réserver depuis son reçu.
+      bookingUrl: `${config.public.appBaseUrl}/${booking.driver.slug}`,
     })
     await sendEmail({ to: req.customerEmail, ...tpl })
   } catch (err) {

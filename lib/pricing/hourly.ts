@@ -9,6 +9,9 @@ import type { BreakdownLine, HourlyPricingInput, PriceResult } from './types'
  * seconde tranche au-delà d'un second seuil (ex: puis 30 €/h après 12 h).
  * Chaque heure est facturée au tarif de sa tranche — jamais toute la durée au
  * tarif réduit. Applique le prix minimum de course puis les majorations.
+ *
+ * Une durée inférieure au minimum du chauffeur (`rate.minHours`) est REFUSÉE
+ * plutôt que facturée au minimum : le client doit savoir ce qu'il commande.
  */
 export function priceHourly(input: HourlyPricingInput): PriceResult {
   const { durationHours, rate, surcharges, params } = input
@@ -18,6 +21,16 @@ export function priceHourly(input: HourlyPricingInput): PriceResult {
   }
   if (!rate || !(rate.pricePerHourCents > 0)) {
     throw new PricingError('Aucun tarif horaire défini.', 'NO_HOURLY_RATE')
+  }
+  // Durée minimale du chauffeur : garde-fou métier partagé par l'estimation en
+  // direct et la soumission de la demande (le formulaire public borne déjà le
+  // sélecteur, mais l'API ne s'y fie pas).
+  const minHours = rate.minHours != null && rate.minHours > 1 ? rate.minHours : null
+  if (minHours != null && durationHours < minHours) {
+    throw new PricingError(
+      `Ce chauffeur accepte les mises à disposition à partir de ${minHours} h.`,
+      'BELOW_MIN_DURATION',
+    )
   }
 
   const overtime =

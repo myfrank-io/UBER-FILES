@@ -58,6 +58,9 @@ interface DriverPublic {
   hasTransfer: boolean
   bookingEnabled: boolean
   hasHourly: boolean
+  // Durée minimale d'une mise à disposition (null/absent = aucune). Optionnel :
+  // un payload public encore en cache CDN peut ne pas porter le champ.
+  hourlyMinHours?: number | null
   // Transferts aéroport : grille des forfaits (affichés avant toute saisie).
   // Optionnel : un payload public encore en cache CDN peut ne pas porter le champ.
   airportTransfer?: { enabled: boolean; rates: AirportRates }
@@ -164,6 +167,15 @@ const dropoffTerminal = ref<string | null>(null)
 const dropoffTerminalCoords = ref<{ lat: number; lng: number } | null>(null)
 const roundTrip = ref(false)
 const durationHours = ref(2)
+// Durée minimale acceptée par le chauffeur (« je ne me déplace pas pour moins de
+// 2 h »). 1 par défaut = aucune contrainte. Le serveur revalide de son côté :
+// cette borne rend juste le refus impossible à atteindre depuis le formulaire.
+const minDurationHours = computed(() => Math.max(1, driver.value?.hourlyMinHours ?? 1))
+// La durée proposée ne descend jamais sous ce minimum : le formulaire s'ouvre
+// directement sur une valeur commandable, plutôt que sur un champ à corriger.
+watch(minDurationHours, (min) => {
+  if (durationHours.value < min) durationHours.value = min
+}, { immediate: true })
 // N° de vol : demandé uniquement sur un transfert aéroport reconnu.
 const airportFlight = ref('')
 
@@ -529,7 +541,7 @@ function errMessage(e: unknown): string {
 const canEstimate = computed(() =>
   type.value === 'TRANSFER'
     ? pickup.value.length > 3 && dropoff.value.length > 3
-    : pickup.value.length > 3 && durationHours.value >= 1,
+    : pickup.value.length > 3 && durationHours.value >= minDurationHours.value,
 )
 const canSubmit = computed(
   () => Boolean(estimate.value) && customer.name.length >= 2 && customer.phone.length >= 6 && customer.email.includes('@'),
@@ -813,7 +825,17 @@ async function priceCtaClick() {
               </div>
               <div>
                 <label class="label" for="duration">{{ $t('public.durationLabel') }}</label>
-                <input id="duration" v-model.number="durationHours" type="number" min="1" max="24" class="field" />
+                <input
+                  id="duration"
+                  v-model.number="durationHours"
+                  type="number"
+                  :min="minDurationHours"
+                  max="24"
+                  class="field"
+                />
+                <p v-if="minDurationHours > 1" class="mt-1 text-xs text-slate-500">
+                  {{ $t('public.durationMin', { hours: minDurationHours }) }}
+                </p>
               </div>
             </template>
 

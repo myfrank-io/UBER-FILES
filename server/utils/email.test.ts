@@ -211,6 +211,53 @@ describe('emailTemplates client — variantes des flux', () => {
   })
 })
 
+describe('emailTemplates — reçu de fin de course', () => {
+  const receipt = {
+    driverName: 'Karim VTC',
+    customerName: 'Marie',
+    scheduledAt: base.scheduledAt,
+    timezone: base.timezone,
+    rideLabel: 'Transfert — Gare de Lyon → Orly',
+    breakdown: [{ label: 'Course', amountCents: 8000 }],
+    amountCents: 8000,
+    currency: 'EUR',
+    paymentLabel: 'Réglé sur place (Espèces)',
+    bookingRef: 'AB12CD34',
+  }
+
+  it('propose de re-réserver, sous le bloc avis', () => {
+    const tpl = emailTemplates.paymentReceipt({
+      ...receipt,
+      reviewUrl: 'https://app.test/avis/karim-paris?ref=AB12CD34',
+      bookingUrl: 'https://app.test/karim-paris',
+    })
+    expect(tpl.subject).toContain('Reçu de votre course')
+    expect(tpl.html).toContain('⭐ Laisser un avis')
+    expect(tpl.html).toContain('Réserver ma prochaine course')
+    expect(tpl.html).toContain('https://app.test/karim-paris')
+    // L'avis reste le premier appel à l'action.
+    expect(tpl.html.indexOf('Laisser un avis')).toBeLessThan(
+      tpl.html.indexOf('Réserver ma prochaine course'),
+    )
+  })
+
+  it('sans lien d\'avis configuré, la réservation reste proposée', () => {
+    const tpl = emailTemplates.paymentReceipt({
+      ...receipt,
+      reviewUrl: null,
+      bookingUrl: 'https://app.test/karim-paris',
+    })
+    expect(tpl.html).not.toContain('Laisser un avis')
+    expect(tpl.html).toContain('Réserver ma prochaine course')
+  })
+
+  it('sans page publique transmise, aucun bloc de re-réservation', () => {
+    const tpl = emailTemplates.paymentReceipt({ ...receipt, reviewUrl: null })
+    expect(tpl.html).not.toContain('Réserver ma prochaine course')
+    expect(tpl.html).toContain('80,00')
+  })
+})
+
 describe('emailTemplates chauffeur', () => {
   it('preRideDriver : alerte H-2 avec trajet, contact client et liens de navigation', () => {
     const tpl = emailTemplates.preRideDriver({

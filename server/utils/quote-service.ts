@@ -175,6 +175,7 @@ export async function computeQuote(args: ComputeArgs): Promise<QuoteComputation>
       overtimePricePerHourCents: driver.hourlyOvertimeRateCents,
       overtime2AfterHours: driver.hourlyOvertime2AfterHours,
       overtime2PricePerHourCents: driver.hourlyOvertime2RateCents,
+      minHours: driver.hourlyMinHours,
     },
     surcharges,
     params,
