@@ -78,6 +78,7 @@ export default defineEventHandler(async (event) => {
               hourlyOvertimeRateCents: null,
               hourlyOvertime2AfterHours: null,
               hourlyOvertime2RateCents: null,
+              hourlyMinHours: null,
             }),
         airportOrlyRiveDroiteCents: airport.orlyRiveDroiteCents,
         airportOrlyRiveGaucheCents: airport.orlyRiveGaucheCents,

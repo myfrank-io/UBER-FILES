@@ -113,6 +113,9 @@ export default defineEventHandler(async (event) => {
     minLeadTimeMinutes: driver.minLeadTimeMinutes,
     hasTransfer: driver.transferBands.length > 0,
     hasHourly: driver.hourlyRateCents != null,
+    // Durée minimale d'une mise à disposition (null = aucune) : borne le
+    // sélecteur de durée du formulaire, que le serveur revérifie de son côté.
+    hourlyMinHours: driver.hourlyMinHours,
     // Onglet « Aéroport » : grille complète (null = trajet non proposé).
     airportTransfer: {
       enabled: airportTransferEnabled(airportRates),

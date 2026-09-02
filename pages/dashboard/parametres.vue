@@ -603,6 +603,9 @@ const hourly = reactive({
   overtime2Enabled: false,
   overtime2AfterHours: 12,
   overtime2RateEuros: '',
+  // Durée minimale acceptée. Désactivé = pas de minimum (le client peut demander 1 h).
+  minEnabled: false,
+  minHours: 2,
 })
 
 watchEffect(() => {
@@ -613,6 +616,7 @@ watchEffect(() => {
   const otRate = d.hourlyOvertimeRateCents as number | null
   const ot2After = d.hourlyOvertime2AfterHours as number | null
   const ot2Rate = d.hourlyOvertime2RateCents as number | null
+  const minHours = d.hourlyMinHours as number | null
   hourly.enabled = rate != null
   hourly.pricePerHourEuros = rate != null ? (rate / 100).toFixed(2) : ''
   hourly.overtimeEnabled = otAfter != null && otRate != null
@@ -621,6 +625,8 @@ watchEffect(() => {
   hourly.overtime2Enabled = ot2After != null && ot2Rate != null
   hourly.overtime2AfterHours = ot2After ?? 12
   hourly.overtime2RateEuros = ot2Rate != null ? (ot2Rate / 100).toFixed(2) : ''
+  hourly.minEnabled = minHours != null && minHours > 1
+  hourly.minHours = minHours ?? 2
 })
 
 // `v` peut être un nombre : v-model sur un input type="number" caste
@@ -641,6 +647,11 @@ const hourlyOvertimeValid = computed(
 
 // La seconde tranche n'existe que comme prolongement de la première : son
 // seuil doit dépasser strictement le premier.
+// Durée minimale : entière, entre 2 h (1 h ne contraint rien) et 24 h.
+const hourlyMinValid = computed(
+  () => Number.isInteger(hourly.minHours) && hourly.minHours >= 2 && hourly.minHours <= 24,
+)
+
 const hourlyOvertime2Active = computed(() => hourly.overtimeEnabled && hourly.overtime2Enabled)
 const hourlyOvertime2CentsInput = computed(() => eurosToCents(hourly.overtime2RateEuros))
 const hourlyOvertime2Valid = computed(
@@ -665,6 +676,14 @@ const hourlyRecap = computed(() => {
   return `Tarif unique : ${formatMoney(base, currency.value)}/h, quelle que soit la durée.`
 })
 
+// Phrase du minimum, affichée sous le récapitulatif tarifaire : c'est la règle
+// que le client lira sur la page de réservation.
+const hourlyMinRecap = computed(() =>
+  hourly.minEnabled && hourlyMinValid.value
+    ? `Durée minimale : ${hourly.minHours} h — une demande plus courte est refusée.`
+    : '',
+)
+
 // Exemple chiffré au-delà du dernier seuil : montre le devis ligne par ligne.
 const hourlyExample = computed(() => {
   const base = hourlyRateCentsInput.value
@@ -688,7 +707,8 @@ const hourlySaveDisabled = computed(
     (hourly.enabled &&
       (!hourlyRateCentsInput.value ||
         (hourly.overtimeEnabled && !hourlyOvertimeValid.value) ||
-        (hourlyOvertime2Active.value && !hourlyOvertime2Valid.value))),
+        (hourlyOvertime2Active.value && !hourlyOvertime2Valid.value) ||
+        (hourly.minEnabled && !hourlyMinValid.value))),
 )
 
 async function saveHourly() {
@@ -701,6 +721,7 @@ async function saveHourly() {
             pricePerHourCents: hourlyRateCentsInput.value,
             overtimeAfterHours: hourly.overtimeEnabled ? hourly.overtimeAfterHours : null,
             overtimeRateCents: hourly.overtimeEnabled ? hourlyOvertimeCentsInput.value : null,
+            minHours: hourly.minEnabled && hourlyMinValid.value ? hourly.minHours : null,
             overtime2AfterHours: hourlyOvertime2Active.value ? hourly.overtime2AfterHours : null,
             overtime2RateCents: hourlyOvertime2Active.value
               ? hourlyOvertime2CentsInput.value
@@ -1188,7 +1209,8 @@ async function call(key: string, fn: () => Promise<unknown>) {
           <h2 class="font-semibold text-slate-900">Mise à disposition — prix à l'heure</h2>
           <p class="mt-1 text-sm text-slate-600">
             Votre tarif horaire et, si vous le souhaitez, une ou deux tranches de prix
-            réduites au-delà d'un certain nombre d'heures.
+            réduites au-delà d'un certain nombre d'heures, ainsi que la durée minimale
+            que vous acceptez.
           </p>
         </div>
 
@@ -1237,9 +1259,23 @@ async function call(key: string, fn: () => Promise<unknown>) {
             </div>
           </template>
 
+          <label class="flex items-center gap-2.5 py-1 text-sm text-slate-600">
+            <input v-model="hourly.minEnabled" type="checkbox" class="h-5 w-5 shrink-0 rounded accent-brand-600" />
+            Durée minimale de réservation
+          </label>
+
+          <div v-if="hourly.minEnabled" class="w-40">
+            <label class="label" for="hourly-min">Au moins (heures)</label>
+            <input id="hourly-min" v-model.number="hourly.minHours" type="number" min="2" max="24" class="field" />
+            <p v-if="!hourlyMinValid" class="mt-1 text-xs text-amber-700">
+              Indiquez un nombre entier d'heures, entre 2 et 24.
+            </p>
+          </div>
+
           <div v-if="hourlyRecap" class="rounded-xl bg-brand-50 px-4 py-3">
             <p class="text-sm font-medium text-slate-900">{{ hourlyRecap }}</p>
             <p v-if="hourlyExample" class="mt-1 text-xs text-slate-500">{{ hourlyExample }}</p>
+            <p v-if="hourlyMinRecap" class="mt-1 text-xs text-slate-500">{{ hourlyMinRecap }}</p>
           </div>
         </template>
         <p v-else class="text-sm text-slate-500">

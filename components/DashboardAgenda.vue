@@ -4,7 +4,18 @@
 // retour sur l'onglet). Une course confirmée ouvre la fiche partagée
 // BookingDetail (toutes les actions) ; un devis en attente ouvre une fiche
 // légère de relance.
+import { fromZonedTime } from 'date-fns-tz'
+import { formatRideTime, rideDayKey } from '~/lib/datetime'
+
 const { formatMoney } = useFormat()
+
+// Fuseau du chauffeur (lieu de prise en charge). L'agenda raisonne en heure
+// MURALE de ce fuseau : les jours de la grille, le regroupement des courses par
+// journée et les heures affichées en découlent tous. Sans cela, un chauffeur qui
+// consulte son planning depuis un autre fuseau verrait une course du 24 à 00h30
+// rangée au 23 — le bug de fuseau signalé côté client, en miroir.
+const { data: me } = await useMe()
+const driverTz = computed(() => (me.value as { timezone?: string } | null)?.timezone ?? 'Europe/Paris')
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -42,51 +53,81 @@ function isRide(e: CalEvent): boolean {
   return e.type === 'BOOKING' || e.type === 'PENDING_QUOTE'
 }
 
-// ─── Date helpers (local, sans dépendance) ──────────────────────────────────
+// ─── Date helpers ────────────────────────────────────────────────────────────
 
-const DAY_MS = 86_400_000
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 const MONTHS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ]
 
+// Les Date manipulées ici sont des dates MURALES : seules leurs composantes
+// civiles (année/mois/jour) comptent, jamais l'instant qu'elles représentent.
+// Elles servent à parcourir des journées ; les instants réels passent toujours
+// par `rideDayKey` / `fromZonedTime` avec le fuseau du chauffeur.
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
-function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+/** Date murale à minuit reconstruite depuis une clé « 2026-07-24 ». */
+function dateFromKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y!, m! - 1, d!)
+}
+/** Décalage en jours CIVILS (constructeur, pas ±24 h : insensible aux changements d'heure). */
+function addDays(d: Date, days: number): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days)
 }
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  return formatRideTime(iso, driverTz.value)
 }
 function fmtShortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  return new Intl.DateTimeFormat('fr-FR', {
+    timeZone: driverTz.value,
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(iso))
 }
 function fmtLongDate(key: string): string {
-  const [y, m, d] = key.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString('fr-FR', {
+  return dateFromKey(key).toLocaleDateString('fr-FR', {
     weekday: 'long', day: 'numeric', month: 'long',
   })
 }
 
 // ─── État de la vue ──────────────────────────────────────────────────────────
 
-const today = new Date()
-const todayKey = dateKey(today)
-const viewYear = ref(today.getFullYear())
-const viewMonth = ref(today.getMonth()) // 0..11
-const selectedKey = ref(todayKey)
+// « Aujourd'hui » du chauffeur, en date murale : c'est le jour de son fuseau,
+// pas celui du navigateur.
+const todayKey = ref(rideDayKey(new Date(), driverTz.value))
+const today = ref(dateFromKey(todayKey.value))
+const viewYear = ref(today.value.getFullYear())
+const viewMonth = ref(today.value.getMonth()) // 0..11
+const selectedKey = ref(todayKey.value)
+
+// Le profil (donc le fuseau) arrive en chargement paresseux : au premier rendu on
+// a pu retenir le jour du repli. Dès qu'il est connu, on recale « aujourd'hui »
+// — et la vue avec, tant que le chauffeur n'a pas lui-même changé de journée.
+watch(driverTz, (tz) => {
+  const next = rideDayKey(new Date(), tz)
+  if (next === todayKey.value) return
+  const untouched = selectedKey.value === todayKey.value
+  todayKey.value = next
+  today.value = dateFromKey(next)
+  if (untouched) {
+    selectedKey.value = next
+    viewYear.value = today.value.getFullYear()
+    viewMonth.value = today.value.getMonth()
+  }
+})
 
 // Grille fixe de 6 semaines (42 jours), semaine commençant le lundi.
 const gridStart = computed(() => {
   const first = new Date(viewYear.value, viewMonth.value, 1)
   const offset = (first.getDay() + 6) % 7 // 0 = lundi
-  return new Date(first.getTime() - offset * DAY_MS)
+  return addDays(first, -offset)
 })
 const gridDays = computed(() =>
   Array.from({ length: 42 }, (_, i) => {
-    const d = new Date(gridStart.value.getTime() + i * DAY_MS)
+    const d = addDays(gridStart.value, i)
     return { key: dateKey(d), dayNum: d.getDate(), inMonth: d.getMonth() === viewMonth.value }
   }),
 )
@@ -97,23 +138,27 @@ function goMonth(delta: number) {
   viewMonth.value = d.getMonth()
   // L'agenda suit le mois affiché : garder un jour d'un autre mois sous la grille
   // (« Jeudi 16 juillet » sous « Août ») est source de confusion.
-  if (d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth()) {
-    selectedKey.value = todayKey
+  if (d.getFullYear() === today.value.getFullYear() && d.getMonth() === today.value.getMonth()) {
+    selectedKey.value = todayKey.value
   } else {
     selectedKey.value = dateKey(d)
   }
 }
 function goToday() {
-  viewYear.value = today.getFullYear()
-  viewMonth.value = today.getMonth()
-  selectedKey.value = todayKey
+  viewYear.value = today.value.getFullYear()
+  viewMonth.value = today.value.getMonth()
+  selectedKey.value = todayKey.value
 }
 
 // ─── Chargement des événements (plage = grille affichée) ────────────────────
 
+// La grille couvre 42 jours CIVILS du chauffeur : ses bornes murales sont
+// converties en instants réels de son fuseau avant d'interroger le serveur,
+// sinon la plage glisse de quelques heures et peut manquer une course aux
+// extrémités.
 const range = computed(() => ({
-  from: new Date(gridStart.value.getTime()).toISOString(),
-  to: new Date(gridStart.value.getTime() + 42 * DAY_MS).toISOString(),
+  from: fromZonedTime(gridStart.value, driverTz.value).toISOString(),
+  to: fromZonedTime(addDays(gridStart.value, 42), driverTz.value).toISOString(),
 }))
 
 const { data: events, refresh, pending } = await useFetch<CalEvent[]>('/api/dashboard/calendar', {
@@ -142,11 +187,14 @@ onUnmounted(() => {
 const eventsByDay = computed(() => {
   const map: Record<string, CalEvent[]> = {}
   for (const e of events.value) {
-    const start = startOfDay(new Date(e.startAt))
-    const lastDay = startOfDay(new Date(new Date(e.endAt).getTime() - 1))
-    for (let t = start.getTime(); t <= lastDay.getTime(); t += DAY_MS) {
-      const key = dateKey(new Date(t))
-      ;(map[key] ??= []).push(e)
+    // Bornes en jours civils DU CHAUFFEUR ; `endAt` est exclusif (une plage qui
+    // finit à minuit appartient à la veille), d'où le retrait d'une milliseconde.
+    const first = dateFromKey(rideDayKey(e.startAt, driverTz.value))
+    const last = dateFromKey(
+      rideDayKey(new Date(new Date(e.endAt).getTime() - 1), driverTz.value),
+    )
+    for (let cur = first; cur <= last; cur = addDays(cur, 1)) {
+      ;(map[dateKey(cur)] ??= []).push(e)
     }
   }
   for (const key of Object.keys(map)) {
@@ -213,8 +261,8 @@ const blockBusy = ref(false)
 const blockError = ref('')
 const block = reactive({
   title: '',
-  startDate: todayKey,
-  endDate: todayKey,
+  startDate: todayKey.value,
+  endDate: todayKey.value,
   startTime: '09:00',
   endTime: '18:00',
   allDay: false,
@@ -262,7 +310,12 @@ function blockDates(): { startAt: Date; endAt: Date } | null {
     startAt = new Date(sy, sm - 1, sd, sh, smin)
     endAt = new Date(ey, em - 1, ed, eh, emin)
   }
-  return { startAt, endAt }
+  // Le chauffeur saisit une heure murale (« 14 h ») : elle vaut dans SON fuseau,
+  // celui de ses courses — pas dans celui du navigateur qui affiche le formulaire.
+  return {
+    startAt: fromZonedTime(startAt, driverTz.value),
+    endAt: fromZonedTime(endAt, driverTz.value),
+  }
 }
 
 async function saveBlock() {
@@ -329,7 +382,7 @@ async function removeBlock(id: string) {
 // ─── Affichage d'un événement dans l'agenda ─────────────────────────────────
 
 function eventTimeLabel(e: CalEvent): string {
-  const sameDay = dateKey(new Date(e.startAt)) === dateKey(new Date(e.endAt))
+  const sameDay = rideDayKey(e.startAt, driverTz.value) === rideDayKey(e.endAt, driverTz.value)
   if (sameDay) return `${fmtTime(e.startAt)} – ${fmtTime(e.endAt)}`
   return `${fmtShortDate(e.startAt)} ${fmtTime(e.startAt)} → ${fmtShortDate(e.endAt)} ${fmtTime(e.endAt)}`
 }

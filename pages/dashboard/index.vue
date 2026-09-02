@@ -3,6 +3,8 @@
 // courses du jour. Le planning complet et l'historique vivent dans l'onglet
 // « Courses » ; les anciens sous-onglets Gains/Clients ont été retirés (Clients
 // est désormais une vue de l'onglet Courses).
+import { isRideToday } from '~/lib/datetime'
+
 definePageMeta({ layout: 'dashboard', middleware: 'dashboard' })
 useHead({ title: 'Accueil' })
 const { formatMoney, formatDateTime } = useFormat()
@@ -18,6 +20,10 @@ const publicPath = computed(() => {
   const d = me.value as { slug?: string; status?: string } | null
   return d?.status === 'ACTIVE' && d?.slug ? `/${d.slug}` : null
 })
+// Fuseau du chauffeur (lieu de prise en charge) : TOUTE heure de course affichée
+// ici y est ancrée, jamais sur celui du navigateur — sinon un chauffeur en
+// déplacement verrait ses courses décalées, et « aujourd'hui » changerait de sens.
+const driverTz = computed(() => (me.value as { timezone?: string } | null)?.timezone ?? 'Europe/Paris')
 const { error: toastError, success: toastSuccess } = useToast()
 
 const busyId = ref<string | null>(null)
@@ -31,23 +37,13 @@ const showSent = ref(false)
 // L'accueil ne montre que les courses d'aujourd'hui ; le reste du planning est
 // dans l'onglet Courses (une seule source de vérité, plus de liste en doublon).
 
-function isToday(iso: string): boolean {
-  const d = new Date(iso)
-  const now = new Date()
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  )
-}
-
 const todayRides = computed(() =>
-  (data.value?.upcomingBookings ?? []).filter((b) => isToday(b.scheduledAt)),
+  (data.value?.upcomingBookings ?? []).filter((b) => isRideToday(b.scheduledAt, driverTz.value)),
 )
 // Prochaine course (hors aujourd'hui) : affichée quand la journée est vide,
 // pour ne jamais laisser l'accueil muet sur la suite.
 const nextRide = computed(() =>
-  (data.value?.upcomingBookings ?? []).find((b) => !isToday(b.scheduledAt)) ?? null,
+  (data.value?.upcomingBookings ?? []).find((b) => !isRideToday(b.scheduledAt, driverTz.value)) ?? null,
 )
 
 // Fiche course partagée (mêmes actions que dans l'onglet Courses).
@@ -179,7 +175,7 @@ async function resend(quoteId: string) {
         </div>
 
         <div class="mt-3 space-y-1 text-sm text-slate-600">
-          <p>📅 {{ formatDateTime(q.ride.scheduledAt) }}</p>
+          <p>📅 {{ formatDateTime(q.ride.scheduledAt, driverTz) }}</p>
           <!-- Transfert aéroport : trajet en clair + n° de vol (suivi du retard). -->
           <p v-if="q.ride.airport" class="text-xs font-semibold text-brand-700">
             ✈️ {{ q.ride.airport }}<template v-if="q.ride.flightNumber"> · vol {{ q.ride.flightNumber }}</template>
@@ -249,7 +245,7 @@ async function resend(quoteId: string) {
           <p class="min-w-0 truncate font-semibold text-slate-900">{{ b.customerName }}</p>
           <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(b.amountCents, b.currency) }}</span>
         </div>
-        <p class="text-sm text-slate-600">{{ formatDateTime(b.scheduledAt) }}</p>
+        <p class="text-sm text-slate-600">{{ formatDateTime(b.scheduledAt, driverTz) }}</p>
         <p v-if="b.airport" class="mt-1 text-xs font-semibold text-brand-700">✈️ {{ b.airport }}</p>
         <RideRoute
           v-if="b.type === 'TRANSFER'"
@@ -280,7 +276,7 @@ async function resend(quoteId: string) {
           <p class="min-w-0 truncate font-semibold text-slate-900">{{ nextRide.customerName }}</p>
           <span class="shrink-0 font-bold text-slate-900">{{ formatMoney(nextRide.amountCents, nextRide.currency) }}</span>
         </div>
-        <p class="text-sm text-slate-600">{{ formatDateTime(nextRide.scheduledAt) }}</p>
+        <p class="text-sm text-slate-600">{{ formatDateTime(nextRide.scheduledAt, driverTz) }}</p>
         <p v-if="nextRide.airport" class="mt-1 text-xs font-semibold text-brand-700">✈️ {{ nextRide.airport }}</p>
         <RideRoute
           v-if="nextRide.type === 'TRANSFER'"
@@ -346,7 +342,7 @@ async function resend(quoteId: string) {
           </span>
         </div>
         <div class="mt-2 space-y-1 text-sm text-slate-600">
-          <p>📅 {{ formatDateTime(q.ride.scheduledAt) }}</p>
+          <p>📅 {{ formatDateTime(q.ride.scheduledAt, driverTz) }}</p>
           <p v-if="q.ride.airport" class="text-xs font-semibold text-brand-700">✈️ {{ q.ride.airport }}</p>
           <div v-if="q.ride.type === 'TRANSFER'">
             <RideRoute nav wrap :pickup="q.ride.pickupAddress" :dropoff="q.ride.dropoffAddress" />
@@ -357,7 +353,7 @@ async function resend(quoteId: string) {
         <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
           <div class="min-w-0">
             <span class="font-bold text-slate-900">{{ formatMoney(q.amountCents, q.currency) }}</span>
-            <p class="text-xs text-slate-400">Valable jusqu'au {{ formatDateTime(q.expiresAt) }}</p>
+            <p class="text-xs text-slate-400">Valable jusqu'au {{ formatDateTime(q.expiresAt, driverTz) }}</p>
           </div>
           <button class="btn-ghost shrink-0 whitespace-nowrap text-sm" :disabled="busyId === q.id" @click="resend(q.id)">
             {{ busyId === q.id ? '…' : '↩ Relancer' }}

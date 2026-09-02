@@ -190,6 +190,10 @@ model Driver {
   hourlyOvertimeRateCents   Int?
   hourlyOvertime2AfterHours Int? // second seuil, strictement supérieur au premier
   hourlyOvertime2RateCents  Int?
+  // Durée minimale acceptée pour une mise à disposition (« je ne me déplace pas
+  // pour moins de 2 h »). null = pas de minimum, le client peut demander 1 h.
+  // Borne le sélecteur de durée de la page publique ET la validation serveur.
+  hourlyMinHours            Int?
 
   // Transferts aéroport (onglet dédié de la page publique) : forfaits fixes
   // Orly/Roissy ↔ Paris intra-muros, valables dans les deux sens, et prix au km

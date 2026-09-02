@@ -86,6 +86,7 @@ export default defineEventHandler(async (event) => {
     hourlyOvertimeRateCents: driver.hourlyOvertimeRateCents,
     hourlyOvertime2AfterHours: driver.hourlyOvertime2AfterHours,
     hourlyOvertime2RateCents: driver.hourlyOvertime2RateCents,
+    hourlyMinHours: driver.hourlyMinHours,
     // Transferts aéroport : 4 forfaits Paris intra-muros + prix au km hors Paris.
     airportOrlyRiveDroiteCents: driver.airportOrlyRiveDroiteCents,
     airportOrlyRiveGaucheCents: driver.airportOrlyRiveGaucheCents,

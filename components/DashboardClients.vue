@@ -4,6 +4,21 @@ const { formatMoney, formatDateTime } = useFormat()
 
 const { data: customers } = await useFetch('/api/dashboard/customers', { lazy: true })
 
+// « Dernière course » est une heure de course : elle s'affiche dans le fuseau du
+// chauffeur (lieu de prise en charge), pas dans celui du navigateur.
+const { data: me } = await useMe()
+const driverTz = computed(() => (me.value as { timezone?: string } | null)?.timezone ?? 'Europe/Paris')
+
+// Export CSV : format court JJ/MM/AAAA (exploitable en tableur), ancré lui aussi
+// sur le fuseau du chauffeur.
+const csvDate = (value: string, timeZone: string) =>
+  new Intl.DateTimeFormat('fr-FR', {
+    timeZone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(value))
+
 function exportCsv() {
   if (!customers.value) return
   const rows = [
@@ -14,7 +29,7 @@ function exportCsv() {
       c.email ?? '',
       String(c.ridesCount),
       (c.totalSpentCents / 100).toFixed(2),
-      c.lastRideAt ? new Date(c.lastRideAt).toLocaleDateString('fr-FR') : '',
+      c.lastRideAt ? csvDate(c.lastRideAt, driverTz.value) : '',
     ]),
   ]
   const csv = rows.map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -61,7 +76,7 @@ function exportCsv() {
         </div>
         <ContactActions class="mt-1.5" :phone="c.phone" :email="c.email" />
         <p v-if="c.lastRideAt" class="mt-1.5 text-xs text-slate-400">
-          Dernière course : {{ formatDateTime(c.lastRideAt) }}
+          Dernière course : {{ formatDateTime(c.lastRideAt, driverTz) }}
         </p>
       </div>
     </div>

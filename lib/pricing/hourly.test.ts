@@ -136,3 +136,52 @@ describe('priceHourly', () => {
     ).toThrow(PricingError)
   })
 })
+
+describe('priceHourly — durée minimale du chauffeur', () => {
+  it('refuse une demande plus courte que le minimum, en disant lequel', () => {
+    expect(() =>
+      priceHourly({
+        durationHours: 1,
+        rate: { pricePerHourCents: 6500, minHours: 2 },
+        surcharges: [],
+        params,
+      }),
+    ).toThrowError(/à partir de 2 h/)
+  })
+
+  it('accepte la durée minimale elle-même et au-delà', () => {
+    const rate = { pricePerHourCents: 6500, minHours: 2 }
+    expect(priceHourly({ durationHours: 2, rate, surcharges: [], params }).amountCents).toBe(13000)
+    expect(priceHourly({ durationHours: 3, rate, surcharges: [], params }).amountCents).toBe(19500)
+  })
+
+  it('ignore un minimum absent, nul ou égal à 1 h (pas de minimum)', () => {
+    for (const minHours of [null, undefined, 0, 1]) {
+      expect(
+        priceHourly({
+          durationHours: 1,
+          rate: { pricePerHourCents: 6500, minHours },
+          surcharges: [],
+          params,
+        }).amountCents,
+      ).toBe(6500)
+    }
+  })
+
+  it('se combine avec les tranches d\'heures supplémentaires (cas « 2 h à 65 €, puis 50 € »)', () => {
+    const rate = {
+      pricePerHourCents: 6500,
+      overtimeAfterHours: 2,
+      overtimePricePerHourCents: 5000,
+      minHours: 2,
+    }
+    // 2 h au tarif de base…
+    expect(priceHourly({ durationHours: 2, rate, surcharges: [], params }).amountCents).toBe(13000)
+    // …puis chaque heure suivante au tarif réduit.
+    expect(priceHourly({ durationHours: 4, rate, surcharges: [], params }).amountCents).toBe(23000)
+    // …et une demande d'1 h reste refusée.
+    expect(() =>
+      priceHourly({ durationHours: 1, rate, surcharges: [], params }),
+    ).toThrowError(/à partir de 2 h/)
+  })
+})

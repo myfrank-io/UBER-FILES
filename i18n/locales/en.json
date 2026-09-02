@@ -68,6 +68,7 @@
     "dropoffPlaceholder": "e.g. 10 rue de Rivoli, Paris",
     "roundTrip": "Round trip",
     "durationLabel": "Desired duration (hours)",
+    "durationMin": "Chauffeur service from {hours} h.",
     "datetimeLabel": "Pickup date and time",
     "leadTime": "Book at least {hours}h in advance.",
     "lastMinuteNotice": "Pickup in less than {window}: a {amount} last-minute surcharge is added to the price.",
