@@ -47,6 +47,22 @@ export const SETUP_STEP_ORDER: SetupStepKey[] = [
   'recap',
 ]
 
+/** Libellés lisibles des étapes (récapitulatif chauffeur, fiche admin). */
+export const SETUP_STEP_LABELS: Record<SetupStepKey, string> = {
+  identite: 'Nom, accroche et photo',
+  contact: 'Téléphone et email',
+  vehicule: 'Véhicule',
+  tarifs: 'Tarifs',
+  annulation: 'Conditions d’annulation',
+  paiement: 'Moyens de paiement',
+  encaissement: 'Encaissement en ligne (SumUp)',
+  google: 'Avis Google',
+  telegram: 'Notifications Telegram',
+  carte: 'Carte de visite digitale',
+  acces: 'Mot de passe',
+  recap: 'Récapitulatif',
+}
+
 /** Étapes qui ne sont faites qu'une fois confirmées par le chauffeur. */
 export const CONFIRMABLE_STEPS: SetupStepKey[] = ['tarifs', 'annulation', 'paiement', 'acces']
 

@@ -197,6 +197,25 @@ export async function loadSetupState(driverId: string, setupSession: boolean) {
   }
 }
 
+/**
+ * Progression du parcours vue par l'admin : même calcul que côté chauffeur,
+ * dans la perspective du lien (l'étape mot de passe compte si le compte n'en
+ * a pas), pour afficher le même pourcentage que lui.
+ */
+export async function setupProgress(driverId: string) {
+  const { snapshot } = await loadSetupState(driverId, true)
+  const result = computeSetup(snapshot)
+  return {
+    percent: result.percent,
+    requiredDone: result.requiredDone,
+    requiredTotal: result.requiredTotal,
+    complete: result.complete,
+    steps: result.steps
+      .filter((s) => s.applicable && s.key !== 'recap')
+      .map((s) => ({ key: s.key, done: s.done, optional: s.optional })),
+  }
+}
+
 /** Ajoute une étape à la liste des étapes confirmées (idempotent). */
 export async function confirmSetupStep(driverId: string, step: string): Promise<string[]> {
   const driver = await prisma.driver.findUniqueOrThrow({
