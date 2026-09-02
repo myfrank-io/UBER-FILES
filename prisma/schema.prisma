@@ -139,6 +139,18 @@ model Driver {
   telegramChatId String?
   telegramLinkCode String? @unique // code d'appairage du bot
 
+  // Parcours de configuration guidée (/configuration). Le lien est généré par
+  // l'admin uniquement ; le jeton ouvre une session chauffeur limitée au
+  // parcours. `setupConfirmed` liste les étapes « à valider » (tarifs,
+  // annulation, paiement) que le chauffeur a explicitement confirmées : elles
+  // ont des valeurs par défaut, on ne peut pas déduire de la donnée seule
+  // qu'il les a relues.
+  setupToken          String?   @unique
+  setupTokenExpiresAt DateTime?
+  setupStartedAt      DateTime?
+  setupCompletedAt    DateTime?
+  setupConfirmed      String[]  @default([])
+
   // Moyens de paiement acceptés (choisis par le chauffeur dans ses réglages).
   // Par défaut : prépaiement Stripe. Le chauffeur peut tout encaisser sur place
   // (carte / espèces / chèque) sans passer par le prépaiement s'il le souhaite.

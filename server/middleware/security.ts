@@ -23,6 +23,8 @@ const RULES: RateRule[] = [
   { pattern: /^\/api\/auth\/login$/, limit: 10, windowMs: 15 * 60 * 1000 },
   // Reset password : 3 / heure par IP
   { pattern: /^\/api\/auth\/(forgot|reset)-password$/, limit: 3, windowMs: 60 * 60 * 1000 },
+  // Ouverture du parcours de configuration par jeton : 20 / 15 minutes par IP
+  { pattern: /^\/api\/setup\/open$/, limit: 20, windowMs: 15 * 60 * 1000 },
 ]
 
 // Map<ruleIndex:ip, timestamps[]>
@@ -143,7 +145,7 @@ export default defineEventHandler((event) => {
   }
 
   // Rate limiting (uniquement pour les routes API publiques/auth)
-  if (path.startsWith('/api/public/') || path.startsWith('/api/auth/')) {
+  if (path.startsWith('/api/public/') || path.startsWith('/api/auth/') || path === '/api/setup/open') {
     const ip =
       getHeader(event, 'x-forwarded-for')?.split(',')[0].trim() ||
       getHeader(event, 'x-real-ip') ||

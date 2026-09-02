@@ -42,6 +42,9 @@ export default defineNuxtConfig({
     '/dashboard/**': { ssr: false },
     '/admin': { ssr: false, swr: false },
     '/admin/**': { ssr: false },
+    // Parcours de configuration guidée (session chauffeur) : même politique.
+    '/configuration': { ssr: false, swr: false },
+    '/configuration/**': { ssr: false },
   },
 
   typescript: {
