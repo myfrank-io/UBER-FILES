@@ -87,28 +87,33 @@ async function enterSpace(id: string) {
   }
 }
 
-// Lien de configuration guidée depuis la liste : génère (ou réutilise) le lien
-// du chauffeur et le copie dans le presse-papiers, sans quitter la page.
+// Lien de configuration guidée depuis la liste. Le bouton ne fait QUE
+// générer (ou réutiliser) le lien du chauffeur et l'afficher dans une
+// fenêtre avec un bouton « Copier » : rien n'est envoyé au chauffeur. La copie
+// se fait au clic sur « Copier » (Safari refuse le presse-papiers après un
+// appel réseau : la copie doit rester dans le geste de l'utilisateur).
+interface SetupLinkModal {
+  id: string
+  name: string
+  phone: string | null
+  url: string
+}
 const linkingId = ref<string | null>(null)
-const linkCopiedId = ref<string | null>(null)
-const linkFallback = ref<{ id: string; url: string } | null>(null)
+const setupModal = ref<SetupLinkModal | null>(null)
+const setupCopied = ref(false)
+const setupInput = ref<HTMLInputElement | null>(null)
 
-async function copySetupLink(id: string) {
+async function openSetupLink(d: { id: string; displayName: string; phone?: string | null }) {
   if (linkingId.value) return
-  linkingId.value = id
+  linkingId.value = d.id
   enterError.value = ''
-  linkFallback.value = null
   try {
-    const res = await $fetch<{ url: string }>(`/api/admin/drivers/${id}/setup-link`, { method: 'POST', body: {} })
-    try {
-      await navigator.clipboard.writeText(res.url)
-      linkCopiedId.value = id
-      setTimeout(() => (linkCopiedId.value = null), 2000)
-    } catch {
-      // Presse-papiers indisponible : on affiche le lien à copier à la main.
-      linkFallback.value = { id, url: res.url }
-    }
+    const res = await $fetch<{ url: string }>(`/api/admin/drivers/${d.id}/setup-link`, { method: 'POST', body: {} })
+    setupCopied.value = false
+    setupModal.value = { id: d.id, name: d.displayName, phone: d.phone ?? null, url: res.url }
     await refresh()
+    await nextTick()
+    setupInput.value?.select()
   } catch (e) {
     enterError.value =
       (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Impossible de générer le lien.'
@@ -117,8 +122,44 @@ async function copySetupLink(id: string) {
   }
 }
 
+function copySetupUrl() {
+  const url = setupModal.value?.url
+  if (!url) return
+  const done = () => {
+    setupCopied.value = true
+    setTimeout(() => (setupCopied.value = false), 2500)
+  }
+  // Repli sans API presse-papiers : sélection + commande de copie classique.
+  const legacy = () => {
+    const el = setupInput.value
+    if (!el) return
+    el.focus()
+    el.select()
+    try {
+      if (document.execCommand('copy')) done()
+    } catch {
+      // Le champ reste sélectionné : Ctrl/Cmd+C fonctionne.
+    }
+  }
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(url).then(done).catch(legacy)
+  } else {
+    legacy()
+  }
+}
+
+const setupWhatsapp = computed(() => {
+  const m = setupModal.value
+  if (!m?.phone) return null
+  const digits = normalizePhone(m.phone)
+  if (!digits) return null
+  const first = m.name.split(/\s+/)[0]
+  const message = `Bonjour ${first}, voici votre lien pour configurer votre espace Ridewiz en quelques minutes : ${m.url}`
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+})
+
 const SETUP_BADGE: Record<string, { label: string; cls: string }> = {
-  ready: { label: 'Config envoyée', cls: 'bg-amber-100 text-amber-800' },
+  ready: { label: 'Lien créé', cls: 'bg-slate-100 text-slate-600' },
   started: { label: 'Config en cours', cls: 'bg-blue-100 text-blue-800' },
   completed: { label: 'Config ✓', cls: 'bg-green-100 text-green-800' },
   expired: { label: 'Lien expiré', cls: 'bg-red-100 text-red-700' },
@@ -247,7 +288,6 @@ const filteredDrivers = computed(() => {
           SumUp : {{ d.sumupConnected ? 'connecté' : 'non connecté' }} · {{ d.bookings }} course(s)
           <span v-if="SETUP_BADGE[d.setupStatus]" class="ml-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" :class="SETUP_BADGE[d.setupStatus].cls">{{ SETUP_BADGE[d.setupStatus].label }}</span>
         </p>
-        <p v-if="linkFallback?.id === d.id" class="mt-2 break-all rounded-lg bg-slate-50 px-2 py-1.5 text-xs text-slate-700">{{ linkFallback.url }}</p>
         <div class="mt-3 flex gap-2 border-t border-slate-100 pt-3">
           <NuxtLink
             :to="`/admin/drivers/${d.id}`"
@@ -274,10 +314,10 @@ const filteredDrivers = computed(() => {
             type="button"
             class="inline-flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 px-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             :disabled="linkingId === d.id"
-            title="Copier le lien de configuration guidée"
-            @click="copySetupLink(d.id)"
+            title="Lien de configuration guidée (à copier, rien n’est envoyé)"
+            @click="openSetupLink(d)"
           >
-            {{ linkingId === d.id ? '…' : linkCopiedId === d.id ? '✓ Copié' : '🔗 Config' }}
+            {{ linkingId === d.id ? '…' : '🔗 Config' }}
           </button>
           <button
             v-if="d.status !== 'ACTIVE'"
@@ -317,7 +357,6 @@ const filteredDrivers = computed(() => {
             <td class="whitespace-nowrap text-xs text-slate-600">
               {{ d.sumupConnected ? '✅ Connecté' : '— Non connecté' }}
               <span v-if="SETUP_BADGE[d.setupStatus]" class="ml-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" :class="SETUP_BADGE[d.setupStatus].cls">{{ SETUP_BADGE[d.setupStatus].label }}</span>
-              <span v-if="linkFallback?.id === d.id" class="mt-1 block max-w-xs break-all text-[11px] text-slate-500">{{ linkFallback.url }}</span>
             </td>
             <td>{{ d.bookings }}</td>
             <td class="whitespace-nowrap text-right">
@@ -334,9 +373,9 @@ const filteredDrivers = computed(() => {
                 type="button"
                 class="mr-1 inline-flex items-center rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
                 :disabled="linkingId === d.id"
-                title="Copier le lien de configuration guidée"
-                @click="copySetupLink(d.id)"
-              >{{ linkingId === d.id ? '…' : linkCopiedId === d.id ? '✓ Copié' : '🔗 Config' }}</button>
+                title="Lien de configuration guidée (à copier, rien n’est envoyé)"
+                @click="openSetupLink(d)"
+              >{{ linkingId === d.id ? '…' : '🔗 Config' }}</button>
               <NuxtLink :to="`/admin/drivers/${d.id}`" class="mr-1 inline-flex items-center rounded-lg px-2.5 py-2 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-800">Détail →</NuxtLink>
               <button v-if="d.status !== 'ACTIVE'" class="inline-flex items-center rounded-lg px-2.5 py-2 text-xs font-semibold text-green-700 hover:bg-green-50" @click="setStatus(d.id, 'ACTIVE')">Activer</button>
               <button v-else class="inline-flex items-center rounded-lg px-2.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50" @click="setStatus(d.id, 'SUSPENDED')">Suspendre</button>
@@ -346,5 +385,36 @@ const filteredDrivers = computed(() => {
       </table>
       <p v-if="filteredDrivers.length === 0" class="py-8 text-center text-sm text-slate-400">Aucun chauffeur trouvé.</p>
     </div>
+
+    <!-- Lien de configuration guidée : affiché pour copie, jamais envoyé automatiquement. -->
+    <AppModal v-if="setupModal" @close="setupModal = null">
+      <h2 class="text-lg font-semibold text-slate-900">Lien de configuration — {{ setupModal.name }}</h2>
+      <p class="mt-1 text-sm text-slate-600">
+        Copiez ce lien et transmettez-le au chauffeur comme vous voulez. <strong>Rien ne lui a été envoyé.</strong>
+        Le lien est valable 30 jours ; le rouvrir ici redonne le même lien.
+      </p>
+      <input
+        ref="setupInput"
+        class="field mt-4 text-sm"
+        :value="setupModal.url"
+        readonly
+        data-testid="setup-modal-url"
+        @focus="($event.target as HTMLInputElement).select()"
+      />
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button type="button" class="btn-primary" data-testid="setup-modal-copy" @click="copySetupUrl">
+          {{ setupCopied ? '✓ Lien copié' : '📋 Copier le lien' }}
+        </button>
+        <a
+          v-if="setupWhatsapp"
+          :href="setupWhatsapp"
+          target="_blank"
+          rel="noopener"
+          class="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-[#25D366] px-4 text-sm font-semibold text-white hover:bg-[#1EBE5B]"
+        >💬 Ouvrir WhatsApp</a>
+        <NuxtLink :to="`/admin/drivers/${setupModal.id}`" class="btn-ghost">Fiche du chauffeur</NuxtLink>
+        <button type="button" class="btn-ghost ml-auto" @click="setupModal = null">Fermer</button>
+      </div>
+    </AppModal>
   </div>
 </template>

@@ -85,20 +85,35 @@ watchEffect(() => {
 
 const SETUP_STATUS: Record<string, { label: string; cls: string }> = {
   none: { label: 'Aucun lien', cls: 'bg-slate-100 text-slate-500' },
-  ready: { label: 'Lien envoyé, jamais ouvert', cls: 'bg-amber-100 text-amber-800' },
+  ready: { label: 'Lien créé, jamais ouvert', cls: 'bg-slate-100 text-slate-600' },
   started: { label: 'Parcours en cours', cls: 'bg-blue-100 text-blue-800' },
   completed: { label: 'Configuration terminée', cls: 'bg-green-100 text-green-800' },
   expired: { label: 'Lien expiré', cls: 'bg-red-100 text-red-700' },
 }
 
-async function copyText(text: string) {
-  try {
-    await navigator.clipboard.writeText(text)
+// Copie dans le geste de clic (Safari refuse le presse-papiers après un appel
+// réseau) ; repli sur la sélection + commande de copie classique.
+const setupUrlInput = ref<HTMLInputElement | null>(null)
+function copySetupUrl() {
+  const url = setupUrl.value
+  if (!url) return
+  const done = () => {
     setupCopied.value = true
-    setTimeout(() => (setupCopied.value = false), 2000)
-  } catch {
-    // Presse-papiers indisponible (http, permissions) : le lien reste sélectionnable.
+    setTimeout(() => (setupCopied.value = false), 2500)
   }
+  const legacy = () => {
+    const el = setupUrlInput.value
+    if (!el) return
+    el.focus()
+    el.select()
+    try {
+      if (document.execCommand('copy')) done()
+    } catch {
+      // Le champ reste sélectionné : Ctrl/Cmd+C fonctionne.
+    }
+  }
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(url).then(done).catch(legacy)
+  else legacy()
 }
 
 async function generateSetupLink(regenerate = false) {
@@ -111,7 +126,6 @@ async function generateSetupLink(regenerate = false) {
       body: { regenerate },
     })
     setupUrl.value = res.url
-    await copyText(res.url)
     await refresh()
   } catch (e) {
     setupError.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.'
@@ -225,20 +239,28 @@ const statusLabels: Record<string, string> = {
           </span>
         </div>
         <p class="mt-1 text-sm text-slate-600">
-          Envoyez ce lien au chauffeur : il remplit lui-même profil, véhicule, tarifs, paiement, SumUp,
-          Google et Telegram depuis un parcours simplifié. Les informations déjà renseignées sont sautées.
+          Le chauffeur remplit lui-même profil, véhicule, tarifs, paiement, SumUp, Google et Telegram
+          depuis un parcours simplifié ; les informations déjà renseignées sont sautées.
+          <strong>Rien n'est envoyé automatiquement</strong> : copiez le lien et transmettez-le vous-même.
         </p>
         <p v-if="data.setup.completedAt" class="mt-1 text-xs text-slate-500">Terminée le {{ formatDateTime(data.setup.completedAt) }}.</p>
         <p v-else-if="data.setup.startedAt" class="mt-1 text-xs text-slate-500">Ouverte le {{ formatDateTime(data.setup.startedAt) }}.</p>
 
-        <div v-if="setupUrl" class="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
-          <span class="break-all" data-testid="setup-url">{{ setupUrl }}</span>
-          <span v-if="data.setup.expiresAt" class="block text-slate-400">Valable jusqu'au {{ formatDateTime(data.setup.expiresAt) }}</span>
+        <div v-if="setupUrl" class="mt-3">
+          <input
+            ref="setupUrlInput"
+            class="field text-xs"
+            :value="setupUrl"
+            readonly
+            data-testid="setup-url"
+            @focus="($event.target as HTMLInputElement).select()"
+          />
+          <p v-if="data.setup.expiresAt" class="mt-1 text-xs text-slate-400">Valable jusqu'au {{ formatDateTime(data.setup.expiresAt) }}</p>
         </div>
 
         <div class="mt-3 flex flex-wrap gap-2">
-          <button class="btn-primary text-sm" :disabled="setupBusy" data-testid="setup-generate" @click="setupUrl ? copyText(setupUrl) : generateSetupLink(false)">
-            {{ setupBusy ? '…' : setupCopied ? '✓ Lien copié' : setupUrl ? '📋 Copier le lien' : '🔗 Générer le lien' }}
+          <button class="btn-primary text-sm" :disabled="setupBusy" data-testid="setup-generate" @click="setupUrl ? copySetupUrl() : generateSetupLink(false)">
+            {{ setupBusy ? '…' : setupCopied ? '✓ Lien copié' : setupUrl ? '📋 Copier le lien' : '🔗 Créer le lien' }}
           </button>
           <a
             v-if="setupWhatsapp"

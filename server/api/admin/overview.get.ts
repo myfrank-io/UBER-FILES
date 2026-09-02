@@ -38,6 +38,7 @@ export default defineEventHandler(async (event) => {
       sumupConnected: d.sumupConnected,
       bookings: d._count.bookings,
       hasAccount: Boolean(d.user),
+      phone: d.phone,
       // Parcours de configuration guidée : none / ready / started / completed / expired.
       setupStatus: setupLinkStatus(d),
       createdAt: d.createdAt,
