@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import { randomBytes } from 'node:crypto'
+import { createHmac, randomBytes } from 'node:crypto'
 import { prisma } from './prisma'
 import { publicPhotoUrl } from './driver'
 import { computeSetup, SETUP_LINK_TTL_MS, type SetupSnapshot } from '~/lib/setup-flow'
@@ -22,6 +22,67 @@ export function setupLinkUrl(token: string): string {
 /** Date d'expiration d'un lien généré maintenant. */
 export function setupLinkExpiry(): Date {
   return new Date(Date.now() + SETUP_LINK_TTL_MS)
+}
+
+/** Chauffeur porteur d'un lien de configuration VALIDE, avec son compte — sinon 410/403/409. */
+export async function findDriverBySetupToken(token: string) {
+  const driver = await prisma.driver.findUnique({
+    where: { setupToken: token },
+    select: {
+      id: true,
+      slug: true,
+      status: true,
+      displayName: true,
+      setupTokenExpiresAt: true,
+      setupStartedAt: true,
+      user: { select: { id: true, email: true } },
+    },
+  })
+  if (!driver || !driver.setupTokenExpiresAt || driver.setupTokenExpiresAt < new Date()) {
+    throw createError({
+      statusCode: 410,
+      statusMessage: 'Ce lien n’est plus valide. Demandez-en un nouveau à votre administrateur.',
+    })
+  }
+  if (driver.status === 'SUSPENDED') {
+    throw createError({ statusCode: 403, statusMessage: 'Ce compte est suspendu.' })
+  }
+  if (!driver.user) {
+    throw createError({ statusCode: 409, statusMessage: 'Ce compte n’a pas d’accès de connexion.' })
+  }
+  return { ...driver, user: driver.user }
+}
+
+/**
+ * Ouvre la session chauffeur du parcours (drapeau `setupFlow`). On repart
+ * d'une session vierge : `setUserSession` fusionne avec l'existante, on ne
+ * garde rien d'un autre compte ouvert sur cet appareil. `impersonator` :
+ * identité de l'admin qui teste le lien, pour revenir à l'admin ensuite.
+ */
+export async function openSetupSession(
+  event: H3Event,
+  driver: { id: string; setupStartedAt: Date | null; user: { id: string; email: string } },
+  impersonator?: { id: string; email: string },
+) {
+  if (!driver.setupStartedAt) {
+    await prisma.driver.update({ where: { id: driver.id }, data: { setupStartedAt: new Date() } })
+  }
+  await clearUserSession(event)
+  await setUserSession(event, {
+    user: { id: driver.user.id, email: driver.user.email, role: 'DRIVER', driverId: driver.id },
+    setupFlow: true,
+    ...(impersonator ? { impersonator } : {}),
+  })
+}
+
+/**
+ * Haché du code de vérification, lié au jeton du lien (un code n'est valable
+ * que pour SON lien) et au secret serveur. Hex, comparé à temps constant.
+ */
+export function hashSetupCode(code: string, token: string): string {
+  const config = useRuntimeConfig()
+  const secret = config.linkTokenSecret || config.session?.password || ''
+  return createHmac('sha256', secret).update(`${token}:${code}`).digest('hex')
 }
 
 /**

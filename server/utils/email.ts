@@ -759,6 +759,24 @@ export const emailTemplates = {
       ),
     }
   },
+  // Code à 6 chiffres pour ouvrir le parcours de configuration depuis le lien
+  // envoyé par l'admin (pas de mot de passe à saisir). Envoyé uniquement quand
+  // le chauffeur appuie sur « Recevoir mon code ».
+  setupCode(opts: { firstName: string; code: string; ttlMinutes: number }) {
+    const digits = esc(opts.code)
+    return {
+      subject: `${opts.code} — votre code Ridewiz`,
+      html: wrap(
+        `Bonjour ${esc(opts.firstName)} 👋`,
+        `<p>Voici votre code pour ouvrir la configuration de votre espace Ridewiz :</p>
+         <p style="margin:24px 0;text-align:center">
+           <span style="display:inline-block;padding:14px 22px;border-radius:12px;background:#FBF7F0;border:1px solid #E4DCCC;font-size:32px;letter-spacing:10px;font-weight:700;color:#16283D">${digits}</span>
+         </p>
+         <p style="font-size:13px;color:#6C7889">Ce code est valable ${opts.ttlMinutes} minutes et ne sert qu'à cette page.
+            Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.</p>`,
+      ),
+    }
+  },
   // Le chauffeur partage sa page publique de réservation à un client (depuis son
   // espace, bouton « Partager ma page »). Canal email. Le corps reprend tel quel
   // le message (modèle personnalisable par le chauffeur) : remerciement, demande
