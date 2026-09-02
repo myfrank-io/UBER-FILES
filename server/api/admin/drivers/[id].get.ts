@@ -1,5 +1,7 @@
 import { requireAdmin } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
+import { setupLinkUrl } from '~/server/utils/setup'
+import { setupLinkStatus } from '~/lib/setup-flow'
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event)
@@ -43,6 +45,18 @@ export default defineEventHandler(async (event) => {
       merchantCode: driver.sumupMerchantCode,
     },
     user: driver.user,
+    // Parcours de configuration guidée : lien courant (s'il est encore valide)
+    // et avancement, pour que l'admin sache s'il faut relancer le chauffeur.
+    setup: {
+      status: setupLinkStatus(driver),
+      url:
+        driver.setupToken && driver.setupTokenExpiresAt && driver.setupTokenExpiresAt > new Date()
+          ? setupLinkUrl(driver.setupToken)
+          : null,
+      expiresAt: driver.setupTokenExpiresAt,
+      startedAt: driver.setupStartedAt,
+      completedAt: driver.setupCompletedAt,
+    },
     stats: {
       bookings: driver._count.bookings,
       customers: driver._count.customers,

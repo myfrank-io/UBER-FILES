@@ -1,5 +1,6 @@
 import { requireAdmin } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
+import { setupLinkStatus } from '~/lib/setup-flow'
 
 // Tableau de bord admin (Chams) : chauffeurs, volume de courses, facturation.
 export default defineEventHandler(async (event) => {
@@ -37,6 +38,8 @@ export default defineEventHandler(async (event) => {
       sumupConnected: d.sumupConnected,
       bookings: d._count.bookings,
       hasAccount: Boolean(d.user),
+      // Parcours de configuration guidée : none / ready / started / completed / expired.
+      setupStatus: setupLinkStatus(d),
       createdAt: d.createdAt,
     })),
   }

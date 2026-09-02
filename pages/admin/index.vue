@@ -87,6 +87,43 @@ async function enterSpace(id: string) {
   }
 }
 
+// Lien de configuration guidée depuis la liste : génère (ou réutilise) le lien
+// du chauffeur et le copie dans le presse-papiers, sans quitter la page.
+const linkingId = ref<string | null>(null)
+const linkCopiedId = ref<string | null>(null)
+const linkFallback = ref<{ id: string; url: string } | null>(null)
+
+async function copySetupLink(id: string) {
+  if (linkingId.value) return
+  linkingId.value = id
+  enterError.value = ''
+  linkFallback.value = null
+  try {
+    const res = await $fetch<{ url: string }>(`/api/admin/drivers/${id}/setup-link`, { method: 'POST', body: {} })
+    try {
+      await navigator.clipboard.writeText(res.url)
+      linkCopiedId.value = id
+      setTimeout(() => (linkCopiedId.value = null), 2000)
+    } catch {
+      // Presse-papiers indisponible : on affiche le lien à copier à la main.
+      linkFallback.value = { id, url: res.url }
+    }
+    await refresh()
+  } catch (e) {
+    enterError.value =
+      (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Impossible de générer le lien.'
+  } finally {
+    linkingId.value = null
+  }
+}
+
+const SETUP_BADGE: Record<string, { label: string; cls: string }> = {
+  ready: { label: 'Config envoyée', cls: 'bg-amber-100 text-amber-800' },
+  started: { label: 'Config en cours', cls: 'bg-blue-100 text-blue-800' },
+  completed: { label: 'Config ✓', cls: 'bg-green-100 text-green-800' },
+  expired: { label: 'Lien expiré', cls: 'bg-red-100 text-red-700' },
+}
+
 async function logout() {
   await $fetch('/api/auth/logout', { method: 'POST' })
   await clear()
@@ -208,7 +245,9 @@ const filteredDrivers = computed(() => {
         </div>
         <p class="mt-2 text-xs text-slate-500">
           SumUp : {{ d.sumupConnected ? 'connecté' : 'non connecté' }} · {{ d.bookings }} course(s)
+          <span v-if="SETUP_BADGE[d.setupStatus]" class="ml-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" :class="SETUP_BADGE[d.setupStatus].cls">{{ SETUP_BADGE[d.setupStatus].label }}</span>
         </p>
+        <p v-if="linkFallback?.id === d.id" class="mt-2 break-all rounded-lg bg-slate-50 px-2 py-1.5 text-xs text-slate-700">{{ linkFallback.url }}</p>
         <div class="mt-3 flex gap-2 border-t border-slate-100 pt-3">
           <NuxtLink
             :to="`/admin/drivers/${d.id}`"
@@ -228,6 +267,17 @@ const filteredDrivers = computed(() => {
             @click="enterSpace(d.id)"
           >
             {{ enteringId === d.id ? '…' : 'Espace ↗' }}
+          </button>
+          <!-- Lien de configuration guidée : généré et copié en un geste. -->
+          <button
+            v-if="d.hasAccount"
+            type="button"
+            class="inline-flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 px-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            :disabled="linkingId === d.id"
+            title="Copier le lien de configuration guidée"
+            @click="copySetupLink(d.id)"
+          >
+            {{ linkingId === d.id ? '…' : linkCopiedId === d.id ? '✓ Copié' : '🔗 Config' }}
           </button>
           <button
             v-if="d.status !== 'ACTIVE'"
@@ -264,7 +314,11 @@ const filteredDrivers = computed(() => {
               <NuxtLink :to="`/${d.slug}`" target="_blank" class="text-xs text-brand-600 hover:underline">/{{ d.slug }}</NuxtLink>
             </td>
             <td><span class="whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold" :class="statusColors[d.status]">{{ statusLabels[d.status] ?? d.status }}</span></td>
-            <td class="whitespace-nowrap text-xs text-slate-600">{{ d.sumupConnected ? '✅ Connecté' : '— Non connecté' }}</td>
+            <td class="whitespace-nowrap text-xs text-slate-600">
+              {{ d.sumupConnected ? '✅ Connecté' : '— Non connecté' }}
+              <span v-if="SETUP_BADGE[d.setupStatus]" class="ml-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" :class="SETUP_BADGE[d.setupStatus].cls">{{ SETUP_BADGE[d.setupStatus].label }}</span>
+              <span v-if="linkFallback?.id === d.id" class="mt-1 block max-w-xs break-all text-[11px] text-slate-500">{{ linkFallback.url }}</span>
+            </td>
             <td>{{ d.bookings }}</td>
             <td class="whitespace-nowrap text-right">
               <button
@@ -275,6 +329,14 @@ const filteredDrivers = computed(() => {
                 title="Accéder à son espace chauffeur"
                 @click="enterSpace(d.id)"
               >{{ enteringId === d.id ? '…' : 'Espace ↗' }}</button>
+              <button
+                v-if="d.hasAccount"
+                type="button"
+                class="mr-1 inline-flex items-center rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                :disabled="linkingId === d.id"
+                title="Copier le lien de configuration guidée"
+                @click="copySetupLink(d.id)"
+              >{{ linkingId === d.id ? '…' : linkCopiedId === d.id ? '✓ Copié' : '🔗 Config' }}</button>
               <NuxtLink :to="`/admin/drivers/${d.id}`" class="mr-1 inline-flex items-center rounded-lg px-2.5 py-2 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-800">Détail →</NuxtLink>
               <button v-if="d.status !== 'ACTIVE'" class="inline-flex items-center rounded-lg px-2.5 py-2 text-xs font-semibold text-green-700 hover:bg-green-50" @click="setStatus(d.id, 'ACTIVE')">Activer</button>
               <button v-else class="inline-flex items-center rounded-lg px-2.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50" @click="setStatus(d.id, 'SUSPENDED')">Suspendre</button>

@@ -92,6 +92,16 @@ const expanded = ref(false)
       Encore quelques étapes avant de recevoir vos premières réservations
       ({{ onboarding.requiredDone }} / {{ onboarding.requiredTotal }} étapes obligatoires).
     </p>
+    <!-- Parcours guidé : les mêmes réglages, un écran à la fois, avec des
+         guides et un simulateur de prix. Les étapes déjà faites sont sautées. -->
+    <NuxtLink
+      v-if="expanded"
+      to="/configuration"
+      class="mt-3 flex items-center justify-between gap-3 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700"
+    >
+      <span>🧭 Me laisser guider, étape par étape</span>
+      <span aria-hidden="true">→</span>
+    </NuxtLink>
     <ul v-if="expanded" class="mt-3 space-y-1.5">
       <li v-for="step in onboarding.steps" :key="step.key">
         <NuxtLink
