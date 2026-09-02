@@ -150,6 +150,12 @@ model Driver {
   setupStartedAt      DateTime?
   setupCompletedAt    DateTime?
   setupConfirmed      String[]  @default([])
+  // Code de vérification par email pour ouvrir le parcours via le lien (le
+  // chauffeur n'a pas à se connecter). Haché ; envoyé seulement à sa demande.
+  setupCodeHash       String?
+  setupCodeExpiresAt  DateTime?
+  setupCodeSentAt     DateTime?
+  setupCodeAttempts   Int       @default(0)
 
   // Moyens de paiement acceptés (choisis par le chauffeur dans ses réglages).
   // Par défaut : prépaiement Stripe. Le chauffeur peut tout encaisser sur place
