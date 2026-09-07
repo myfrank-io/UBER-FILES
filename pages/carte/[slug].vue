@@ -31,9 +31,6 @@ useHead(() => {
     title,
     meta: [
       { name: 'description', content: description },
-      // Marque blanche : ajoutée à l'écran d'accueil iOS, la carte porte le nom
-      // du chauffeur (remplace le « Ridewiz » du head global).
-      { name: 'apple-mobile-web-app-title', content: c.displayName },
       { property: 'og:type', content: 'profile' },
       { property: 'og:title', content: title },
       { property: 'og:description', content: description },
