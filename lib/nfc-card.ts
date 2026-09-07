@@ -271,15 +271,15 @@ export function nfcCardProposalMessage(opts: {
   qtyBusiness: number
 }): string {
   const firstName = opts.driverName.trim().split(/\s+/)[0] ?? ''
-  const hello = firstName ? `Bonjour ${firstName},` : 'Bonjour,'
+  const hello = firstName ? `Salut ${firstName},` : 'Salut,'
   const parts = [
     opts.qtyReview > 0 ? `${opts.qtyReview} cartes avis Google` : '',
     opts.qtyBusiness > 0 ? `${opts.qtyBusiness} cartes de visite` : '',
   ].filter(Boolean)
   const what = parts.length ? ` (${parts.join(' et ')})` : ''
   return (
-    `${hello} voici la proposition de design pour vos cartes NFC${what} : ${opts.url}\n\n` +
-    `Dites-moi si vous voulez changer quelque chose avant l'impression.`
+    `${hello} voici la proposition de design pour tes cartes NFC${what} : ${opts.url}\n\n` +
+    `Dis-moi si tu veux changer quelque chose avant l'impression.`
   )
 }
 

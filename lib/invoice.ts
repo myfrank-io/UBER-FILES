@@ -302,3 +302,34 @@ export function defaultInstallments(totalCents: number, count: number): Installm
             : `échéance ${index + 1}`,
   }))
 }
+
+/** Lien public d'une facture, tel qu'on l'envoie au chauffeur. */
+export function invoiceShareUrl(appBaseUrl: string, token: string): string {
+  return `${appBaseUrl.replace(/\/+$/, '')}/facture/${encodeURIComponent(token)}`
+}
+
+/**
+ * Message WhatsApp pré-rempli pour envoyer sa facture au chauffeur. On tutoie :
+ * ce sont des indépendants qu'on suit un par un, pas des inconnus.
+ */
+export function invoiceWhatsAppMessage(opts: {
+  /** Nom du chauffeur, complet ou non : seul le prénom est utilisé. */
+  driverName: string
+  number: string
+  totalCents: number
+  url: string
+  paymentTerms: string | null
+}): string {
+  const firstName = opts.driverName.trim().split(/\s+/)[0] ?? ''
+  const hello = firstName ? `Salut ${firstName} 👋` : 'Salut 👋'
+  const terms = opts.paymentTerms?.trim()
+  return [
+    hello,
+    '',
+    `Voici ta facture n°${opts.number} — ${formatEuros(opts.totalCents)} :`,
+    opts.url,
+    ...(terms ? ['', terms] : []),
+    '',
+    'Dis-moi si tu as une question.',
+  ].join('\n')
+}

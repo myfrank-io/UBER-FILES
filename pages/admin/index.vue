@@ -46,7 +46,7 @@ const whatsappUrl = computed(() => {
   if (!result.value || !form.phone) return null
   const digits = normalizePhone(form.phone)
   if (!digits) return null
-  const message = `Bonjour ${result.value.firstName}, voici votre lien pour créer votre espace chauffeur Ridewiz : ${result.value.inviteUrl}`
+  const message = `Salut ${result.value.firstName}, voici ton lien pour créer ton espace chauffeur Ridewiz : ${result.value.inviteUrl}`
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
 })
 
@@ -154,7 +154,7 @@ const setupWhatsapp = computed(() => {
   const digits = normalizePhone(m.phone)
   if (!digits) return null
   const first = m.name.split(/\s+/)[0]
-  const message = `Bonjour ${first}, voici votre lien pour configurer votre espace Ridewiz en quelques minutes : ${m.url}`
+  const message = `Salut ${first}, voici ton lien pour configurer ton espace Ridewiz en quelques minutes : ${m.url}`
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
 })
 

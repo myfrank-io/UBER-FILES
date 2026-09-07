@@ -1,6 +1,7 @@
 // Facturation : accès aux données et mise en forme, entre Prisma et les routes
 // admin. La logique de calcul vit dans lib/invoice.ts, le dessin du PDF dans
 // server/utils/invoice-pdf.ts.
+import { randomBytes } from 'node:crypto'
 import type { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from './prisma'
@@ -90,6 +91,21 @@ export function formatInvoiceDate(date: Date): string {
     month: '2-digit',
     year: 'numeric',
   }).format(date)
+}
+
+/**
+ * Jeton du lien public, créé à la première demande puis stable : le PDF est
+ * régénéré à chaque ouverture, le lien reste donc valable après une correction
+ * de la facture.
+ */
+export async function ensureInvoiceShareToken(invoice: { id: string; shareToken: string | null }): Promise<string> {
+  if (invoice.shareToken) return invoice.shareToken
+  const updated = await prisma.invoice.update({
+    where: { id: invoice.id },
+    data: { shareToken: randomBytes(18).toString('base64url') },
+    select: { shareToken: true },
+  })
+  return updated.shareToken!
 }
 
 /** DTO renvoyé au client : jamais l'entité Prisma brute. */
