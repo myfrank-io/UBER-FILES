@@ -95,6 +95,9 @@ function safeText(font: PDFFont, s: string): string {
 interface Fonts {
   regular: PDFFont
   bold: PDFFont
+  /** Sans-serif, réservée aux libellés de mise en page (jamais sur la carte). */
+  sans: PDFFont
+  sansBold: PDFFont
 }
 
 /**
@@ -253,6 +256,8 @@ async function prepare(input: NfcCardRenderInput) {
   const fonts: Fonts = {
     regular: await pdf.embedFont(StandardFonts.TimesRoman),
     bold: await pdf.embedFont(StandardFonts.TimesRomanBold),
+    sans: await pdf.embedFont(StandardFonts.Helvetica),
+    sansBold: await pdf.embedFont(StandardFonts.HelveticaBold),
   }
   let logoImage: PDFImage | null = null
   if (input.logo) {
@@ -336,6 +341,185 @@ export async function generateNfcCardPreviewPdf(
       ),
       { x: left * MM, y: (297 - top - cardH - 10) * MM, size: 8, font: fonts.regular, color: muted },
     )
+  }
+  return pdf.save()
+}
+
+// ─── Proposition envoyée au chauffeur ────────────────────────────────────────
+
+/** Ce que fait chaque carte, expliqué au chauffeur (sans jargon d'impression). */
+const PROPOSAL_EXPLAINER: Record<NfcCardProduct, string> = {
+  review:
+    "Votre client approche son téléphone de la carte, ou scanne le QR code. Il arrive sur votre page d'avis : cinq étoiles l'envoient déposer son avis sur votre fiche Google, une note plus basse vous revient en privé sans passer en public.",
+  business:
+    'Votre client approche son téléphone de la carte, ou scanne le QR code. Votre carte de visite en ligne s\u2019ouvre : vos coordonnées, vos véhicules et le bouton pour réserver une course.',
+}
+
+/** Découpe un texte en lignes qui tiennent dans `maxWidth` (en points). */
+function wrapText(font: PDFFont, text: string, size: number, maxWidth: number): string[] {
+  const lines: string[] = []
+  let line = ''
+  for (const word of safeText(font, text).split(/\s+/)) {
+    const next = line ? `${line} ${word}` : word
+    if (line && font.widthOfTextAtSize(next, size) > maxWidth) {
+      lines.push(line)
+      line = word
+    } else {
+      line = next
+    }
+  }
+  if (line) lines.push(line)
+  return lines
+}
+
+/** Texte interlettré (petites capitales de mise en page), aligné à gauche. */
+function drawTracked(
+  page: PDFPage,
+  text: string,
+  opts: { x: number; y: number; size: number; font: PDFFont; color: RGB; tracking: number },
+) {
+  let x = opts.x
+  for (const ch of safeText(opts.font, text)) {
+    page.drawText(ch, { x, y: opts.y, size: opts.size, font: opts.font, color: opts.color })
+    x += opts.font.widthOfTextAtSize(ch, opts.size) + opts.tracking
+  }
+}
+
+function trackedWidth(font: PDFFont, text: string, size: number, tracking: number): number {
+  const chars = [...safeText(font, text)]
+  return font.widthOfTextAtSize(chars.join(''), size) + tracking * Math.max(0, chars.length - 1)
+}
+
+/** Contour arrondi d'une carte, dans le repère du dessin (mm). */
+function roundedCardPath(): string {
+  const r = CARD_RADIUS
+  const w = CARD_W
+  const h = CARD_H
+  return `M${r} 0 H${w - r} A${r} ${r} 0 0 1 ${w} ${r} V${h - r} A${r} ${r} 0 0 1 ${w - r} ${h} H${r} A${r} ${r} 0 0 1 0 ${h - r} V${r} A${r} ${r} 0 0 1 ${r} 0 Z`
+}
+
+/**
+ * PDF de PROPOSITION, celui qu'on envoie au chauffeur : une page A4 par
+ * produit, recto et verso en grand, ce que fait la carte et le lien ouvert par
+ * le QR. Aucune mention de fond perdu ni de fichier d'impression — c'est la
+ * prévisualisation qui parle à la production, pas celle-ci.
+ */
+export async function generateNfcCardProposalPdf(
+  input: NfcCardRenderInput,
+  products: { product: NfcCardProduct; quantity: number }[],
+): Promise<Uint8Array> {
+  const { pdf, fonts, logoImage } = await prepare(input)
+  pdf.setTitle(`Proposition de cartes NFC — ${input.driverName}`)
+
+  const A4: [number, number] = [210 * MM, 297 * MM]
+  const ink = rgb(0.055, 0.106, 0.173)
+  const muted = rgb(0.604, 0.545, 0.447)
+  const copper = rgb(0.71, 0.475, 0.247)
+  const hairline = rgb(0.87, 0.85, 0.82)
+
+  const scale = 1.6
+  const cardW = CARD_W * scale
+  const cardH = CARD_H * scale
+  const gap = 14
+  const left = (210 - (2 * cardW + gap)) / 2
+  const cardsTop = 74
+  // y compté depuis le HAUT de la page, converti pour l'axe PDF (origine en bas).
+  const Y = (mmFromTop: number) => (297 - mmFromTop) * MM
+
+  for (const { product, quantity } of products) {
+    const page = pdf.addPage(A4)
+    const matrix = qrMatrix(input.urls[product])
+
+    drawTracked(page, 'PROPOSITION DE DESIGN', {
+      x: left * MM,
+      y: Y(22),
+      size: 8,
+      font: fonts.sansBold,
+      color: muted,
+      tracking: 1.6,
+    })
+    page.drawText(safeText(fonts.bold, NFC_CARD_PRODUCT_LABELS[product]), {
+      x: left * MM,
+      y: Y(35),
+      size: 22,
+      font: fonts.bold,
+      color: ink,
+    })
+    const subtitle = `${input.driverName} · ${quantity} carte${quantity > 1 ? 's' : ''}`
+    page.drawText(safeText(fonts.sans, subtitle), {
+      x: left * MM,
+      y: Y(43),
+      size: 10,
+      font: fonts.sans,
+      color: muted,
+    })
+    page.drawLine({
+      start: { x: left * MM, y: Y(49) },
+      end: { x: (left + 38) * MM, y: Y(49) },
+      thickness: 1,
+      color: copper,
+    })
+
+    // Recto / verso, en grand, avec un filet discret pour détacher les cartes
+    // claires du papier.
+    const sides: { side: 'front' | 'back'; label: string; ox: number }[] = [
+      { side: 'front', label: 'RECTO', ox: left },
+      { side: 'back', label: 'VERSO', ox: left + cardW + gap },
+    ]
+    for (const s of sides) {
+      const canvas = new CardCanvas(page, s.ox, cardsTop, scale, fonts, input, logoImage)
+      canvas.background(true)
+      if (s.side === 'front') canvas.front()
+      else canvas.back(product, matrix)
+      page.drawSvgPath(roundedCardPath(), {
+        x: s.ox * MM,
+        y: Y(cardsTop),
+        scale: scale * MM,
+        borderColor: hairline,
+        borderWidth: 0.6,
+      })
+      const w = trackedWidth(fonts.sansBold, s.label, 8, 1.6)
+      drawTracked(page, s.label, {
+        x: (s.ox + cardW / 2) * MM - w / 2,
+        y: Y(cardsTop + cardH + 7),
+        size: 8,
+        font: fonts.sansBold,
+        color: muted,
+        tracking: 1.6,
+      })
+    }
+
+    // Ce que fait la carte, puis le lien qu'ouvre le QR.
+    const textTop = cardsTop + cardH + 22
+    drawTracked(page, 'CE QUE FAIT LA CARTE', {
+      x: left * MM,
+      y: Y(textTop),
+      size: 8,
+      font: fonts.sansBold,
+      color: muted,
+      tracking: 1.6,
+    })
+    const width = (2 * cardW + gap) * MM
+    wrapText(fonts.regular, PROPOSAL_EXPLAINER[product], 11, width).forEach((line, i) => {
+      page.drawText(line, { x: left * MM, y: Y(textTop + 8 + i * 5.4), size: 11, font: fonts.regular, color: ink })
+    })
+    page.drawText(safeText(fonts.sans, `Le QR code ouvre : ${input.urls[product]}`), {
+      x: left * MM,
+      y: Y(textTop + 30),
+      size: 9,
+      font: fonts.sans,
+      color: muted,
+    })
+
+    const footer = 'Ridewiz · Votre chauffeur, votre signature.'
+    const fw = fonts.sans.widthOfTextAtSize(safeText(fonts.sans, footer), 8)
+    page.drawText(safeText(fonts.sans, footer), {
+      x: 105 * MM - fw / 2,
+      y: Y(283),
+      size: 8,
+      font: fonts.sans,
+      color: muted,
+    })
   }
   return pdf.save()
 }

@@ -1,11 +1,13 @@
 import { requireAdmin } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import {
+  ensureNfcCardProposalToken,
   loadOrCreateNfcCardDesign,
   nfcCardLinks,
   nfcDriverSelect,
   serializeNfcCardDesign,
 } from '~/server/utils/nfc-card'
+import { nfcCardProposalUrl } from '~/lib/nfc-card'
 
 // Design des cartes NFC d'un chauffeur + tout ce dont l'éditeur admin a besoin
 // (liens des QR, fiche Google, logo de la carte digitale réutilisable).
@@ -26,6 +28,7 @@ export default defineEventHandler(async (event) => {
   if (!driver) throw createError({ statusCode: 404, statusMessage: 'Chauffeur introuvable.' })
 
   const design = await loadOrCreateNfcCardDesign(driver)
+  const proposalToken = await ensureNfcCardProposalToken(design)
   const links = nfcCardLinks(config.public.appBaseUrl, driver)
   const cardLogo = driver.cardProfile?.images[0]
 
@@ -43,6 +46,8 @@ export default defineEventHandler(async (event) => {
       cardLogoAvailable: Boolean(cardLogo && /^image\/(png|jpe?g)$/i.test(cardLogo.mime)),
     },
     links,
+    // Lien public à envoyer au chauffeur (PDF de proposition).
+    proposalUrl: nfcCardProposalUrl(config.public.appBaseUrl, proposalToken),
     design: serializeNfcCardDesign(driver.id, design),
     orderEmail: config.nfcCardOrderEmail,
   }

@@ -253,6 +253,36 @@ export function nfcCardTargetUrl(appBaseUrl: string, slug: string, product: NfcC
   return product === 'review' ? `${base}/avis/${s}` : `${base}/carte/${s}`
 }
 
+// ─── Proposition envoyée au chauffeur ────────────────────────────────────────
+
+/** URL publique du PDF de proposition (lien court, envoyé par WhatsApp). */
+export function nfcCardProposalUrl(appBaseUrl: string, token: string): string {
+  return `${appBaseUrl.replace(/\/+$/, '')}/cartes-nfc/${encodeURIComponent(token)}`
+}
+
+/**
+ * Message WhatsApp prêt à envoyer : le chauffeur ouvre le PDF, valide ou
+ * demande une correction. Les quantités à 0 ne sont pas mentionnées.
+ */
+export function nfcCardProposalMessage(opts: {
+  driverName: string
+  url: string
+  qtyReview: number
+  qtyBusiness: number
+}): string {
+  const firstName = opts.driverName.trim().split(/\s+/)[0] ?? ''
+  const hello = firstName ? `Bonjour ${firstName},` : 'Bonjour,'
+  const parts = [
+    opts.qtyReview > 0 ? `${opts.qtyReview} cartes avis Google` : '',
+    opts.qtyBusiness > 0 ? `${opts.qtyBusiness} cartes de visite` : '',
+  ].filter(Boolean)
+  const what = parts.length ? ` (${parts.join(' et ')})` : ''
+  return (
+    `${hello} voici la proposition de design pour vos cartes NFC${what} : ${opts.url}\n\n` +
+    `Dites-moi si vous voulez changer quelque chose avant l'impression.`
+  )
+}
+
 // ─── QR code ─────────────────────────────────────────────────────────────────
 
 export interface QrMatrix {
