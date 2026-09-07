@@ -958,7 +958,23 @@ model InvoiceLine {
   quantity       Int    @default(1)
   unitPriceCents Int
 
+  // Remise sur la ligne. Le prix unitaire reste celui du catalogue : c'est la
+  // remise qui varie, pour que la facture montre ce qui a été offert ou
+  // consenti plutôt que de le dissimuler dans un prix rabaissé.
+  discountKind  InvoiceDiscountKind @default(NONE)
+  /// Centièmes de pour-cent si PERCENT (10000 = offert), centimes si AMOUNT.
+  discountValue Int                 @default(0)
+
   @@index([invoiceId])
+}
+
+/// Forme d'une remise de ligne : aucune, un pourcentage, ou un montant fixe.
+/// « Offert » est un pourcentage de 100 %, ce qui garde la valeur d'origine
+/// visible sur la facture.
+enum InvoiceDiscountKind {
+  NONE
+  PERCENT
+  AMOUNT
 }
 
 /// Échéance de règlement (« acompte de 50 % à la commande »). Le montant est
