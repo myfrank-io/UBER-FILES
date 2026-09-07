@@ -271,7 +271,7 @@ async function register() {
         <button type="submit" class="rw-btn w-full !py-4 !text-[15px]">Continuer</button>
 
         <p class="text-center text-[13px] text-[#9A8B72]">
-          ✓ Sans engagement &nbsp;·&nbsp; ✓ Zéro commission sur vos courses
+          ✓ Paiement unique, aucun abonnement &nbsp;·&nbsp; ✓ Zéro commission sur vos courses
         </p>
       </form>
 
