@@ -34,7 +34,8 @@ const fields = reactive({
   tagline: props.title?.trim() || DEFAULT_LOGO_TAGLINE,
 })
 const accentKey = ref(LOGO_ACCENTS[0]!.key)
-const metallic = ref(true)
+// Or plat par défaut : le dégradé métal reste disponible en option.
+const metallic = ref(false)
 const category = ref<LogoCategory | 'all'>('all')
 
 const colors = computed<LogoColors>(() => {
