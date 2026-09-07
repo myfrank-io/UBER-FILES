@@ -11,6 +11,7 @@ import {
   DEFAULT_FG_COLOR,
   DEFAULT_QUANTITY,
   DEFAULT_TITLE,
+  EMPTY_SHIPPING,
   LOGO_OFFSET_MAX,
   LOGO_SCALE_MAX,
   LOGO_SCALE_MIN,
@@ -19,10 +20,13 @@ import {
   defaultCardName,
   formatCardPhone,
   nfcCardProposalMessage,
+  nfcDeliveryMessage,
   qrContrastWarning,
   qrMatrix,
+  shippingComplete,
   type GoogleLogoStyle,
   type NfcCardProduct,
+  type NfcShipping,
 } from '~/lib/nfc-card'
 import { MAX_PHOTO_SOURCE_BYTES, resizeImageToDataUrl } from '~/composables/useImageResize'
 import { logoRecipeFollowsTheme, type LogoRecipe } from '~/lib/logo-bank'
@@ -54,6 +58,9 @@ const form = reactive({
   phone: '',
   qtyReview: DEFAULT_QUANTITY,
   qtyBusiness: DEFAULT_QUANTITY,
+  // Adresse de livraison : éditable ici, ou remplie par le chauffeur depuis le
+  // lien public. Enregistrée avec le reste du design.
+  shipping: { ...EMPTY_SHIPPING } as NfcShipping,
 })
 
 // Logo : soit l'URL enregistrée, soit une data URL fraîchement importée (pas
@@ -79,6 +86,7 @@ function loadFromServer() {
   form.phone = d.phone
   form.qtyReview = d.qtyReview
   form.qtyBusiness = d.qtyBusiness
+  form.shipping = { ...EMPTY_SHIPPING, ...d.shipping }
   savedLogoUrl.value = d.logoUrl
   pendingLogo.value = undefined
   pendingRecipe.value = undefined
@@ -313,6 +321,39 @@ function copyProposalLink() {
     .catch(() => toast.error('Copie impossible : ouvrez le lien depuis la carte « Liens ».'))
 }
 
+// ─── Livraison ───────────────────────────────────────────────────────────────
+// Le chauffeur peut remplir l'adresse lui-même depuis /livraison/{jeton} : on
+// lui envoie le lien par WhatsApp, avec un message tutoyé (les seuls messages
+// envoyés à la main, par opposition aux notifications automatiques).
+const deliveryReady = computed(() => shippingComplete(form.shipping))
+
+const deliveryMessage = computed(() =>
+  nfcDeliveryMessage({
+    driverName: data.value?.driver.displayName ?? '',
+    url: data.value?.deliveryUrl ?? '',
+  }),
+)
+
+const deliveryWhatsapp = computed(() => {
+  const digits = toWhatsAppDigits(data.value?.driver.phone)
+  return digits && data.value?.deliveryUrl
+    ? `https://wa.me/${digits}?text=${encodeURIComponent(deliveryMessage.value)}`
+    : null
+})
+
+const deliveryCopied = ref(false)
+function copyDeliveryLink() {
+  const url = data.value?.deliveryUrl
+  if (!url) return
+  navigator.clipboard
+    ?.writeText(url)
+    .then(() => {
+      deliveryCopied.value = true
+      setTimeout(() => (deliveryCopied.value = false), 2500)
+    })
+    .catch(() => toast.error('Copie impossible : sélectionnez le lien à la main.'))
+}
+
 const products: NfcCardProduct[] = ['review', 'business']
 const productLabels = NFC_CARD_PRODUCT_LABELS
 </script>
@@ -503,6 +544,103 @@ const productLabels = NFC_CARD_PRODUCT_LABELS
             <p class="mt-2 text-xs text-slate-500">Un produit à 0 n'est pas généré ni envoyé.</p>
           </section>
 
+          <!-- Livraison -->
+          <section class="card" data-testid="nfc-delivery">
+            <div class="flex items-start justify-between gap-3">
+              <h2 class="font-semibold text-slate-900">Livraison</h2>
+              <span
+                v-if="deliveryReady"
+                class="whitespace-nowrap rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-800"
+              >Adresse complète</span>
+              <span
+                v-else
+                class="whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800"
+              >Adresse manquante</span>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">
+              Où envoyer les cartes imprimées. Remplissez-la ici, ou demandez au chauffeur de le faire lui-même.
+            </p>
+            <p v-if="data.design.shipFilledAt" class="mt-1 text-xs text-slate-400">
+              Remplie par le chauffeur le {{ formatDateTime(data.design.shipFilledAt) }}.
+            </p>
+
+            <div class="mt-3 space-y-3">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="label">Prénom</label>
+                  <input v-model="form.shipping.firstName" class="field !py-2" maxlength="60" data-testid="ship-first" />
+                </div>
+                <div>
+                  <label class="label">Nom</label>
+                  <input v-model="form.shipping.lastName" class="field !py-2" maxlength="60" data-testid="ship-last" />
+                </div>
+              </div>
+              <div>
+                <label class="label">Adresse</label>
+                <input
+                  v-model="form.shipping.address"
+                  class="field !py-2"
+                  maxlength="160"
+                  placeholder="12 rue des Lilas, bât. B"
+                  data-testid="ship-address"
+                />
+              </div>
+              <div class="grid grid-cols-[110px_1fr] gap-3">
+                <div>
+                  <label class="label">Code postal</label>
+                  <input
+                    v-model="form.shipping.postalCode"
+                    class="field !py-2"
+                    inputmode="numeric"
+                    maxlength="5"
+                    placeholder="75011"
+                    data-testid="ship-postal"
+                  />
+                </div>
+                <div>
+                  <label class="label">Ville</label>
+                  <input v-model="form.shipping.city" class="field !py-2" maxlength="80" data-testid="ship-city" />
+                </div>
+              </div>
+              <div>
+                <label class="label">Téléphone</label>
+                <input
+                  v-model="form.shipping.phone"
+                  class="field !py-2"
+                  type="tel"
+                  maxlength="30"
+                  placeholder="06 12 34 56 78"
+                  data-testid="ship-phone"
+                />
+              </div>
+            </div>
+
+            <!-- Le chauffeur remplit lui-même : le lien ouvre le formulaire
+                 public, sur le même jeton que la proposition. -->
+            <div class="mt-4 border-t border-slate-200 pt-3">
+              <p class="text-xs text-slate-500">Faire remplir par le chauffeur :</p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <a
+                  v-if="deliveryWhatsapp"
+                  :href="deliveryWhatsapp"
+                  target="_blank"
+                  rel="noopener"
+                  class="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-green-600/40 bg-green-50 px-3.5 text-sm font-semibold text-green-800 transition hover:bg-green-100"
+                  data-testid="delivery-whatsapp"
+                >
+                  💬 Demander l'adresse
+                </a>
+                <button type="button" class="btn-ghost !min-h-[40px] !py-2 text-sm" @click="copyDeliveryLink">
+                  {{ deliveryCopied ? 'Lien copié' : '🔗 Copier le lien' }}
+                </button>
+              </div>
+              <p v-if="!deliveryWhatsapp" class="mt-2 text-xs text-amber-700">
+                Ce chauffeur n'a pas de numéro : copiez le lien et envoyez-le vous-même.
+              </p>
+              <p class="mt-2 break-all text-xs text-slate-400">{{ data.deliveryUrl }}</p>
+            </div>
+          </section>
+
           <!-- Liens -->
           <section class="card text-sm">
             <h2 class="font-semibold text-slate-900">Liens encodés (QR = puce NFC)</h2>
@@ -596,6 +734,10 @@ const productLabels = NFC_CARD_PRODUCT_LABELS
         Les fichiers d'impression ({{ [form.qtyReview > 0 ? `${form.qtyReview} avis Google` : '', form.qtyBusiness > 0 ? `${form.qtyBusiness} cartes de visite` : ''].filter(Boolean).join(' + ') || 'aucune carte' }})
         et la prévisualisation seront envoyés à <strong>{{ data?.orderEmail }}</strong>.
         <span v-if="dirty">Les modifications en cours seront enregistrées avant l'envoi.</span>
+      </p>
+      <p v-if="!deliveryReady" class="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800" data-testid="delivery-warning">
+        ⚠️ Aucune adresse de livraison complète : la production ne saura pas où expédier les cartes.
+        Vous pouvez quand même envoyer le design et communiquer l'adresse plus tard.
       </p>
       <div class="mt-5 flex justify-end gap-2">
         <button class="btn-ghost text-sm" @click="confirmSend = false">Annuler</button>

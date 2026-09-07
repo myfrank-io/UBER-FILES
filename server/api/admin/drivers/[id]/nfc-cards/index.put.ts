@@ -2,9 +2,14 @@ import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { requireAdmin } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
-import { nfcCardDesignSchema } from '~/lib/nfc-card'
+import { nfcCardDesignSchema, nfcShippingSchema, shippingStarted } from '~/lib/nfc-card'
 import { logoRecipeSchema } from '~/lib/logo-bank'
-import { loadOrCreateNfcCardDesign, nfcDriverSelect, serializeNfcCardDesign } from '~/server/utils/nfc-card'
+import {
+  loadOrCreateNfcCardDesign,
+  nfcDriverSelect,
+  nfcShippingWriteData,
+  serializeNfcCardDesign,
+} from '~/server/utils/nfc-card'
 
 // Enregistrement du design. Le logo voyage à part des réglages :
 //   - `logo` absent → inchangé ; `null` → supprimé ; data URL → remplacé ;
@@ -25,6 +30,9 @@ const schema = nfcCardDesignSchema.extend({
   // un logo importé ou retiré, seule pour enregistrer des réglages (textes,
   // couleurs) modifiés sans nouveau rendu, absente si rien ne change.
   logoRecipe: logoRecipeSchema.nullable().optional(),
+  // Adresse de livraison : partielle acceptée (l'admin enregistre au fil de
+  // l'eau), absente = inchangée. Le formulaire du chauffeur, lui, exige tout.
+  shipping: nfcShippingSchema.optional(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -38,7 +46,7 @@ export default defineEventHandler(async (event) => {
   if (!body.success) {
     throw createError({ statusCode: 400, statusMessage: body.error.errors.map((e) => e.message).join(' ') })
   }
-  const { logo, useCardLogo, logoRecipe, ...fields } = body.data
+  const { logo, useCardLogo, logoRecipe, shipping, ...fields } = body.data
 
   let logoPatch: { logoData: string | null; logoMime: string | null } | null = null
   if (useCardLogo) {
@@ -76,7 +84,17 @@ export default defineEventHandler(async (event) => {
   await loadOrCreateNfcCardDesign(driver)
   const design = await prisma.nfcCardDesign.update({
     where: { driverId: id },
-    data: { ...fields, ...(logoPatch ?? {}), ...recipePatch },
+    data: {
+      ...fields,
+      ...(logoPatch ?? {}),
+      ...recipePatch,
+      // Une adresse ENTIÈREMENT vide n'écrase rien : entre l'ouverture de
+      // l'éditeur et l'enregistrement, le chauffeur a pu remplir la sienne
+      // depuis le lien public — un « Enregistrer » sur des champs jamais
+      // touchés ne doit pas l'effacer. Pour vider une adresse à la main, on
+      // corrige les champs (ils repartent alors non vides), ou on la remplace.
+      ...(shipping && shippingStarted(shipping) ? nfcShippingWriteData(shipping) : {}),
+    },
   })
 
   return { ok: true, design: serializeNfcCardDesign(id, design) }

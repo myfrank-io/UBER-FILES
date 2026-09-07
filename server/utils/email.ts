@@ -1181,6 +1181,10 @@ export function nfcCardOrderEmail(opts: {
   cardPublished: boolean
   bgColor: string
   fgColor: string
+  /** Adresse de livraison mise en lignes (vide = aucune adresse connue). */
+  shippingLines: string[]
+  /** Vrai quand les six champs sont là : le colis peut partir tel quel. */
+  shippingComplete: boolean
   attachmentNames: string[]
 }): { subject: string; html: string } {
   const row = (label: string, value: string) =>
@@ -1209,6 +1213,19 @@ export function nfcCardOrderEmail(opts: {
       ${row('Carte de visite', `${link(opts.cardUrl)}${opts.cardPublished ? '' : ' <em style="color:#b45309">(carte non publiée pour l’instant)</em>'}`)}
       ${row('Page publique', link(opts.publicPageUrl))}
     </table>
+
+    <h2 style="margin:20px 0 6px;font-size:15px;color:#0E1B2C">Livraison</h2>
+    ${
+      opts.shippingComplete
+        ? `<p style="margin:0;font-size:14px;line-height:1.5">${opts.shippingLines.map(esc).join('<br>')}</p>`
+        : `<div style="margin:0;padding:12px 14px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:12px;font-size:14px;color:#92400E">
+             <strong>Adresse de livraison incomplète.</strong>${
+               opts.shippingLines.length
+                 ? ` Ce qui est connu :<br>${opts.shippingLines.map(esc).join('<br>')}`
+                 : ' Aucune adresse renseignée.'
+             }<br>Ne pas expédier avant confirmation.
+           </div>`
+    }
 
     <h2 style="margin:20px 0 6px;font-size:15px;color:#0E1B2C">Verso carte de visite</h2>
     <table style="border-collapse:collapse">

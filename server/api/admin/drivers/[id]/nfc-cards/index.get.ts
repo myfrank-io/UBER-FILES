@@ -7,7 +7,7 @@ import {
   nfcDriverSelect,
   serializeNfcCardDesign,
 } from '~/server/utils/nfc-card'
-import { nfcCardProposalUrl } from '~/lib/nfc-card'
+import { nfcCardProposalUrl, nfcDeliveryUrl } from '~/lib/nfc-card'
 
 // Design des cartes NFC d'un chauffeur + tout ce dont l'éditeur admin a besoin
 // (liens des QR, fiche Google, logo de la carte digitale réutilisable).
@@ -46,8 +46,10 @@ export default defineEventHandler(async (event) => {
       cardLogoAvailable: Boolean(cardLogo && /^image\/(png|jpe?g)$/i.test(cardLogo.mime)),
     },
     links,
-    // Lien public à envoyer au chauffeur (PDF de proposition).
+    // Liens publics à envoyer au chauffeur : le PDF de proposition et le
+    // formulaire d'adresse de livraison. Même jeton, deux pages.
     proposalUrl: nfcCardProposalUrl(config.public.appBaseUrl, proposalToken),
+    deliveryUrl: nfcDeliveryUrl(config.public.appBaseUrl, proposalToken),
     design: serializeNfcCardDesign(driver.id, design),
     orderEmail: config.nfcCardOrderEmail,
   }

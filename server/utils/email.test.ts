@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emailTemplates } from './email'
+import { emailTemplates, nfcCardOrderEmail } from './email'
 
 const base = {
   customerName: 'Ali & Fils <script>alert(1)</script>',
@@ -496,5 +496,56 @@ describe('emailTemplates compte & sécurité', () => {
     expect(tpl.html).toContain('Un client')
     expect(tpl.html).toContain('★★★★☆')
     expect(tpl.html).not.toContain('réf.')
+  })
+})
+
+describe('nfcCardOrderEmail — livraison', () => {
+  const order = {
+    driverName: 'Job Kerkar',
+    slug: 'job-kerkar',
+    qtyReview: 10,
+    qtyBusiness: 10,
+    name: 'Job',
+    title: 'Chauffeur Privé',
+    phone: '07.45.20.55.65',
+    reviewQrUrl: 'https://ridewiz.fr/avis/job-kerkar',
+    googleReviewUrl: 'https://g.page/r/abc',
+    cardUrl: 'https://ridewiz.fr/carte/job-kerkar',
+    publicPageUrl: 'https://ridewiz.fr/job-kerkar',
+    cardPublished: true,
+    bgColor: '#F6F1E9',
+    fgColor: '#111111',
+    attachmentNames: ['cartes-avis-google-impression-job-kerkar.pdf'],
+  }
+
+  it('imprime l’adresse quand elle est complète', () => {
+    const tpl = nfcCardOrderEmail({
+      ...order,
+      shippingLines: ['Job Kerkar', '12 rue des Lilas', '75011 Paris', '06 12 34 56 78'],
+      shippingComplete: true,
+    })
+    expect(tpl.html).toContain('Livraison')
+    expect(tpl.html).toContain('12 rue des Lilas')
+    expect(tpl.html).toContain('75011 Paris')
+    expect(tpl.html).not.toContain('Ne pas expédier')
+  })
+
+  it('alerte franchement quand l’adresse manque', () => {
+    const tpl = nfcCardOrderEmail({ ...order, shippingLines: [], shippingComplete: false })
+    expect(tpl.html).toContain('Adresse de livraison incomplète')
+    expect(tpl.html).toContain('Aucune adresse renseignée')
+    expect(tpl.html).toContain('Ne pas expédier')
+  })
+
+  it('montre le peu qu’on sait d’une adresse partielle, et échappe les saisies', () => {
+    const tpl = nfcCardOrderEmail({
+      ...order,
+      shippingLines: ['<script>alert(1)</script>', 'Paris'],
+      shippingComplete: false,
+    })
+    expect(tpl.html).toContain('Adresse de livraison incomplète')
+    expect(tpl.html).toContain('Paris')
+    expect(tpl.html).not.toContain('<script>')
+    expect(tpl.html).toContain('&lt;script&gt;')
   })
 })

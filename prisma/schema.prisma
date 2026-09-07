@@ -877,8 +877,24 @@ model NfcCardDesign {
 
   // Lien public (court) vers le PDF de proposition envoyé au chauffeur.
   // Créé à la première demande, stable ensuite : le PDF est régénéré à chaque
-  // ouverture, donc le lien reflète toujours le design enregistré.
+  // ouverture, donc le lien reflète toujours le design enregistré. Le même
+  // jeton ouvre le formulaire d'adresse de livraison (/livraison/{token}) :
+  // même destinataire, même commande, un seul lien à envoyer.
   proposalToken String? @unique
+
+  // Adresse de livraison des cartes imprimées : saisie par l'admin, ou par le
+  // chauffeur lui-même depuis le lien public. Tout est optionnel en base — une
+  // commande peut partir chez l'admin — mais l'email de production le signale.
+  shipFirstName  String?
+  shipLastName   String?
+  shipAddress    String?
+  shipPostalCode String?
+  shipCity       String?
+  shipPhone      String?
+
+  // Dernière saisie par le CHAUFFEUR depuis le lien public (null = l'adresse
+  // vient de l'admin, ou n'existe pas encore).
+  shipFilledAt DateTime?
 
   // Dernier envoi du design validé à la production.
   sentAt    DateTime?

@@ -1,13 +1,14 @@
 import { requireAdmin } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import { nfcCardOrderEmail, sendEmail, type EmailAttachment } from '~/server/utils/email'
-import { NFC_CARD_PRODUCTS, type NfcCardProduct } from '~/lib/nfc-card'
+import { NFC_CARD_PRODUCTS, formatShippingLines, shippingComplete, type NfcCardProduct } from '~/lib/nfc-card'
 import {
   buildNfcCardRenderInput,
   loadOrCreateNfcCardDesign,
   nfcCardFileName,
   nfcCardLinks,
   nfcDriverSelect,
+  nfcShipping,
   serializeNfcCardDesign,
 } from '~/server/utils/nfc-card'
 import { generateNfcCardPreviewPdf, generateNfcCardPrintPdf } from '~/server/utils/nfc-card-pdf'
@@ -74,6 +75,10 @@ export default defineEventHandler(async (event) => {
       cardPublished: Boolean(driver.cardProfile?.published),
       bgColor: design.bgColor,
       fgColor: design.fgColor,
+      // L'adresse manquante n'empêche PAS l'envoi (les cartes peuvent partir
+      // chez l'admin), mais l'email le dit en toutes lettres.
+      shippingLines: formatShippingLines(nfcShipping(design)),
+      shippingComplete: shippingComplete(nfcShipping(design)),
       attachmentNames: attachments.map((a) => a.filename),
     }),
   })
