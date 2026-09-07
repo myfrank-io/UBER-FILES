@@ -228,33 +228,6 @@ export const LATE_PAYMENT_MENTION =
   'En cas de retard de paiement, application de pénalités au taux de trois fois le taux d’intérêt légal, ' +
   'ainsi qu’une indemnité forfaitaire pour frais de recouvrement de 40 € (art. L441-10 et D441-5 du code de commerce).'
 
-/**
- * Articles vendus habituellement, proposés en un clic dans l'éditeur. Ce ne
- * sont que des points de départ : la désignation et le prix restent
- * modifiables ligne par ligne sur chaque facture.
- */
-export const INVOICE_PRESETS: { key: string; chip: string; label: string; unitPriceCents: number }[] = [
-  {
-    key: 'acces',
-    // `chip` : ce qui s'affiche sur le bouton ; `label` : ce qui s'imprime.
-    chip: 'Accès + paramétrage',
-    label: 'Accès Ridewiz\n+ paramétrage',
-    unitPriceCents: 40_000,
-  },
-  {
-    key: 'cartes',
-    chip: 'Lot de 20 cartes',
-    label: 'Création 20 cartes (2 × 10)\nAvis Google + carte de visite digitale\nLogo',
-    unitPriceCents: 20_000,
-  },
-  {
-    key: 'acces-cartes',
-    chip: 'Accès + QR + cartes',
-    label: 'Accès Ridewiz\n+ paramétrage\nmise en place QR code + cartes',
-    unitPriceCents: 40_000,
-  },
-]
-
 /** Échéances les plus fréquentes, proposées dans la liste déroulante. */
 export const DUE_LABEL_SUGGESTIONS = [
   'à la commande',

@@ -101,6 +101,61 @@ async function createInvoice() {
   }
 }
 
+// ═══ Catalogue de produits ═══
+// Ce que l'on vend habituellement, pour l'ajouter à une facture en un clic.
+// Une facture copie la désignation et le prix : modifier ou retirer un produit
+// ici ne touche aucune facture déjà émise.
+const productModal = ref(false)
+const productBusy = ref(false)
+const productError = ref('')
+/** id du produit en cours d'édition, null pour une création. */
+const editingProductId = ref<string | null>(null)
+const productForm = reactive({ name: '', label: '', priceEuros: 0 })
+
+function openProduct(product?: { id: string; name: string; label: string; unitPriceCents: number }) {
+  productError.value = ''
+  editingProductId.value = product?.id ?? null
+  productForm.name = product?.name ?? ''
+  productForm.label = product?.label ?? ''
+  productForm.priceEuros = (product?.unitPriceCents ?? 0) / 100
+  productModal.value = true
+}
+
+async function saveProduct() {
+  productBusy.value = true
+  productError.value = ''
+  const body = {
+    name: productForm.name.trim(),
+    label: productForm.label.trim(),
+    unitPriceCents: Math.round((Number(productForm.priceEuros) || 0) * 100),
+  }
+  try {
+    if (editingProductId.value) {
+      await $fetch(`/api/admin/invoice-products/${editingProductId.value}`, { method: 'PUT', body })
+    } else {
+      await $fetch('/api/admin/invoice-products', { method: 'POST', body })
+    }
+    productModal.value = false
+    await refresh()
+    toast.success(editingProductId.value ? 'Produit modifié.' : 'Produit ajouté.')
+  } catch (e) {
+    productError.value = apiError(e, 'Enregistrement impossible.')
+  } finally {
+    productBusy.value = false
+  }
+}
+
+async function removeProduct(product: { id: string; name: string }) {
+  if (!confirm(`Retirer « ${product.name} » du catalogue ? Les factures déjà émises ne changent pas.`)) return
+  try {
+    await $fetch(`/api/admin/invoice-products/${product.id}`, { method: 'DELETE' })
+    await refresh()
+    toast.success('Produit retiré du catalogue.')
+  } catch (e) {
+    toast.error(apiError(e))
+  }
+}
+
 // ═══ Identité de l'émetteur ═══
 const editingIssuer = ref(false)
 const issuerBusy = ref(false)
@@ -184,6 +239,53 @@ async function saveIssuer() {
       </p>
     </div>
 
+    <!-- ═══ Catalogue ═══ -->
+    <div v-if="data" class="card mt-6">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 class="font-semibold text-slate-900">Produits</h2>
+          <p class="mt-1 text-sm text-slate-500">
+            Ce que vous vendez habituellement, à ajouter à une facture en un clic.
+          </p>
+        </div>
+        <button class="btn-ghost !min-h-0 !py-2 text-sm" data-testid="new-product" @click="openProduct()">
+          Ajouter un produit
+        </button>
+      </div>
+
+      <p v-if="data.products.length === 0" class="mt-4 text-sm text-slate-500">
+        Aucun produit pour l’instant.
+      </p>
+      <ul v-else class="mt-4 divide-y divide-slate-200">
+        <li
+          v-for="product in data.products"
+          :key="product.id"
+          class="flex flex-wrap items-center gap-x-4 gap-y-1 py-3"
+          data-testid="product-row"
+        >
+          <div class="min-w-0 flex-1">
+            <p class="font-semibold text-slate-900">{{ product.name }}</p>
+            <p class="whitespace-pre-line text-sm text-slate-500">{{ product.label }}</p>
+          </div>
+          <span class="font-serif text-lg text-slate-900">{{ formatEuros(product.unitPriceCents) }}</span>
+          <button
+            class="rounded-lg px-2 py-1 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            :data-testid="`edit-product-${product.id}`"
+            @click="openProduct(product)"
+          >
+            Modifier
+          </button>
+          <button
+            class="rounded-lg px-2 py-1 text-sm text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+            :data-testid="`delete-product-${product.id}`"
+            @click="removeProduct(product)"
+          >
+            Retirer
+          </button>
+        </li>
+      </ul>
+    </div>
+
     <!-- ═══ Filtres ═══ -->
     <div class="mt-6 flex flex-wrap gap-3">
       <input v-model="search" class="field sm:max-w-xs" placeholder="Numéro, client, SIRET…" />
@@ -248,6 +350,52 @@ async function saveIssuer() {
         <button class="btn-ghost" @click="creating = false">Annuler</button>
         <button class="btn-primary" :disabled="createBusy" @click="createInvoice">
           {{ createBusy ? 'Création…' : 'Créer le brouillon' }}
+        </button>
+      </div>
+    </AppModal>
+
+    <!-- ═══ Modale : produit ═══ -->
+    <AppModal v-if="productModal" @close="productModal = false">
+      <h2 class="title-serif text-xl">{{ editingProductId ? 'Modifier le produit' : 'Nouveau produit' }}</h2>
+
+      <label class="label mt-5">Nom</label>
+      <input
+        v-model="productForm.name"
+        class="field"
+        placeholder="Accès + paramétrage"
+        data-testid="product-name"
+      />
+      <p class="mt-1 text-xs text-slate-500">Affiché sur le bouton d’ajout, dans l’éditeur de facture.</p>
+
+      <label class="label mt-4">Désignation imprimée</label>
+      <textarea
+        v-model="productForm.label"
+        class="field min-h-[90px] resize-y"
+        rows="3"
+        placeholder="Accès Ridewiz&#10;+ paramétrage"
+        data-testid="product-label"
+      />
+      <p class="mt-1 text-xs text-slate-500">Un retour à la ligne = une ligne sur la facture.</p>
+
+      <label class="label mt-4">Prix</label>
+      <div class="relative w-40">
+        <input
+          v-model.number="productForm.priceEuros"
+          class="field pr-7"
+          type="number"
+          min="0"
+          step="1"
+          data-testid="product-price"
+        />
+        <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">€</span>
+      </div>
+
+      <p v-if="productError" class="mt-3 text-sm text-red-600">{{ productError }}</p>
+
+      <div class="mt-6 flex justify-end gap-2">
+        <button class="btn-ghost" @click="productModal = false">Annuler</button>
+        <button class="btn-primary" :disabled="productBusy" data-testid="save-product" @click="saveProduct">
+          {{ productBusy ? 'Enregistrement…' : 'Enregistrer' }}
         </button>
       </div>
     </AppModal>

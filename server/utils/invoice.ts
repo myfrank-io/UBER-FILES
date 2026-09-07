@@ -35,6 +35,29 @@ export async function loadIssuer() {
   })
 }
 
+/** DTO d'un produit du catalogue. */
+export function serializeProduct(product: {
+  id: string
+  name: string
+  label: string
+  unitPriceCents: number
+  position: number
+}) {
+  return {
+    id: product.id,
+    name: product.name,
+    label: product.label,
+    unitPriceCents: product.unitPriceCents,
+    position: product.position,
+  }
+}
+
+/** Catalogue complet, dans l'ordre d'affichage. */
+export async function loadProducts() {
+  const products = await prisma.invoiceProduct.findMany({ orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] })
+  return products.map(serializeProduct)
+}
+
 /** Champs sans lesquels une facture ne serait pas conforme. */
 export function missingIssuerFields(issuer: { name: string; addressLine: string; city: string; siret: string }) {
   const missing: string[] = []
