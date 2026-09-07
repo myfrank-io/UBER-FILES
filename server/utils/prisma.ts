@@ -14,6 +14,8 @@ const createPrismaClient = () =>
       // Images de la carte de visite : même règle, le blob n'est lu que par
       // l'endpoint image via un select explicite.
       cardImage: { data: true },
+      // Logo des cartes NFC : idem, lu par l’endpoint image et le générateur PDF.
+      nfcCardDesign: { logoData: true },
     },
   })
 

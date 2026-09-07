@@ -228,6 +228,7 @@ model Driver {
   payments         Payment[]
   subscription     Subscription?
   cardProfile      CardProfile?
+  nfcCardDesign    NfcCardDesign?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -831,4 +832,48 @@ model CardImage {
   updatedAt DateTime @updatedAt
 
   @@unique([profileId, role])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cartes NFC physiques (admin uniquement)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Design des cartes NFC imprimées d'un chauffeur (« Avis Google » et « Carte
+/// de visite en ligne »), composé par l'admin depuis la fiche chauffeur, jamais
+/// visible du chauffeur. Le layout (positions du QR, des icônes, des textes)
+/// est fixe et vit dans lib/nfc-card.ts ; seuls le logo, les couleurs et les
+/// textes libres sont stockés ici. Les PDF sont régénérés à chaque envoi.
+model NfcCardDesign {
+  id       String @id @default(cuid())
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String @unique
+
+  bgColor String @default("#F6F1E9")
+  fgColor String @default("#111111")
+
+  // Logo du chauffeur (PNG/JPEG en base64, omis globalement par le client
+  // Prisma : lu uniquement par l'endpoint image et le générateur PDF).
+  logoData    String? @db.Text
+  logoMime    String?
+  logoScale   Float   @default(1)
+  logoOffsetX Float   @default(0) // mm
+  logoOffsetY Float   @default(0) // mm
+
+  // Logo Google du verso « avis » : monochrome (couleur des éléments) ou officiel.
+  googleLogoStyle String @default("mono")
+
+  // Verso de la carte de visite.
+  name  String?
+  title String?
+  phone String?
+
+  qtyReview   Int @default(10)
+  qtyBusiness Int @default(10)
+
+  // Dernier envoi du design validé à la production.
+  sentAt    DateTime?
+  sentCount Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
