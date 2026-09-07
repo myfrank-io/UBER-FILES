@@ -18,6 +18,7 @@ export default defineEventHandler(async (event) => {
     where: { id },
     select: {
       ...nfcDriverSelect,
+      companyName: true,
       googlePlaceName: true,
       cardProfile: { select: { published: true, images: { where: { role: 'logo' }, select: { mime: true } } } },
     },
@@ -33,6 +34,7 @@ export default defineEventHandler(async (event) => {
       id: driver.id,
       slug: driver.slug,
       displayName: driver.displayName,
+      companyName: driver.companyName,
       phone: driver.phone,
       googlePlaceName: driver.googlePlaceName,
       cardPublished: Boolean(driver.cardProfile?.published),
