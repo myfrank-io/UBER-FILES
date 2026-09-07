@@ -55,8 +55,8 @@ export const LOGO_OFFSET_MAX = 14
 /** Icône NFC (téléphone + ondes) sur le recto. */
 export const NFC_ICON_BOX: Box = { x: 17, y: 57, w: 20, h: 21 }
 
-/** QR code au verso (les deux produits) : 28 mm, centré horizontalement. */
-export const QR_BOX: Box = { x: 13, y: 25.5, w: 28, h: 28 }
+/** QR code au verso (les deux produits) : 28 mm, centré sur la carte (x et y). */
+export const QR_BOX: Box = { x: (CARD_W - 28) / 2, y: (CARD_H - 28) / 2, w: 28, h: 28 }
 
 /** Logo Google au verso « avis ». */
 export const GOOGLE_LOGO_BOX: Box = { x: 21.5, y: 67, w: 11, h: 11 }
