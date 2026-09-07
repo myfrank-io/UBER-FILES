@@ -3,21 +3,25 @@
 
 /** Une ligne de facture telle qu'elle est saisie. */
 export type InvoiceLineInput = {
-  /** Désignation, éventuellement sur plusieurs lignes (« Accès RideWiz\n+ paramétrage »). */
+  /** Désignation, éventuellement sur plusieurs lignes (« Accès Ridewiz\n+ paramétrage »). */
   label: string
   quantity: number
   unitPriceCents: number
 }
 
-/** Une échéance de règlement (« Acompte de 50 % à la commande »). */
+/**
+ * Une échéance de règlement (« acompte de 200 € à la commande »).
+ *
+ * C'est le MONTANT qui fait foi, jamais un pourcentage : 600 € en trois fois,
+ * c'est 200 / 200 / 200, et non 33,34 % / 33,33 % / 33,33 % qui donnerait
+ * 200,04 / 199,98 / 199,98. La part en pour-cent n'est qu'un affichage,
+ * déduite du montant.
+ */
 export type InstallmentInput = {
-  /** Part du total, en centièmes de pour-cent (5000 = 50 %) pour éviter les flottants. */
-  shareBasisPoints: number
+  amountCents: number
   /** Quand c'est dû, tel qu'on l'écrit sur la facture : « à la commande », « à la livraison ». */
   dueLabel: string
 }
-
-export type Installment = InstallmentInput & { amountCents: number }
 
 /** Montant d'une ligne. Les quantités sont entières, les prix en centimes. */
 export function lineAmountCents(line: Pick<InvoiceLineInput, 'quantity' | 'unitPriceCents'>): number {
@@ -25,9 +29,9 @@ export function lineAmountCents(line: Pick<InvoiceLineInput, 'quantity' | 'unitP
 }
 
 /**
- * Totaux d'une facture. Pas de TVA en franchise en base (art. 293 B du CGI) :
- * le total est le sous-total. `vatRateBasisPoints` permet de facturer avec TVA
- * si l'émetteur sort un jour de la franchise.
+ * Totaux d'une facture. L'émetteur est en franchise en base (art. 293 B du
+ * CGI) : il n'y a pas de TVA, le total est le sous-total. `vatRateBasisPoints`
+ * reste accepté pour le jour où la franchise ne s'appliquerait plus.
  */
 export function invoiceTotals(lines: InvoiceLineInput[], vatRateBasisPoints = 0) {
   const subtotalCents = lines.reduce((sum, line) => sum + lineAmountCents(line), 0)
@@ -36,33 +40,35 @@ export function invoiceTotals(lines: InvoiceLineInput[], vatRateBasisPoints = 0)
 }
 
 /**
- * Répartit un total entre les échéances. Les arrondis vont tous sur la
- * DERNIÈRE échéance : la somme des échéances est toujours exactement le total,
- * jamais un centime de plus ou de moins (une facture qui ne tombe pas juste
- * est un litige garanti).
+ * Découpe un total en `count` échéances RONDES. Chaque échéance est un nombre
+ * entier d'euros ; les euros qui ne tombent pas juste sont distribués un par un
+ * depuis la première, et les centimes éventuels atterrissent sur la première.
+ * La somme vaut toujours exactement le total — une facture qui ne tombe pas
+ * juste est un litige garanti.
+ *
+ *   600 € en 3 fois → 200 / 200 / 200
+ *   500 € en 3 fois → 167 / 167 / 166
+ *   400 € en 3 fois → 134 / 133 / 133
  */
-export function splitInstallments(totalCents: number, parts: InstallmentInput[]): Installment[] {
-  if (parts.length === 0) return []
-  const head = parts.slice(0, -1).map((part) => ({
-    ...part,
-    amountCents: Math.round((totalCents * part.shareBasisPoints) / 10_000),
-  }))
-  const allocated = head.reduce((sum, part) => sum + part.amountCents, 0)
-  const last = parts[parts.length - 1]!
-  return [...head, { ...last, amountCents: totalCents - allocated }]
+export function splitAmountsEvenly(totalCents: number, count: number): number[] {
+  if (count < 1) return []
+  if (count === 1) return [totalCents]
+
+  const base = Math.floor(totalCents / count / 100) * 100
+  const parts = Array.from({ length: count }, () => base)
+  let rest = totalCents - base * count
+  for (let i = 0; rest >= 100; i++) {
+    parts[i % count]! += 100
+    rest -= 100
+  }
+  parts[0]! += rest
+  return parts
 }
 
-/**
- * Répartition par défaut pour un règlement « en N fois » : parts égales, le
- * reliquat de pour-cent sur la première (un acompte rond se lit mieux qu'un
- * solde à 33,34 %).
- */
-export function evenShares(count: number): number[] {
-  if (count < 1) return []
-  const base = Math.floor(10_000 / count)
-  const shares = Array.from({ length: count }, () => base)
-  shares[0] += 10_000 - base * count
-  return shares
+/** Part d'un montant dans le total, en centièmes de pour-cent (5000 = 50 %). */
+export function shareBasisPoints(amountCents: number, totalCents: number): number {
+  if (totalCents === 0) return 0
+  return Math.round((amountCents * 10_000) / totalCents)
 }
 
 /** « 400 € », « 1 234,50 € » — format français, centimes masqués si nuls. */
@@ -156,35 +162,57 @@ export function formatSiret(value: string): string {
 /**
  * Phrase de modalités de paiement, telle qu'elle s'imprime sur la facture.
  * Une seule échéance = règlement comptant ; deux = acompte + solde (la forme
- * la plus courante) ; au-delà, on énumère. Le texte reste modifiable à la main
- * dans l'écran de saisie : cette fonction ne fait que proposer le défaut.
+ * la plus courante) ; au-delà, on énumère les montants.
+ *
+ * Le pourcentage n'est mentionné que s'il tombe rond : « acompte de 50 % » se
+ * lit bien, « acompte de 33,34 % » non — dans ce cas seul le montant est
+ * annoncé, qui est de toute façon ce que le client doit régler. Le texte reste
+ * modifiable à la main : cette fonction ne fait que proposer le défaut.
  */
-export function paymentTermsSentence(installments: Installment[]): string {
+export function paymentTermsSentence(installments: InstallmentInput[]): string {
   if (installments.length === 0) return ''
+  const total = installments.reduce((sum, part) => sum + part.amountCents, 0)
+
+  /** « 50 % » si la part tombe sur un pour-cent entier, sinon rien. */
+  const roundShare = (amountCents: number): string | null => {
+    if (total === 0) return null
+    const bps = (amountCents * 10_000) / total
+    return Number.isInteger(bps) && bps % 100 === 0 ? formatShare(bps) : null
+  }
+
   if (installments.length === 1) {
     const only = installments[0]!
     const when = only.dueLabel.trim() || 'à réception de la présente facture'
     return `Modalités de paiement : règlement de la totalité, soit ${formatEuros(only.amountCents)}, ${when}.`
   }
+
   if (installments.length === 2) {
-    const [first, second] = installments as [Installment, Installment]
-    const firstWhen = first.dueLabel.trim() ? `${first.dueLabel.trim()}, ` : ''
+    const [first, second] = installments as [InstallmentInput, InstallmentInput]
+    const firstWhen = first.dueLabel.trim()
     const secondWhen = second.dueLabel.trim() || 'à la livraison'
-    return (
-      `Modalités de paiement : acompte de ${formatShare(first.shareBasisPoints)} ${firstWhen}` +
-      `soit ${formatEuros(first.amountCents)}, à régler à réception de la présente facture. ` +
-      `Le solde de ${formatShare(second.shareBasisPoints)}, soit ${formatEuros(second.amountCents)}, ` +
-      `sera dû ${secondWhen}.`
-    )
+    const firstShare = roundShare(first.amountCents)
+    const secondShare = roundShare(second.amountCents)
+
+    const acompte = firstShare
+      ? `acompte de ${firstShare}${firstWhen ? ` ${firstWhen}` : ''}, soit ${formatEuros(first.amountCents)}`
+      : `acompte de ${formatEuros(first.amountCents)}${firstWhen ? ` ${firstWhen}` : ''}`
+    const solde = secondShare
+      ? `Le solde de ${secondShare}, soit ${formatEuros(second.amountCents)},`
+      : `Le solde, soit ${formatEuros(second.amountCents)},`
+    return `Modalités de paiement : ${acompte}, à régler à réception de la présente facture. ${solde} sera dû ${secondWhen}.`
   }
+
   const parts = installments.map((part) => {
     const when = part.dueLabel.trim() ? ` ${part.dueLabel.trim()}` : ''
-    return `${formatShare(part.shareBasisPoints)} (${formatEuros(part.amountCents)})${when}`
+    return `${formatEuros(part.amountCents)}${when}`
   })
   return `Modalités de paiement : règlement en ${installments.length} fois — ${parts.join(', ')}.`
 }
 
-/** Mention de TVA. En franchise en base, l'article 293 B du CGI est obligatoire. */
+/**
+ * Mention de TVA. L'émetteur est en franchise en base (auto-entrepreneur) :
+ * l'article 293 B du CGI est alors une mention obligatoire.
+ */
 export function vatMention(vatRateBasisPoints: number): string {
   return vatRateBasisPoints === 0
     ? 'TVA non applicable, article 293 B du CGI'
@@ -235,17 +263,17 @@ export const DUE_LABEL_SUGGESTIONS = [
   'sous 30 jours',
 ]
 
-/** Échéancier par défaut pour un règlement en N fois. */
-export function defaultInstallments(count: number): InstallmentInput[] {
-  const shares = evenShares(count)
-  return shares.map((shareBasisPoints, index) => ({
-    shareBasisPoints,
+/** Échéancier par défaut pour un règlement « en N fois », à montants ronds. */
+export function defaultInstallments(totalCents: number, count: number): InstallmentInput[] {
+  const amounts = splitAmountsEvenly(totalCents, count)
+  return amounts.map((amountCents, index) => ({
+    amountCents,
     dueLabel:
       count === 1
         ? 'à réception de la présente facture'
         : index === 0
           ? 'à la commande'
-          : index === shares.length - 1
+          : index === amounts.length - 1
             ? 'à la livraison'
             : `échéance ${index + 1}`,
   }))

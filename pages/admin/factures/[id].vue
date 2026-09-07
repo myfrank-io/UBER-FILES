@@ -4,9 +4,11 @@ import {
   INVOICE_PRESETS,
   defaultInstallments,
   formatEuros,
+  formatShare,
   invoiceTotals,
   paymentTermsSentence,
-  splitInstallments,
+  shareBasisPoints,
+  splitAmountsEvenly,
 } from '~/lib/invoice'
 import type { CompanyMatch } from '~/server/utils/company-lookup'
 
@@ -51,7 +53,7 @@ interface LineForm {
   priceEuros: number
 }
 interface InstallmentForm {
-  sharePercent: number
+  amountEuros: number
   dueLabel: string
 }
 
@@ -65,10 +67,8 @@ const form = reactive({
   clientPhone: '',
   clientAddress: '',
   clientSiret: '',
-  clientVatNumber: '',
   issuedAt: '',
   dueDate: '',
-  vatRatePercent: 0,
   notes: '',
   paymentTerms: '',
 })
@@ -76,6 +76,9 @@ const lines = ref<LineForm[]>([])
 const installments = ref<InstallmentForm[]>([])
 /** Modalités retouchées à la main : on cesse alors de les régénérer. */
 const termsEdited = ref(false)
+/** Échéancier réglé à la main : on cesse alors de le re-répartir tout seul. */
+const installmentsEdited = ref(false)
+const scheduleWarning = ref(false)
 
 /** Date d'un champ <input type="date"> (AAAA-MM-JJ) depuis une date ISO. */
 function toDateInput(value: string | Date | null): string {
@@ -93,10 +96,8 @@ function seed(invoice: Invoice) {
   form.clientPhone = invoice.client.phone ?? ''
   form.clientAddress = invoice.client.address ?? ''
   form.clientSiret = invoice.client.siret ?? ''
-  form.clientVatNumber = invoice.client.vatNumber ?? ''
   form.issuedAt = toDateInput(invoice.issuedAt)
   form.dueDate = toDateInput(invoice.dueDate)
-  form.vatRatePercent = invoice.vatRateBps / 100
   form.notes = invoice.notes ?? ''
   form.paymentTerms = invoice.paymentTerms ?? ''
   lines.value = invoice.lines.map((line) => ({
@@ -105,9 +106,10 @@ function seed(invoice: Invoice) {
     priceEuros: line.unitPriceCents / 100,
   }))
   installments.value = invoice.installments.map((part) => ({
-    sharePercent: part.shareBps / 100,
+    amountEuros: part.amountCents / 100,
     dueLabel: part.dueLabel,
   }))
+  installmentsEdited.value = invoice.installments.length > 0
   termsEdited.value = Boolean(invoice.paymentTerms)
 }
 seed(data.value.invoice)
@@ -120,39 +122,69 @@ const contentLines = computed(() =>
     unitPriceCents: Math.round((Number(line.priceEuros) || 0) * 100),
   })),
 )
-const totals = computed(() => invoiceTotals(contentLines.value, Math.round(form.vatRatePercent * 100)))
-const shareTotal = computed(() => installments.value.reduce((sum, part) => sum + (Number(part.sharePercent) || 0), 0))
-const shareValid = computed(() => installments.value.length === 0 || Math.abs(shareTotal.value - 100) < 0.005)
-const splitParts = computed(() =>
-  splitInstallments(
-    totals.value.totalCents,
-    installments.value.map((part) => ({
-      shareBasisPoints: Math.round((Number(part.sharePercent) || 0) * 100),
-      dueLabel: part.dueLabel,
-    })),
-  ),
+const totals = computed(() => invoiceTotals(contentLines.value, 0))
+
+/** Les échéances telles qu'elles partiront au serveur : des montants. */
+const contentInstallments = computed(() =>
+  installments.value.map((part) => ({
+    amountCents: Math.round((Number(part.amountEuros) || 0) * 100),
+    dueLabel: part.dueLabel,
+  })),
+)
+const scheduledCents = computed(() => contentInstallments.value.reduce((sum, p) => sum + p.amountCents, 0))
+/** Le total des échéances doit couvrir la facture au centime près. */
+const scheduleValid = computed(
+  () => installments.value.length === 0 || scheduledCents.value === totals.value.totalCents,
 )
 
 /** Régénère la phrase des modalités depuis l'échéancier courant. */
 function regenerateTerms() {
-  form.paymentTerms = paymentTermsSentence(splitParts.value)
+  form.paymentTerms = paymentTermsSentence(contentInstallments.value)
   termsEdited.value = false
 }
 // Tant que la phrase n'a pas été retouchée, elle suit l'échéancier.
 watch(
-  [splitParts, () => totals.value.totalCents],
+  contentInstallments,
   () => {
-    if (!termsEdited.value) form.paymentTerms = paymentTermsSentence(splitParts.value)
+    if (!termsEdited.value) form.paymentTerms = paymentTermsSentence(contentInstallments.value)
   },
-  { deep: true },
+  { deep: true, immediate: true },
 )
 
-function setInstallmentCount(count: number) {
-  installments.value = defaultInstallments(count).map((part) => ({
-    sharePercent: part.shareBasisPoints / 100,
+// Le total change (une ligne ajoutée, un prix corrigé) : tant que l'échéancier
+// n'a pas été réglé à la main, il se re-répartit en montants ronds plutôt que
+// de rester sur des montants qui ne couvrent plus la facture.
+watch(
+  () => totals.value.totalCents,
+  (total) => {
+    if (installments.value.length > 0 && !installmentsEdited.value) {
+      setInstallmentCount(installments.value.length, false)
+    } else if (installments.value.length > 0 && scheduledCents.value !== total) {
+      scheduleWarning.value = true
+    }
+  },
+)
+
+/** Règle un règlement « en N fois » : des montants ronds, pas des pourcentages. */
+function setInstallmentCount(count: number, manual = true) {
+  installments.value = defaultInstallments(totals.value.totalCents, count).map((part) => ({
+    amountEuros: part.amountCents / 100,
     dueLabel: part.dueLabel,
   }))
+  if (manual) installmentsEdited.value = false
+  scheduleWarning.value = false
   termsEdited.value = false
+}
+
+/** Redistribue le total sur le nombre d'échéances en cours. */
+function redistribute() {
+  const amounts = splitAmountsEvenly(totals.value.totalCents, installments.value.length)
+  installments.value = installments.value.map((part, index) => ({
+    ...part,
+    amountEuros: (amounts[index] ?? 0) / 100,
+  }))
+  installmentsEdited.value = false
+  scheduleWarning.value = false
 }
 
 // ═══ Lignes ═══
@@ -215,8 +247,8 @@ const pdfUrl = computed(() => `/api/admin/invoices/${id}/pdf?v=${previewKey.valu
 const issuerMissing = computed(() => data.value?.issuer.missing ?? [])
 
 async function save() {
-  if (!shareValid.value) {
-    saveError.value = 'Les échéances doivent totaliser 100 %.'
+  if (!scheduleValid.value) {
+    saveError.value = `Les échéances totalisent ${formatEuros(scheduledCents.value)} au lieu de ${formatEuros(totals.value.totalCents)}.`
     return
   }
   saving.value = true
@@ -234,15 +266,10 @@ async function save() {
           clientPhone: form.clientPhone,
           clientAddress: form.clientAddress,
           clientSiret: form.clientSiret,
-          clientVatNumber: form.clientVatNumber,
           issuedAt: form.issuedAt || new Date().toISOString(),
           dueDate: form.dueDate || null,
-          vatRateBps: Math.round(form.vatRatePercent * 100),
           lines: contentLines.value,
-          installments: installments.value.map((part) => ({
-            shareBasisPoints: Math.round((Number(part.sharePercent) || 0) * 100),
-            dueLabel: part.dueLabel,
-          })),
+          installments: contentInstallments.value,
           paymentTerms: form.paymentTerms,
           notes: form.notes,
         },
@@ -423,10 +450,6 @@ async function removeInvoice() {
               <label class="label">Email</label>
               <input v-model="form.clientEmail" class="field" type="email" />
             </div>
-            <div>
-              <label class="label">N° TVA (facultatif)</label>
-              <input v-model="form.clientVatNumber" class="field" />
-            </div>
           </div>
         </section>
 
@@ -529,26 +552,26 @@ async function removeInvoice() {
             </button>
             <button
               class="rounded-full border border-slate-300 px-4 py-2 text-sm text-slate-500 transition hover:bg-slate-50"
-              @click="installments = []"
+              @click="installments = []; scheduleWarning = false"
             >
               Aucune mention
             </button>
           </div>
 
           <div v-for="(part, index) in installments" :key="index" class="mt-3 flex flex-wrap items-end gap-3">
-            <div class="w-24">
-              <label class="label">Part</label>
+            <div class="w-36">
+              <label class="label">Montant</label>
               <div class="relative">
                 <input
-                  v-model.number="part.sharePercent"
+                  v-model.number="part.amountEuros"
                   class="field pr-7"
                   type="number"
                   min="0"
-                  max="100"
-                  step="0.01"
-                  :data-testid="`share-${index}`"
+                  step="1"
+                  :data-testid="`amount-${index}`"
+                  @input="installmentsEdited = true"
                 />
-                <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">%</span>
+                <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">€</span>
               </div>
             </div>
             <div class="min-w-[180px] flex-1">
@@ -561,16 +584,23 @@ async function removeInvoice() {
                 :data-testid="`due-${index}`"
               />
             </div>
-            <p class="w-24 pb-3 text-right font-semibold text-slate-900">
-              {{ formatEuros(splitParts[index]?.amountCents ?? 0) }}
+            <p class="w-20 pb-3 text-right text-sm text-slate-400">
+              {{ formatShare(shareBasisPoints(contentInstallments[index]?.amountCents ?? 0, totals.totalCents)) }}
             </p>
           </div>
           <datalist id="due-labels">
             <option v-for="suggestion in DUE_LABEL_SUGGESTIONS" :key="suggestion" :value="suggestion" />
           </datalist>
 
-          <p v-if="!shareValid" class="mt-3 text-sm text-red-600" data-testid="share-error">
-            Les parts totalisent {{ shareTotal.toFixed(2) }} % : elles doivent faire 100 %.
+          <div v-if="!scheduleValid" class="mt-3 flex flex-wrap items-center gap-3" data-testid="schedule-error">
+            <p class="text-sm text-red-600">
+              Les échéances totalisent {{ formatEuros(scheduledCents) }} au lieu de
+              {{ formatEuros(totals.totalCents) }}.
+            </p>
+            <button class="btn-ghost !min-h-0 !py-1.5 text-xs" @click="redistribute">Répartir également</button>
+          </div>
+          <p v-else-if="scheduleWarning" class="mt-3 text-sm text-slate-500">
+            Le total a changé : vérifiez la répartition.
           </p>
 
           <div class="mt-5">
@@ -608,13 +638,10 @@ async function removeInvoice() {
             </div>
             <div>
               <label class="label">TVA</label>
-              <div class="relative">
-                <input v-model.number="form.vatRatePercent" class="field pr-7" type="number" min="0" max="100" step="0.1" />
-                <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">%</span>
-              </div>
-              <p class="mt-1 text-xs text-slate-500">
-                0 % = franchise en base : la facture porte la mention de l’article 293 B du CGI.
+              <p class="rounded-xl bg-slate-50 px-3.5 py-3 text-sm text-slate-600">
+                Non applicable — article 293 B du CGI
               </p>
+              <p class="mt-1 text-xs text-slate-500">Franchise en base : aucune TVA n’est facturée.</p>
             </div>
             <div class="sm:col-span-2">
               <label class="label">Note (facultatif)</label>

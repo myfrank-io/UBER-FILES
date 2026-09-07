@@ -114,17 +114,13 @@ const issuer = reactive({
   postalCode: '',
   city: '',
   siret: '',
-  vatNumber: '',
   numberPrefix: '',
 })
 
 watch(editingIssuer, (open) => {
   if (!open || !data.value) return
   issuerError.value = ''
-  Object.assign(issuer, {
-    ...data.value.issuer,
-    vatNumber: data.value.issuer.vatNumber ?? '',
-  })
+  Object.assign(issuer, data.value.issuer)
 })
 
 async function saveIssuer() {
@@ -133,7 +129,8 @@ async function saveIssuer() {
   try {
     await $fetch('/api/admin/invoice-issuer', {
       method: 'PUT',
-      body: { ...issuer, vatNumber: issuer.vatNumber.trim() || null },
+      // Auto-entrepreneur en franchise en base : aucun numéro de TVA à porter.
+      body: { ...issuer, vatNumber: null },
     })
     editingIssuer.value = false
     await refresh()
@@ -284,10 +281,6 @@ async function saveIssuer() {
         <div>
           <label class="label">SIRET</label>
           <input v-model="issuer.siret" class="field" placeholder="92065972900015" data-testid="issuer-siret" />
-        </div>
-        <div>
-          <label class="label">N° TVA (facultatif)</label>
-          <input v-model="issuer.vatNumber" class="field" placeholder="FR…" />
         </div>
         <div>
           <label class="label">Email</label>

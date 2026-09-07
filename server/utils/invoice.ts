@@ -5,7 +5,13 @@ import type { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from './prisma'
 import type { InvoiceRenderInput } from './invoice-pdf'
-import { invoiceTotals, nextInvoiceNumber, splitInstallments, type InstallmentInput } from '~/lib/invoice'
+import {
+  formatEuros,
+  invoiceTotals,
+  nextInvoiceNumber,
+  shareBasisPoints,
+  type InstallmentInput,
+} from '~/lib/invoice'
 
 /** Une facture chargée avec tout ce qui s'imprime dessus. */
 export const INVOICE_INCLUDE = {
@@ -126,11 +132,12 @@ export interface InvoiceContent {
 
 /**
  * Traduit le contenu saisi en écriture Prisma : totaux recalculés côté serveur
- * (jamais ceux envoyés par le client) et échéances réparties sur ce total.
+ * (jamais ceux envoyés par le client). Les échéances portent des MONTANTS ;
+ * la part en pour-cent n'est stockée que pour information, déduite du montant.
  */
 export function invoiceWriteData(content: InvoiceContent) {
   const { subtotalCents, vatCents, totalCents } = invoiceTotals(content.lines, content.vatRateBps)
-  const installments = splitInstallments(totalCents, content.installments)
+  const installments = content.installments
   return {
     invoice: {
       driverId: content.driverId,
@@ -153,7 +160,7 @@ export function invoiceWriteData(content: InvoiceContent) {
     lines: content.lines.map((line, position) => ({ ...line, position })),
     installments: installments.map((part, position) => ({
       position,
-      shareBps: part.shareBasisPoints,
+      shareBps: shareBasisPoints(part.amountCents, totalCents),
       dueLabel: part.dueLabel,
       amountCents: part.amountCents,
     })),
@@ -250,7 +257,7 @@ export const invoiceContentSchema = z
     installments: z
       .array(
         z.object({
-          shareBasisPoints: z.number().int().min(1).max(10_000),
+          amountCents: z.number().int().min(0).max(100_000_000),
           dueLabel: z.string().trim().max(120),
         }),
       )
@@ -261,11 +268,14 @@ export const invoiceContentSchema = z
   })
   .superRefine((value, ctx) => {
     if (value.installments.length === 0) return
-    const total = value.installments.reduce((sum, part) => sum + part.shareBasisPoints, 0)
-    if (total !== 10_000) {
+    // Les échéances doivent couvrir le total au centime près : une facture dont
+    // les règlements ne tombent pas juste est un litige garanti.
+    const total = invoiceTotals(value.lines, value.vatRateBps).totalCents
+    const scheduled = value.installments.reduce((sum, part) => sum + part.amountCents, 0)
+    if (scheduled !== total) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Les échéances doivent totaliser 100 %.',
+        message: `Les échéances totalisent ${formatEuros(scheduled)} au lieu de ${formatEuros(total)}.`,
         path: ['installments'],
       })
     }
