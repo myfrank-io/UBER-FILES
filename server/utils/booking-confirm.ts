@@ -3,6 +3,7 @@ import { prisma } from '~/server/utils/prisma'
 import { bookingSlot, findConflict } from '~/server/utils/calendar'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { notifyDriver } from '~/server/utils/notify-driver'
+import { bookingConfirmedPush } from '~/lib/driver-push'
 import { bookingConfirmedMessage, driverFirstName } from '~/server/utils/telegram'
 import { signClientToken } from '~/server/utils/tokens'
 
@@ -146,6 +147,20 @@ export async function confirmBookingFromQuote(quote: QuoteWithRelations, payment
         currency: quote.currency,
         paidOnline: true,
         conflictWarning: Boolean(conflict),
+      }),
+      push: bookingConfirmedPush({
+        customerName: req.customerName,
+        scheduledAt: req.scheduledAt,
+        timezone: quote.driver.timezone,
+        type: req.type,
+        durationHours: req.durationHours,
+        pickupAddress: req.pickupAddress,
+        dropoffAddress: req.dropoffAddress,
+        amountCents: quote.amountCents,
+        currency: quote.currency,
+        paidOnline: true,
+        conflictWarning: Boolean(conflict),
+        quoteId: quote.id,
       }),
     })
   } catch (err) {

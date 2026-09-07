@@ -6,6 +6,7 @@ import { createRefund } from '~/server/utils/stripe'
 import { getValidAccessToken, refundTransaction } from '~/server/utils/sumup'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { notifyDriver } from '~/server/utils/notify-driver'
+import { cancellationPush } from '~/lib/driver-push'
 import { driverFirstName } from '~/server/utils/telegram'
 import { formatMoney } from '~/lib/money'
 import { formatRideDateTime } from '~/lib/datetime'
@@ -139,6 +140,14 @@ export default defineEventHandler(async (event) => {
         `Course prévue le ${scheduledStr}\n` +
         `${refundStr}`,
     },
+    push: cancellationPush({
+      customerName: req.customerName,
+      scheduledAt: booking.scheduledAt,
+      timezone: booking.driver.timezone,
+      refundCents: refunded ? refund.refundCents : 0,
+      currency: booking.quote.currency,
+      bookingId: booking.id,
+    }),
   })
 
   return { ok: true, refundCents: refund.refundCents, retainedCents: refund.retainedCents }

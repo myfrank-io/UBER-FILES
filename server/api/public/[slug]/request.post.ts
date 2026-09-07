@@ -8,6 +8,7 @@ import { PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-m
 import { prisma } from '~/server/utils/prisma'
 import { newRequestMessage, driverFirstName } from '~/server/utils/telegram'
 import { notifyDriver } from '~/server/utils/notify-driver'
+import { newRequestPush } from '~/lib/driver-push'
 import { emailTemplates, sendEmail } from '~/server/utils/email'
 import { sendQuoteToClient } from '~/server/utils/quote-actions'
 import { createQuoteCheckoutUrl } from '~/server/utils/checkout'
@@ -261,6 +262,21 @@ export default defineEventHandler(async (event) => {
         quoteId: quote.id,
         hasConflict: Boolean(conflict),
         autoSent,
+      }),
+      push: newRequestPush({
+        customerName: input.customer.name,
+        scheduledAt,
+        timezone: driver.timezone,
+        type: input.type,
+        durationHours: input.durationHours,
+        pickupAddress: pickupDisplay,
+        dropoffAddress: input.dropoffAddress,
+        airportLabel,
+        amountCents: computation.price.amountCents,
+        currency: computation.price.currency,
+        hasConflict: Boolean(conflict),
+        autoSent,
+        quoteId: quote.id,
       }),
     })
   }

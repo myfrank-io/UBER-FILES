@@ -3,6 +3,7 @@ import { prisma } from './prisma'
 import { bookingSlot, findConflict } from './calendar'
 import { sendEmail, emailTemplates } from './email'
 import { notifyDriver } from './notify-driver'
+import { bookingConfirmedPush } from '~/lib/driver-push'
 import { bookingConfirmedMessage, driverFirstName } from './telegram'
 import { signClientToken } from './tokens'
 import { isQuotePaymentExpired } from './quote-status'
@@ -187,6 +188,20 @@ export async function confirmQuoteOnSite(
         currency: quote.currency,
         paidOnline: false,
         methodLabel: PAYMENT_METHOD_LABELS[method],
+      }),
+      push: bookingConfirmedPush({
+        customerName: req.customerName,
+        scheduledAt: req.scheduledAt,
+        timezone: quote.driver.timezone,
+        type: req.type,
+        durationHours: req.durationHours,
+        pickupAddress: req.pickupAddress,
+        dropoffAddress: req.dropoffAddress,
+        amountCents: quote.amountCents,
+        currency: quote.currency,
+        paidOnline: false,
+        methodLabel: PAYMENT_METHOD_LABELS[method],
+        quoteId: quote.id,
       }),
     })
   } catch (err) {

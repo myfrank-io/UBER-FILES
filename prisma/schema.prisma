@@ -138,6 +138,8 @@ model Driver {
   // Notifications
   telegramChatId String?
   telegramLinkCode String? @unique // code d'appairage du bot
+  // Notifications push de l'app (PWA) : un abonnement par appareil.
+  pushSubscriptions PushSubscription[]
 
   // Parcours de configuration guidée (/configuration). Le lien est généré par
   // l'admin uniquement ; le jeton ouvre une session chauffeur limitée au
@@ -1049,4 +1051,25 @@ model InvoiceProduct {
   updatedAt DateTime @updatedAt
 
   @@index([position])
+}
+
+/// Abonnement aux notifications push (PWA) : un par appareil/navigateur du
+/// chauffeur, enregistré depuis Réglages › Général. Supprimé automatiquement
+/// dès que le service push le déclare expiré ou révoqué (app désinstallée).
+model PushSubscription {
+  id       String @id @default(cuid())
+  driverId String
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  /// URL d'envoi fournie par le service push (Apple, Google…) — unique par appareil.
+  endpoint  String  @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+
+  createdAt  DateTime  @default(now())
+  /// Dernier envoi réussi vers cet appareil.
+  lastUsedAt DateTime?
+
+  @@index([driverId])
 }

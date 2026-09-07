@@ -1983,6 +1983,9 @@ async function call(key: string, fn: () => Promise<unknown>) {
 
       <!-- Application mobile (PWA) -->
       <DashboardInstallCard />
+
+      <!-- Notifications push de l'application -->
+      <DashboardPushCard />
     </div>
   </div>
 </template>

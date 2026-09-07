@@ -142,7 +142,10 @@ layout dashboard et le service worker n'est enregistré que sur `/dashboard`
 (`plugins/pwa.client.ts`) : la page publique d'un chauffeur reste un site classique
 pour ses clients. Le service worker ne précache que le build (`_nuxt`, polices,
 icônes) — jamais `/api/**` ni le HTML. Une nouvelle version se signale par un bandeau
-« Actualiser », sans rechargement automatique.
+« Actualiser », sans rechargement automatique. Une fois installée, l'app peut recevoir des
+**notifications push** (`server/utils/push.ts`, gestionnaires dans `public/push-sw.js`) :
+troisième canal de `notifyDriver` après l'email et Telegram, à chaque étape d'une réservation
+(nouvelle demande, confirmation, report, annulation, rappel, retour client).
 
 ## Configuration des intégrations (production)
 
@@ -153,6 +156,7 @@ icônes) — jamais `/api/**` ni le HTML. Une nouvelle version se signale par un
 | Google Maps | `GOOGLE_MAPS_API_KEY` | Restreindre la clé (Places + Routes). Sans clé : repli haversine + Base Adresse Nationale (data.gouv.fr) |
 | Resend | `RESEND_API_KEY`, `EMAIL_FROM` | Vérifier SPF/DKIM du domaine |
 | Telegram | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_BOT_USERNAME` | Webhook : `/api/webhooks/telegram`. Chaque chauffeur lie son compte depuis ses réglages (opt-in) |
+| Push (PWA) | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Générer : `npx web-push generate-vapid-keys`. Le chauffeur active les notifications depuis Réglages › Général (iPhone : app ajoutée à l'écran d'accueil requise). Sans clés : journalisées |
 | INSEE | `INSEE_API_KEY` | Vérification SIREN à l'onboarding |
 
 > Sans clés, l'application fonctionne en mode dégradé (emails/Telegram journalisés, itinéraires
