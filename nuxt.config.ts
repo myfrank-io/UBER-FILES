@@ -226,11 +226,12 @@ export default defineNuxtConfig({
             'Ridewiz — Réservez votre chauffeur VTC privé : devis instantané, paiement sécurisé, créneau garanti.',
         },
         { name: 'theme-color', content: '#0E1B2C' },
-        // Nom de l'icône quand une page est ajoutée à l'écran d'accueil iOS —
-        // sans lui, Safari reprend le <title> complet de la page. Les pages en
-        // marque blanche des chauffeurs (/{slug}, /carte/{slug}) le remplacent
-        // par le nom du chauffeur.
+        // Nom de l'icône quand une page est ajoutée à l'écran d'accueil, quelle
+        // que soit la page (accueil, connexion, page publique d'un chauffeur…) :
+        // toujours « Ridewiz ». Sans ces balises, Safari (iOS) et Chrome
+        // (Android, hors manifeste) reprennent le <title> complet de la page.
         { name: 'apple-mobile-web-app-title', content: 'Ridewiz' },
+        { name: 'application-name', content: 'Ridewiz' },
       ],
       // Favicon Ridewiz (picto « itinéraire », variante fond nuit de la charte).
       // Les typographies de la charte sont auto-hébergées via @nuxt/fonts.
