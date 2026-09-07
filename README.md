@@ -16,6 +16,7 @@ créneau est **bloqué dans le calendrier** du chauffeur.
 - **Resend** (emails transactionnels — canal de notification principal) · **Telegram Bot**
   (optionnel, coupé par défaut) · **API Sirene INSEE**
 - Tests : **Vitest** (logique métier) + **Playwright** (E2E)
+- **PWA** (`@vite-pwa/nuxt`) — espace chauffeur installable sur l'écran d'accueil, sans store
 
 ## Démarrage rapide
 
@@ -131,6 +132,17 @@ Déclenchés via un cron externe appelant l'endpoint protégé :
 ```bash
 curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://votre-domaine/api/cron/reminders
 ```
+
+### Application mobile (PWA)
+
+L'espace chauffeur s'installe sur l'écran d'accueil du téléphone sans passer par un
+store (Android : invite native ; iOS : Partager → « Sur l'écran d'accueil ») — module
+`@vite-pwa/nuxt`, bloc `pwa` de `nuxt.config.ts`. Le manifeste n'est lié que par le
+layout dashboard et le service worker n'est enregistré que sur `/dashboard`
+(`plugins/pwa.client.ts`) : la page publique d'un chauffeur reste un site classique
+pour ses clients. Le service worker ne précache que le build (`_nuxt`, polices,
+icônes) — jamais `/api/**` ni le HTML. Une nouvelle version se signale par un bandeau
+« Actualiser », sans rechargement automatique.
 
 ## Configuration des intégrations (production)
 
