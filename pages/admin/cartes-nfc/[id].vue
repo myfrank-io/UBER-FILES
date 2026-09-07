@@ -130,6 +130,16 @@ function removeLogo() {
   useCardLogo.value = false
 }
 
+// Banque de logos : un modèle choisi devient le logo importé (PNG transparent),
+// à enregistrer comme n'importe quel logo.
+const logoBank = ref(false)
+function onLogoPicked(dataUrl: string) {
+  pendingLogo.value = dataUrl
+  useCardLogo.value = false
+  logoBank.value = false
+  resetLogoPlacement()
+}
+
 function takeCardLogo() {
   // Aperçu impossible avant sauvegarde (le blob est côté serveur) : on
   // enregistre tout de suite, le logo apparaît au retour.
@@ -276,11 +286,20 @@ const productLabels = NFC_CARD_PRODUCT_LABELS
                   <button class="text-red-600 hover:underline" type="button" @click="removeLogo">Retirer</button>
                 </div>
               </div>
-              <button v-else type="button" class="text-sm text-slate-600" @click="logoInput?.click()">
-                <span class="font-semibold text-brand-700">Importer un logo</span> ou le déposer ici
-              </button>
+              <div v-else class="flex flex-col items-center gap-2">
+                <button type="button" class="text-sm text-slate-600" @click="logoInput?.click()">
+                  <span class="font-semibold text-brand-700">Importer un logo</span> ou le déposer ici
+                </button>
+                <span class="text-xs text-slate-400">ou</span>
+                <button type="button" class="btn-primary !min-h-0 !px-4 !py-2 text-sm" data-testid="logo-bank-open" @click="logoBank = true">
+                  ✨ Créer un logo
+                </button>
+              </div>
             </div>
             <input ref="logoInput" type="file" accept="image/png,image/jpeg" class="hidden" @change="onLogoInput" />
+            <button v-if="logoSrc" type="button" class="mt-2 mr-3 text-xs text-brand-700 hover:underline" @click="logoBank = true">
+              ✨ Créer un autre logo
+            </button>
             <button
               v-if="data.driver.cardLogoAvailable"
               type="button"
@@ -444,6 +463,17 @@ const productLabels = NFC_CARD_PRODUCT_LABELS
         </div>
       </div>
     </div>
+
+    <LogoBankModal
+      v-if="logoBank && data"
+      :driver-name="data.driver.displayName"
+      :company-name="data.driver.companyName"
+      :title="form.title"
+      :bg-color="form.bgColor"
+      :fg-color="form.fgColor"
+      @close="logoBank = false"
+      @pick="onLogoPicked"
+    />
 
     <!-- Confirmation d'envoi -->
     <AppModal v-if="confirmSend" @close="confirmSend = false">

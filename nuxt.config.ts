@@ -16,6 +16,10 @@ export default defineNuxtConfig({
       { name: 'DM Serif Display', weights: [400], styles: ['normal', 'italic'] },
       { name: 'DM Sans', weights: [400, 500, 600, 700] },
       { name: 'Space Grotesk', weights: [500, 600] },
+      // Banque de logos (admin, canvas) : deux serifs « haut de gamme ». Injectées
+      // globalement car aucune règle CSS ne les référence.
+      { name: 'Cormorant Garamond', weights: [600], styles: ['normal', 'italic'], global: true },
+      { name: 'Cinzel', weights: [600], global: true },
     ],
   },
 
