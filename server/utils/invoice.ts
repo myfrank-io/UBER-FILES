@@ -8,14 +8,17 @@ import { prisma } from './prisma'
 import type { InvoiceRenderInput } from './invoice-pdf'
 import {
   formatEuros,
+  invoiceSettlement,
   invoiceTotals,
   lineDiscountCents,
   lineGrossCents,
   lineNetCents,
   nextInvoiceNumber,
   shareBasisPoints,
+  statusFromInstallments,
   type DiscountKind,
   type InstallmentInput,
+  type InvoiceStatusLike,
 } from '~/lib/invoice'
 
 /** Une facture chargée avec tout ce qui s'imprime dessus. */
@@ -149,13 +152,52 @@ export function serializeInvoice(invoice: InvoiceWithRelations) {
       shareBps: part.shareBps,
       dueLabel: part.dueLabel,
       amountCents: part.amountCents,
+      paidAt: part.paidAt,
     })),
+    // Encaissé / restant, calculé ici pour que tous les écrans affichent le
+    // même chiffre sans le recalculer chacun à sa façon.
+    settlement: invoiceSettlement(invoice),
     sentAt: invoice.sentAt,
     sentCount: invoice.sentCount,
     paidAt: invoice.paidAt,
     createdAt: invoice.createdAt,
     updatedAt: invoice.updatedAt,
   }
+}
+
+/**
+ * Sélection minimale pour calculer une position de trésorerie : inutile de
+ * charger les lignes et le client pour additionner des échéances.
+ */
+export const SETTLEMENT_SELECT = {
+  status: true,
+  totalCents: true,
+  installments: { select: { amountCents: true, paidAt: true }, orderBy: { position: 'asc' as const } },
+} as const
+
+/** Facture réduite à ce que le calcul de règlement lit. */
+export type SettlementRow = {
+  status: InvoiceStatusLike
+  totalCents: number
+  installments: { amountCents: number; paidAt: Date | null }[]
+}
+
+/**
+ * Applique à une facture le statut que ses encaissements imposent, et remet
+ * `paidAt` en cohérence. Renvoie la facture rechargée.
+ *
+ * Appelé après chaque cochage : le statut de la facture est une CONSÉQUENCE des
+ * échéances, jamais une saisie parallèle qui pourrait les contredire.
+ */
+export async function syncInvoiceStatus(invoiceId: string): Promise<InvoiceWithRelations> {
+  const invoice = await findInvoiceOr404(invoiceId)
+  const status = statusFromInstallments(invoice)
+  if (status === invoice.status) return invoice
+  return prisma.invoice.update({
+    where: { id: invoiceId },
+    data: { status, paidAt: status === 'PAID' ? (invoice.paidAt ?? new Date()) : null },
+    include: INVOICE_INCLUDE,
+  })
 }
 
 /** Le contenu modifiable d'une facture, partagé par la création et la mise à jour. */

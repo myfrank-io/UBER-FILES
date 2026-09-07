@@ -2,6 +2,8 @@ import { requireAdmin } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import { setupLinkUrl, setupProgress } from '~/server/utils/setup'
 import { setupLinkStatus } from '~/lib/setup-flow'
+import { INVOICE_INCLUDE, serializeInvoice } from '~/server/utils/invoice'
+import { cashPosition } from '~/lib/invoice'
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event)
@@ -17,7 +19,7 @@ export default defineEventHandler(async (event) => {
 
   if (!driver) throw createError({ statusCode: 404, statusMessage: 'Chauffeur introuvable.' })
 
-  const [revenue, upcoming, progress] = await Promise.all([
+  const [revenue, upcoming, progress, invoices] = await Promise.all([
     prisma.payment.aggregate({
       where: { driverId: id, status: 'PAID' },
       _sum: { amountCents: true },
@@ -29,9 +31,24 @@ export default defineEventHandler(async (event) => {
     // Avancement du parcours (même calcul que l'écran du chauffeur), même sans
     // lien : un chauffeur existant a déjà une partie de sa configuration faite.
     driver.user ? setupProgress(id) : Promise.resolve(null),
+    // Ce que Ridewiz a facturé À ce chauffeur (accès, paramétrage, cartes) —
+    // à ne pas confondre avec `revenue`, qui est ce que LUI encaisse de ses
+    // clients.
+    prisma.invoice.findMany({
+      where: { driverId: id },
+      include: INVOICE_INCLUDE,
+      orderBy: { issuedAt: 'desc' },
+      take: 50,
+    }),
   ])
 
   return {
+    // Facturation Ridewiz → chauffeur : le détail des factures et la position
+    // de trésorerie qui en découle (encaissé / reste à recevoir).
+    billing: {
+      invoices: invoices.map(serializeInvoice),
+      ...cashPosition(invoices),
+    },
     id: driver.id,
     slug: driver.slug,
     displayName: driver.displayName,

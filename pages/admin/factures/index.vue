@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatEuros } from '~/lib/invoice'
+import { INVOICE_STATUS_CLASSES, INVOICE_STATUS_LABELS, formatEuros } from '~/lib/invoice'
 
 // Facturation : liste des factures émises, création d'un brouillon, et
 // identité légale de l'émetteur (imprimée en pied de chaque facture).
@@ -12,18 +12,8 @@ const { data, refresh, pending } = await useFetch('/api/admin/invoices')
 const search = ref('')
 const statusFilter = ref<'' | 'DRAFT' | 'SENT' | 'PAID' | 'CANCELLED'>('')
 
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: 'Brouillon',
-  SENT: 'Envoyée',
-  PAID: 'Payée',
-  CANCELLED: 'Annulée',
-}
-const STATUS_CLASSES: Record<string, string> = {
-  DRAFT: 'bg-slate-100 text-slate-600',
-  SENT: 'bg-amber-100 text-amber-800',
-  PAID: 'bg-green-100 text-green-700',
-  CANCELLED: 'bg-red-100 text-red-700',
-}
+const STATUS_LABELS = INVOICE_STATUS_LABELS
+const STATUS_CLASSES = INVOICE_STATUS_CLASSES
 
 const invoices = computed(() => {
   const term = search.value.trim().toLowerCase()

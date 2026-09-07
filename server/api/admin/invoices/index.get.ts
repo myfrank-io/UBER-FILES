@@ -7,8 +7,11 @@ import {
   loadProducts,
   missingIssuerFields,
   serializeInvoice,
+  SETTLEMENT_SELECT,
   suggestNextNumber,
+  type SettlementRow,
 } from '~/server/utils/invoice'
+import { cashPosition } from '~/lib/invoice'
 
 // Liste des factures pour l'écran d'administration, avec de quoi en ouvrir une
 // nouvelle sans second aller-retour (numéro suggéré, identité de l'émetteur,
@@ -24,7 +27,7 @@ export default defineEventHandler(async (event) => {
   if (!q.success) throw createError({ statusCode: 400, statusMessage: 'Filtre invalide.' })
   const { q: search, status } = q.data
 
-  const [invoices, issuer, drivers, suggestedNumber, products] = await Promise.all([
+  const [invoices, issuer, drivers, suggestedNumber, products, allInvoices] = await Promise.all([
     prisma.invoice.findMany({
       where: {
         ...(status ? { status } : {}),
@@ -49,11 +52,12 @@ export default defineEventHandler(async (event) => {
     }),
     suggestNextNumber(),
     loadProducts(),
+    // Les chiffres d'en-tête décrivent TOUT le livre de factures, pas la liste
+    // filtrée : sinon la trésorerie changerait en tapant dans la recherche.
+    prisma.invoice.findMany({ select: { status: true, ...SETTLEMENT_SELECT } }),
   ])
 
-  // Chiffres d'en-tête : le total encaissé et ce qui reste à encaisser.
-  const paidCents = invoices.filter((i) => i.status === 'PAID').reduce((sum, i) => sum + i.totalCents, 0)
-  const pendingCents = invoices.filter((i) => i.status === 'SENT').reduce((sum, i) => sum + i.totalCents, 0)
+  const cash = cashPosition(allInvoices as SettlementRow[])
 
   return {
     invoices: invoices.map(serializeInvoice),
@@ -62,10 +66,13 @@ export default defineEventHandler(async (event) => {
     drivers,
     products,
     stats: {
-      total: invoices.length,
-      draft: invoices.filter((i) => i.status === 'DRAFT').length,
-      paidCents,
-      pendingCents,
+      total: allInvoices.length,
+      draft: allInvoices.filter((i) => i.status === 'DRAFT').length,
+      // Encaissé / à recevoir au sens des ÉCHÉANCES : une facture réglée en
+      // partie compte pour ce qu'elle a rapporté, pas tout ou rien.
+      paidCents: cash.collectedCents,
+      pendingCents: cash.outstandingCents,
+      draftCents: cash.draftCents,
     },
   }
 })

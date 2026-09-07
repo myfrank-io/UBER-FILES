@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import {
   DUE_LABEL_SUGGESTIONS,
+  INVOICE_STATUS_CLASSES,
+  INVOICE_STATUS_LABELS,
   defaultInstallments,
   discountLabel,
   formatEuros,
@@ -24,6 +26,7 @@ definePageMeta({ layout: 'default', middleware: 'admin' })
 const route = useRoute()
 const id = route.params.id as string
 const toast = useToast()
+const { formatDateTime } = useFormat()
 
 const { data, refresh } = await useFetch(`/api/admin/invoices/${id}`)
 if (!data.value) throw createError({ statusCode: 404, statusMessage: 'Facture introuvable.' })
@@ -31,18 +34,29 @@ useHead({ title: () => `Facture n°${data.value?.invoice.number ?? '…'} — Ad
 
 type Invoice = NonNullable<typeof data.value>['invoice']
 
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: 'Brouillon',
-  SENT: 'Envoyée',
-  PAID: 'Payée',
-  CANCELLED: 'Annulée',
+// ─── Encaissement des échéances ─────────────────────────────────────────────
+// Se lit sur l'état ENREGISTRÉ (data.invoice), jamais sur le brouillon du
+// formulaire : cocher « reçu » est un fait comptable, pas une modification de
+// la facture en cours de saisie.
+const savedInstallments = computed(() => data.value?.invoice.installments ?? [])
+const settlement = computed(() => data.value?.invoice.settlement)
+const togglingPart = ref<string | null>(null)
+
+async function togglePart(partId: string, paid: boolean) {
+  togglingPart.value = partId
+  try {
+    await $fetch(`/api/admin/invoices/${id}/installments/${partId}`, { method: 'PATCH', body: { paid } })
+    await refresh()
+    form.status = data.value!.invoice.status
+  } catch (e) {
+    toast.error((e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Enregistrement impossible.')
+  } finally {
+    togglingPart.value = null
+  }
 }
-const STATUS_CLASSES: Record<string, string> = {
-  DRAFT: 'bg-slate-100 text-slate-600',
-  SENT: 'bg-amber-100 text-amber-800',
-  PAID: 'bg-green-100 text-green-700',
-  CANCELLED: 'bg-red-100 text-red-700',
-}
+
+const STATUS_LABELS = INVOICE_STATUS_LABELS
+const STATUS_CLASSES = INVOICE_STATUS_CLASSES
 
 function apiError(e: unknown, fallback = 'Erreur.') {
   return (e as { data?: { statusMessage?: string } })?.data?.statusMessage || fallback
@@ -842,6 +856,51 @@ async function removeInvoice() {
           <p v-if="data?.invoice.sentCount" class="mt-3 text-sm text-slate-500">
             Envoyée {{ data.invoice.sentCount }} fois.
           </p>
+
+          <!-- Encaissements : une case par échéance, sur l'état enregistré.
+               Tout coché solde la facture ; en décocher une la remet en attente. -->
+          <div v-if="savedInstallments.length" class="mt-5 border-t border-slate-200 pt-4" data-testid="settlement">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 class="text-sm font-semibold text-slate-900">Encaissements</h3>
+              <p v-if="settlement" class="text-sm">
+                <span class="font-semibold text-green-700">{{ formatEuros(settlement.collectedCents) }}</span>
+                <span class="text-slate-400"> reçus · </span>
+                <span class="font-semibold text-amber-800">{{ formatEuros(settlement.outstandingCents) }}</span>
+                <span class="text-slate-400"> restants</span>
+              </p>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">Cochez une échéance quand l'argent est arrivé.</p>
+            <ul class="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200">
+              <li
+                v-for="(part, index) in savedInstallments"
+                :key="part.id"
+                class="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5"
+              >
+                <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                  <input
+                    type="checkbox"
+                    class="h-5 w-5 shrink-0 rounded border-slate-300 text-brand-600 focus:ring-brand-500 disabled:opacity-40"
+                    :checked="Boolean(part.paidAt)"
+                    :disabled="togglingPart === part.id || form.status === 'CANCELLED'"
+                    :data-testid="`settle-${index + 1}`"
+                    @change="togglePart(part.id, ($event.target as HTMLInputElement).checked)"
+                  />
+                  <span class="min-w-0">
+                    <span class="block truncate text-sm" :class="part.paidAt ? 'text-slate-500 line-through' : 'text-slate-900'">
+                      {{ part.dueLabel || `Échéance ${index + 1}` }}
+                    </span>
+                    <span v-if="part.paidAt" class="block text-xs text-green-700">Encaissé le {{ formatDateTime(part.paidAt) }}</span>
+                  </span>
+                </label>
+                <span class="font-serif text-base" :class="part.paidAt ? 'text-green-700' : 'text-slate-900'">
+                  {{ formatEuros(part.amountCents) }}
+                </span>
+              </li>
+            </ul>
+            <p class="mt-2 text-xs text-slate-400">
+              L'échéancier ci-contre reste modifiable : les encaissements déjà cochés suivent leur rang.
+            </p>
+          </div>
 
           <!-- Lien public : le chauffeur ouvre sa facture sans compte. -->
           <div class="mt-5 border-t border-slate-200 pt-4">

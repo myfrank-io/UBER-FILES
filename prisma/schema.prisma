@@ -1017,6 +1017,11 @@ model InvoiceInstallment {
   dueLabel    String
   amountCents Int
 
+  /// Date d'encaissement de CETTE échéance (null = pas encore reçue). C'est la
+  /// seule source de vérité du « cash encaissé » : le statut de la facture en
+  /// découle, jamais l'inverse.
+  paidAt DateTime?
+
   @@index([invoiceId])
 }
 

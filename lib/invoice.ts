@@ -90,6 +90,134 @@ export function invoiceTotals(lines: InvoiceLineInput[], vatRateBasisPoints = 0)
   return { grossCents, discountCents, subtotalCents, vatCents, totalCents: subtotalCents + vatCents }
 }
 
+/** Libellés des statuts, partagés par tous les écrans qui affichent une facture. */
+export const INVOICE_STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'Brouillon',
+  SENT: 'Envoyée',
+  PAID: 'Payée',
+  CANCELLED: 'Annulée',
+}
+
+/** Pastille de statut (classes Tailwind), même code couleur partout. */
+export const INVOICE_STATUS_CLASSES: Record<string, string> = {
+  DRAFT: 'bg-slate-100 text-slate-600',
+  SENT: 'bg-amber-100 text-amber-800',
+  PAID: 'bg-green-100 text-green-700',
+  CANCELLED: 'bg-red-100 text-red-700',
+}
+
+// ─── Règlement : ce qui est encaissé, ce qui reste à recevoir ────────────────
+
+/** Les quatre états d'une facture, tels qu'ils vivent en base. */
+export type InvoiceStatusLike = 'DRAFT' | 'SENT' | 'PAID' | 'CANCELLED'
+
+/** Une échéance vue par le calcul de règlement : un montant, encaissé ou non. */
+export interface SettlementPart {
+  amountCents: number
+  /** Date d'encaissement, ou null tant que l'argent n'est pas arrivé. */
+  paidAt: Date | string | null
+}
+
+export interface SettlementInvoice {
+  status: InvoiceStatusLike
+  totalCents: number
+  installments: SettlementPart[]
+}
+
+export interface Settlement {
+  /** Montant réellement dû par le client (0 pour une facture annulée). */
+  billedCents: number
+  collectedCents: number
+  outstandingCents: number
+  /** Échéances encaissées / nombre total (1 quand il n'y a pas d'échéancier). */
+  paidCount: number
+  partCount: number
+  fullyPaid: boolean
+}
+
+/**
+ * Règlement d'UNE facture.
+ *
+ * Une facture sans échéancier est traitée comme une échéance unique du total,
+ * encaissée si son statut est PAYÉE : les deux formes se comptent alors de la
+ * même façon, et l'appelant n'a pas à distinguer les cas.
+ *
+ * Une facture ANNULÉE ne doit plus rien : ni encaissée, ni à recevoir. On ne la
+ * compte nulle part plutôt que de la faire apparaître comme un impayé éternel.
+ */
+export function invoiceSettlement(invoice: SettlementInvoice): Settlement {
+  if (invoice.status === 'CANCELLED') {
+    return { billedCents: 0, collectedCents: 0, outstandingCents: 0, paidCount: 0, partCount: 0, fullyPaid: false }
+  }
+
+  const parts: SettlementPart[] = invoice.installments.length
+    ? invoice.installments
+    : [{ amountCents: invoice.totalCents, paidAt: invoice.status === 'PAID' ? new Date(0) : null }]
+
+  let collectedCents = 0
+  let outstandingCents = 0
+  let paidCount = 0
+  for (const part of parts) {
+    if (part.paidAt) {
+      collectedCents += part.amountCents
+      paidCount++
+    } else {
+      outstandingCents += part.amountCents
+    }
+  }
+
+  return {
+    billedCents: collectedCents + outstandingCents,
+    collectedCents,
+    outstandingCents,
+    paidCount,
+    partCount: parts.length,
+    fullyPaid: parts.length > 0 && paidCount === parts.length,
+  }
+}
+
+export interface CashPosition {
+  collectedCents: number
+  outstandingCents: number
+  /** Ce que porteraient les brouillons s'ils étaient envoyés (compté à part). */
+  draftCents: number
+  billedCents: number
+}
+
+/**
+ * Position de trésorerie sur un ensemble de factures.
+ *
+ * Un BROUILLON n'est pas une créance : il n'a pas été envoyé, le client ne doit
+ * rien. Il ne compte donc pas dans « à recevoir » — il est isolé dans
+ * `draftCents` pour que l'écran puisse le mentionner sans mentir sur le reste à
+ * encaisser. Une échéance cochée sur un brouillon, elle, est bien de l'argent
+ * reçu : on la compte.
+ */
+export function cashPosition(invoices: SettlementInvoice[]): CashPosition {
+  const position: CashPosition = { collectedCents: 0, outstandingCents: 0, draftCents: 0, billedCents: 0 }
+  for (const invoice of invoices) {
+    const settlement = invoiceSettlement(invoice)
+    position.collectedCents += settlement.collectedCents
+    position.billedCents += settlement.billedCents
+    if (invoice.status === 'DRAFT') position.draftCents += settlement.outstandingCents
+    else position.outstandingCents += settlement.outstandingCents
+  }
+  return position
+}
+
+/**
+ * Statut qu'une facture DOIT avoir au vu de ses encaissements. Le statut suit
+ * les échéances, jamais l'inverse : cocher la dernière échéance solde la
+ * facture, en décocher une la remet en attente.
+ *
+ * Les brouillons et les annulées ne bougent pas : un brouillon soldé reste un
+ * brouillon (il n'a jamais été émis), une annulée reste annulée.
+ */
+export function statusFromInstallments(invoice: SettlementInvoice): InvoiceStatusLike {
+  if (invoice.status === 'DRAFT' || invoice.status === 'CANCELLED') return invoice.status
+  return invoiceSettlement(invoice).fullyPaid ? 'PAID' : 'SENT'
+}
+
 /**
  * Découpe un total en `count` échéances RONDES. Chaque échéance est un nombre
  * entier d'euros ; les euros qui ne tombent pas juste sont distribués un par un

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   DUE_LABEL_SUGGESTIONS,
+  cashPosition,
+  invoiceSettlement,
+  statusFromInstallments,
   LATE_PAYMENT_MENTION,
   defaultInstallments,
   formatEuros,
@@ -365,5 +368,99 @@ describe('lien public et message WhatsApp', () => {
       paymentTerms: null,
     })
     expect(message).not.toContain('Modalités')
+  })
+})
+
+describe('règlement d’une facture', () => {
+  const part = (amountCents: number, paid = false) => ({ amountCents, paidAt: paid ? new Date() : null })
+
+  it('compte ce qui est encaissé et ce qui reste, échéance par échéance', () => {
+    const s = invoiceSettlement({
+      status: 'SENT',
+      totalCents: 60_000,
+      installments: [part(20_000, true), part(20_000), part(20_000)],
+    })
+    expect(s.collectedCents).toBe(20_000)
+    expect(s.outstandingCents).toBe(40_000)
+    expect(s.billedCents).toBe(60_000)
+    expect(s.paidCount).toBe(1)
+    expect(s.partCount).toBe(3)
+    expect(s.fullyPaid).toBe(false)
+  })
+
+  it('solde la facture quand toutes les échéances sont cochées', () => {
+    const s = invoiceSettlement({
+      status: 'SENT',
+      totalCents: 40_000,
+      installments: [part(20_000, true), part(20_000, true)],
+    })
+    expect(s.collectedCents).toBe(40_000)
+    expect(s.outstandingCents).toBe(0)
+    expect(s.fullyPaid).toBe(true)
+  })
+
+  it('sans échéancier : la facture entière tient lieu d’échéance unique', () => {
+    expect(invoiceSettlement({ status: 'SENT', totalCents: 40_000, installments: [] })).toMatchObject({
+      collectedCents: 0,
+      outstandingCents: 40_000,
+      partCount: 1,
+      fullyPaid: false,
+    })
+    expect(invoiceSettlement({ status: 'PAID', totalCents: 40_000, installments: [] })).toMatchObject({
+      collectedCents: 40_000,
+      outstandingCents: 0,
+      fullyPaid: true,
+    })
+  })
+
+  it('une facture annulée ne doit plus rien, même partiellement encaissée', () => {
+    const s = invoiceSettlement({
+      status: 'CANCELLED',
+      totalCents: 60_000,
+      installments: [part(20_000, true), part(40_000)],
+    })
+    expect(s).toMatchObject({ billedCents: 0, collectedCents: 0, outstandingCents: 0, fullyPaid: false })
+  })
+
+  it('cashPosition : les brouillons sont isolés, jamais comptés comme créance', () => {
+    const position = cashPosition([
+      { status: 'SENT', totalCents: 60_000, installments: [part(20_000, true), part(40_000)] },
+      { status: 'PAID', totalCents: 40_000, installments: [] },
+      { status: 'DRAFT', totalCents: 30_000, installments: [] },
+      { status: 'CANCELLED', totalCents: 99_000, installments: [] },
+    ])
+    expect(position.collectedCents).toBe(60_000) // 200 € + 400 €
+    expect(position.outstandingCents).toBe(40_000) // la seule créance réelle
+    expect(position.draftCents).toBe(30_000)
+    expect(position.billedCents).toBe(130_000) // l’annulée ne compte nulle part
+  })
+
+  it('cashPosition : une échéance cochée sur un brouillon est bien de l’argent reçu', () => {
+    const position = cashPosition([
+      { status: 'DRAFT', totalCents: 40_000, installments: [part(20_000, true), part(20_000)] },
+    ])
+    expect(position.collectedCents).toBe(20_000)
+    expect(position.outstandingCents).toBe(0)
+    expect(position.draftCents).toBe(20_000)
+  })
+
+  it('cashPosition : rien à compter', () => {
+    expect(cashPosition([])).toEqual({ collectedCents: 0, outstandingCents: 0, draftCents: 0, billedCents: 0 })
+  })
+
+  it('statusFromInstallments : le statut suit les encaissements', () => {
+    const parts = [part(20_000, true), part(20_000)]
+    expect(statusFromInstallments({ status: 'SENT', totalCents: 40_000, installments: parts })).toBe('SENT')
+    expect(
+      statusFromInstallments({ status: 'SENT', totalCents: 40_000, installments: [part(20_000, true), part(20_000, true)] }),
+    ).toBe('PAID')
+    // Décocher une échéance remet la facture en attente.
+    expect(statusFromInstallments({ status: 'PAID', totalCents: 40_000, installments: parts })).toBe('SENT')
+  })
+
+  it('statusFromInstallments : brouillon et annulée ne bougent pas', () => {
+    const soldé = [part(20_000, true)]
+    expect(statusFromInstallments({ status: 'DRAFT', totalCents: 20_000, installments: soldé })).toBe('DRAFT')
+    expect(statusFromInstallments({ status: 'CANCELLED', totalCents: 20_000, installments: soldé })).toBe('CANCELLED')
   })
 })

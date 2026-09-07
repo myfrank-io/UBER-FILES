@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { SETUP_STEP_LABELS } from '~/lib/setup-flow'
+import { INVOICE_STATUS_CLASSES, INVOICE_STATUS_LABELS, formatEuros } from '~/lib/invoice'
 
 definePageMeta({ layout: 'default', middleware: 'admin' })
 
@@ -53,6 +54,33 @@ async function save() {
     saveError.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Erreur.'
   } finally {
     saving.value = false
+  }
+}
+
+// ─── Facturation Ridewiz → chauffeur ─────────────────────────────────────────
+// Ce que CE chauffeur doit à Ridewiz (accès, paramétrage, cartes), et où en
+// sont ses règlements. À ne pas confondre avec « Volume encaissé » plus haut,
+// qui est ce que lui encaisse de ses propres clients.
+const billing = computed(() => data.value?.billing)
+
+// Une échéance en cours de bascule : la case est désactivée le temps de
+// l'aller-retour, pour qu'un double-clic ne parte pas deux fois.
+const togglingPart = ref<string | null>(null)
+const billingError = ref('')
+
+async function togglePart(invoiceId: string, partId: string, paid: boolean) {
+  togglingPart.value = partId
+  billingError.value = ''
+  try {
+    await $fetch(`/api/admin/invoices/${invoiceId}/installments/${partId}`, {
+      method: 'PATCH',
+      body: { paid },
+    })
+    await refresh()
+  } catch (e) {
+    billingError.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Enregistrement impossible.'
+  } finally {
+    togglingPart.value = null
   }
 }
 
@@ -229,7 +257,7 @@ const statusLabels: Record<string, string> = {
       <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatCard title="Courses" :value="data.stats.bookings" />
         <StatCard title="À venir" :value="data.stats.upcomingBookings" />
-        <StatCard class="col-span-2 sm:col-span-1" title="Volume encaissé" :value="formatMoney(data.stats.revenueCents)" />
+        <StatCard class="col-span-2 sm:col-span-1" title="Encaissé par lui" :value="formatMoney(data.stats.revenueCents)" />
       </div>
 
       <!-- Configuration guidée -->
@@ -415,6 +443,105 @@ const statusLabels: Record<string, string> = {
           <NuxtLink to="/admin/factures" class="btn-ghost mt-3 text-sm">Ouvrir la facturation →</NuxtLink>
         </div>
       </div>
+
+      <!-- ═══ Règlements : ce que ce chauffeur doit à Ridewiz ═══ -->
+      <section v-if="billing" class="card mt-6" data-testid="billing-card">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 class="font-semibold text-slate-900">💶 Ce qu'il nous doit</h2>
+          <NuxtLink to="/admin/factures" class="text-sm text-brand-700 hover:underline">Facturation →</NuxtLink>
+        </div>
+        <p class="mt-1 text-sm text-slate-500">
+          Factures Ridewiz émises à ce chauffeur. Cochez une échéance quand l'argent est arrivé :
+          la facture se solde toute seule une fois tout coché.
+        </p>
+
+        <!-- Les trois chiffres qui comptent. -->
+        <div class="mt-4 grid grid-cols-3 gap-3">
+          <div class="rounded-xl border border-slate-200 p-3">
+            <p class="text-xs text-slate-500">Facturé</p>
+            <p class="mt-0.5 font-serif text-xl font-medium text-slate-900" data-testid="billed">{{ formatEuros(billing.billedCents) }}</p>
+          </div>
+          <div class="rounded-xl border border-green-200 bg-green-50/60 p-3">
+            <p class="text-xs text-green-800">Encaissé</p>
+            <p class="mt-0.5 font-serif text-xl font-medium text-green-800" data-testid="collected">{{ formatEuros(billing.collectedCents) }}</p>
+          </div>
+          <div class="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+            <p class="text-xs text-amber-800">Reste à recevoir</p>
+            <p class="mt-0.5 font-serif text-xl font-medium text-amber-900" data-testid="outstanding">{{ formatEuros(billing.outstandingCents) }}</p>
+          </div>
+        </div>
+        <p v-if="billing.draftCents > 0" class="mt-2 text-xs text-slate-400">
+          {{ formatEuros(billing.draftCents) }} en brouillon, non comptés dans le reste à recevoir.
+        </p>
+
+        <p v-if="billingError" class="mt-3 rounded-xl bg-red-50 px-4 py-2 text-sm text-red-700">{{ billingError }}</p>
+
+        <p v-if="!billing.invoices.length" class="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+          Aucune facture pour ce chauffeur.
+        </p>
+
+        <!-- Une facture par bloc, ses échéances en dessous. -->
+        <div
+          v-for="invoice in billing.invoices"
+          :key="invoice.id"
+          class="mt-4 rounded-xl border border-slate-200"
+          :data-testid="`invoice-${invoice.number}`"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
+            <div class="flex items-center gap-2">
+              <NuxtLink :to="`/admin/factures/${invoice.id}`" class="font-semibold text-slate-900 hover:underline">
+                n°{{ invoice.number }}
+              </NuxtLink>
+              <span class="rounded-full px-2 py-0.5 text-xs font-semibold" :class="INVOICE_STATUS_CLASSES[invoice.status]">
+                {{ INVOICE_STATUS_LABELS[invoice.status] }}
+              </span>
+              <span class="text-xs text-slate-400">{{ invoice.issuedAtLabel }}</span>
+            </div>
+            <div class="text-right">
+              <span class="font-serif text-lg text-slate-900">{{ formatEuros(invoice.totalCents) }}</span>
+              <span v-if="invoice.settlement.outstandingCents > 0 && invoice.status !== 'CANCELLED'" class="ml-2 text-xs text-amber-800">
+                reste {{ formatEuros(invoice.settlement.outstandingCents) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Échéancier : une case par échéance. -->
+          <ul v-if="invoice.installments.length" class="divide-y divide-slate-100">
+            <li
+              v-for="(part, index) in invoice.installments"
+              :key="part.id"
+              class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5"
+            >
+              <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  class="h-5 w-5 shrink-0 rounded border-slate-300 text-brand-600 focus:ring-brand-500 disabled:opacity-40"
+                  :checked="Boolean(part.paidAt)"
+                  :disabled="togglingPart === part.id || invoice.status === 'CANCELLED'"
+                  :data-testid="`part-${invoice.number}-${index + 1}`"
+                  @change="togglePart(invoice.id, part.id, ($event.target as HTMLInputElement).checked)"
+                />
+                <span class="min-w-0">
+                  <span class="block truncate text-sm" :class="part.paidAt ? 'text-slate-500 line-through' : 'text-slate-900'">
+                    {{ part.dueLabel || `Échéance ${index + 1}` }}
+                  </span>
+                  <span v-if="part.paidAt" class="block text-xs text-green-700">Encaissé le {{ formatDateTime(part.paidAt) }}</span>
+                </span>
+              </label>
+              <span class="font-serif text-base" :class="part.paidAt ? 'text-green-700' : 'text-slate-900'">
+                {{ formatEuros(part.amountCents) }}
+              </span>
+            </li>
+          </ul>
+
+          <!-- Sans échéancier, la facture est réglée d'un bloc : on renvoie au
+               suivi de la facture plutôt que d'inventer une case ici. -->
+          <p v-else class="px-4 py-2.5 text-sm text-slate-500">
+            Pas d'échéancier — réglée d'un bloc.
+            <NuxtLink :to="`/admin/factures/${invoice.id}`" class="text-brand-700 hover:underline">Changer le statut →</NuxtLink>
+          </p>
+        </div>
+      </section>
     </div>
 
     <!-- Edit modal -->
