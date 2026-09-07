@@ -78,7 +78,8 @@ export default defineEventHandler(async (event) => {
       },
       hourlyRateCents: 6000,
       cancellationPolicy: { create: { freeUntilHours: 24, retainedPercent: 50 } },
-      subscription: { create: { monthlyFeeCents: 4900, planName: 'Standard' } },
+      // Accès payé une seule fois à l'inscription : aucune mensualité (cf. /).
+      subscription: { create: { planName: 'Standard' } },
       user: {
         create: {
           email,
