@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  EMPTY_SHIPPING,
+  formatShippingLines,
+  nfcDeliveryMessage,
+  nfcDeliveryUrl,
+  nfcShippingFilledSchema,
+  nfcShippingSchema,
+  shippingComplete,
+  shippingStarted,
   CARD_H,
   CARD_W,
   GOOGLE_LOGO_BOX,
@@ -213,5 +221,75 @@ describe('proposition au chauffeur', () => {
   it('reste correct sans nom ni quantité', () => {
     const msg = nfcCardProposalMessage({ driverName: '', url: 'u', qtyReview: 0, qtyBusiness: 0 })
     expect(msg.startsWith('Salut, voici la proposition')).toBe(true)
+  })
+})
+
+describe('adresse de livraison', () => {
+  const complete = {
+    firstName: 'Job',
+    lastName: 'Kerkar',
+    address: '12 rue des Lilas',
+    postalCode: '75011',
+    city: 'Paris',
+    phone: '06 12 34 56 78',
+  }
+
+  it('shippingComplete : exige les six champs', () => {
+    expect(shippingComplete(complete)).toBe(true)
+    expect(shippingComplete({ ...complete, city: '' })).toBe(false)
+    expect(shippingComplete({ ...complete, phone: '   ' })).toBe(false)
+    expect(shippingComplete(EMPTY_SHIPPING)).toBe(false)
+    expect(shippingComplete(null)).toBe(false)
+  })
+
+  it('shippingStarted : vrai dès le premier champ rempli', () => {
+    expect(shippingStarted(EMPTY_SHIPPING)).toBe(false)
+    expect(shippingStarted({ ...EMPTY_SHIPPING, city: 'Paris' })).toBe(true)
+  })
+
+  it('formatShippingLines : étiquette prête à coller, sans ligne vide', () => {
+    expect(formatShippingLines(complete)).toEqual([
+      'Job Kerkar',
+      '12 rue des Lilas',
+      '75011 Paris',
+      '06 12 34 56 78',
+    ])
+    expect(formatShippingLines({ ...EMPTY_SHIPPING, city: 'Paris' })).toEqual(['Paris'])
+    expect(formatShippingLines(null)).toEqual([])
+  })
+
+  it('nfcShippingSchema : le brouillon de l’admin accepte les champs vides', () => {
+    const res = nfcShippingSchema.safeParse({ ...EMPTY_SHIPPING, city: '  Paris   Nord ' })
+    expect(res.success).toBe(true)
+    expect(res.success && res.data.city).toBe('Paris Nord')
+  })
+
+  it('nfcShippingSchema : refuse un code postal mal formé, même en brouillon', () => {
+    expect(nfcShippingSchema.safeParse({ ...EMPTY_SHIPPING, postalCode: '7501' }).success).toBe(false)
+    expect(nfcShippingSchema.safeParse({ ...EMPTY_SHIPPING, postalCode: '' }).success).toBe(true)
+  })
+
+  it('nfcShippingFilledSchema : le formulaire chauffeur exige tout', () => {
+    expect(nfcShippingFilledSchema.safeParse(complete).success).toBe(true)
+    const res = nfcShippingFilledSchema.safeParse({ ...complete, address: '' })
+    expect(res.success).toBe(false)
+    expect(res.success === false && res.error.errors[0]!.message).toContain('adresse')
+  })
+
+  it('nfcDeliveryUrl : lien public dérivé du jeton de proposition', () => {
+    expect(nfcDeliveryUrl('https://ridewiz.fr/', 'abc123')).toBe('https://ridewiz.fr/livraison/abc123')
+    expect(nfcDeliveryUrl('https://ridewiz.fr', 'a/b')).toBe('https://ridewiz.fr/livraison/a%2Fb')
+  })
+
+  it('nfcDeliveryMessage : tutoie le chauffeur et porte le lien', () => {
+    const msg = nfcDeliveryMessage({ driverName: 'Job Kerkar', url: 'https://ridewiz.fr/livraison/abc' })
+    expect(msg).toContain('Salut Job,')
+    expect(msg).toContain('Tu peux la remplir ici')
+    expect(msg).toContain('https://ridewiz.fr/livraison/abc')
+    expect(msg).not.toContain('Vous')
+  })
+
+  it('nfcDeliveryMessage : reste correct sans nom', () => {
+    expect(nfcDeliveryMessage({ driverName: '', url: 'u' }).startsWith('Salut, il me manque')).toBe(true)
   })
 })

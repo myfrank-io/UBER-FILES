@@ -12,8 +12,10 @@ import {
   defaultCardName,
   formatCardPhone,
   nfcCardTargetUrl,
+  shippingComplete,
   type GoogleLogoStyle,
   type NfcCardProduct,
+  type NfcShipping,
 } from '~/lib/nfc-card'
 import { driverReviewUrl } from '~/lib/review-link'
 import { parseLogoRecipe } from '~/lib/logo-bank'
@@ -82,9 +84,48 @@ export function serializeNfcCardDesign(driverId: string, design: NfcCardDesignRo
     qtyReview: design.qtyReview,
     qtyBusiness: design.qtyBusiness,
     logoRecipe: parseLogoRecipe(design.logoRecipe),
+    shipping: nfcShipping(design),
+    shippingComplete: shippingComplete(nfcShipping(design)),
+    shipFilledAt: design.shipFilledAt,
     sentAt: design.sentAt,
     sentCount: design.sentCount,
     updatedAt: design.updatedAt,
+  }
+}
+
+/** Colonnes ship* de la ligne, ramenées à la forme plate de l'interface. */
+export function nfcShipping(design: {
+  shipFirstName: string | null
+  shipLastName: string | null
+  shipAddress: string | null
+  shipPostalCode: string | null
+  shipCity: string | null
+  shipPhone: string | null
+}): NfcShipping {
+  return {
+    firstName: design.shipFirstName ?? '',
+    lastName: design.shipLastName ?? '',
+    address: design.shipAddress ?? '',
+    postalCode: design.shipPostalCode ?? '',
+    city: design.shipCity ?? '',
+    phone: design.shipPhone ?? '',
+  }
+}
+
+/**
+ * Colonnes à écrire pour une adresse. Un champ vide est stocké NULL et non
+ * chaîne vide : « pas de ville » et « ville = "" » sont la même chose, autant
+ * n'en garder qu'une représentation.
+ */
+export function nfcShippingWriteData(shipping: NfcShipping) {
+  const orNull = (v: string) => (v.trim() ? v.trim() : null)
+  return {
+    shipFirstName: orNull(shipping.firstName),
+    shipLastName: orNull(shipping.lastName),
+    shipAddress: orNull(shipping.address),
+    shipPostalCode: orNull(shipping.postalCode),
+    shipCity: orNull(shipping.city),
+    shipPhone: orNull(shipping.phone),
   }
 }
 

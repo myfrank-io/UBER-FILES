@@ -38,6 +38,10 @@ export default defineNuxtConfig({
     // s-maxage de /api/public/carte/[slug]. (Non couvert par '/*', qui ne matche
     // qu'un seul segment.)
     '/carte/**': { swr: 60 },
+    // Formulaire d'adresse de livraison des cartes NFC : page à jeton, propre à
+    // un chauffeur. Jamais mise en cache CDN — deux chauffeurs ne doivent pas
+    // pouvoir se croiser dans le même HTML.
+    '/livraison/**': { swr: false, headers: { 'Cache-Control': 'no-store' } },
     // Back-office : rendu client uniquement (SPA). Le shell HTML statique
     // arrive instantanément du CDN, les données étaient déjà chargées côté
     // client — et plus aucune invocation lambda pour le HTML. Pas d'enjeu SEO

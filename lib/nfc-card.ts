@@ -283,6 +283,127 @@ export function nfcCardProposalMessage(opts: {
   )
 }
 
+// ─── Livraison ───────────────────────────────────────────────────────────────
+
+/**
+ * Adresse de livraison des cartes imprimées. Champs séparés (et non une adresse
+ * libre) parce que c'est ce que demandent les formulaires du transporteur, et
+ * que ça évite les saisies incomplètes du genre « rue des Lilas » sans ville.
+ */
+export interface NfcShipping {
+  firstName: string
+  lastName: string
+  address: string
+  postalCode: string
+  city: string
+  phone: string
+}
+
+export const EMPTY_SHIPPING: NfcShipping = {
+  firstName: '',
+  lastName: '',
+  address: '',
+  postalCode: '',
+  city: '',
+  phone: '',
+}
+
+/** Un champ d'adresse : espaces normalisés, jamais coupé au milieu d'un mot. */
+const shipText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max, `${max} caractères maximum.`)
+    .transform((v) => v.replace(/\s+/g, ' '))
+
+/**
+ * Code postal français : 5 chiffres. Le champ VIDE est accepté ici — c'est le
+ * schéma « brouillon » de l'admin, qui doit pouvoir enregistrer une adresse à
+ * moitié saisie sans se faire jeter. La complétude est exigée à part
+ * (nfcShippingFilledSchema), là où elle compte vraiment.
+ */
+const shipPostalCode = z
+  .string()
+  .trim()
+  .refine((v) => v === '' || /^\d{5}$/.test(v), 'Code postal invalide (5 chiffres).')
+
+/** Adresse partielle : ce que l'admin peut enregistrer à tout moment. */
+export const nfcShippingSchema = z.object({
+  firstName: shipText(60),
+  lastName: shipText(60),
+  address: shipText(160),
+  postalCode: shipPostalCode,
+  city: shipText(80),
+  phone: shipText(30),
+})
+
+/** Champs obligatoires d'une adresse complète, avec le libellé affiché. */
+const REQUIRED_SHIPPING_FIELDS: { key: keyof NfcShipping; label: string }[] = [
+  { key: 'firstName', label: 'Le prénom' },
+  { key: 'lastName', label: 'Le nom' },
+  { key: 'address', label: 'L’adresse' },
+  { key: 'postalCode', label: 'Le code postal' },
+  { key: 'city', label: 'La ville' },
+  { key: 'phone', label: 'Le téléphone' },
+]
+
+/**
+ * Adresse COMPLÈTE : ce que le chauffeur envoie depuis le lien public. À moitié
+ * remplie, elle ne sert à rien — le colis ne partirait pas — donc on refuse.
+ */
+export const nfcShippingFilledSchema = nfcShippingSchema.superRefine((value, ctx) => {
+  for (const { key, label } of REQUIRED_SHIPPING_FIELDS) {
+    if (!value[key]) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: `${label} est obligatoire.` })
+    }
+  }
+  if (value.postalCode && !/^\d{5}$/.test(value.postalCode)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['postalCode'], message: 'Code postal invalide (5 chiffres).' })
+  }
+})
+
+/** Vrai quand les six champs sont renseignés : le colis peut partir. */
+export function shippingComplete(shipping: Partial<NfcShipping> | null | undefined): boolean {
+  if (!shipping) return false
+  return REQUIRED_SHIPPING_FIELDS.every(({ key }) => Boolean(shipping[key]?.trim()))
+}
+
+/** Vrai dès qu'un champ est renseigné (adresse commencée mais incomplète). */
+export function shippingStarted(shipping: Partial<NfcShipping> | null | undefined): boolean {
+  if (!shipping) return false
+  return Object.values(shipping).some((v) => Boolean(v?.trim()))
+}
+
+/**
+ * Adresse mise en lignes, telle qu'on l'écrit sur une étiquette :
+ * « Prénom Nom / adresse / 75011 Paris / 06 12 34 56 78 ». Les lignes vides
+ * sont omises — une adresse partielle reste lisible.
+ */
+export function formatShippingLines(shipping: Partial<NfcShipping> | null | undefined): string[] {
+  if (!shipping) return []
+  const name = [shipping.firstName, shipping.lastName].map((v) => v?.trim() ?? '').filter(Boolean).join(' ')
+  const cityLine = [shipping.postalCode, shipping.city].map((v) => v?.trim() ?? '').filter(Boolean).join(' ')
+  return [name, shipping.address?.trim() ?? '', cityLine, shipping.phone?.trim() ?? ''].filter(Boolean)
+}
+
+/** URL publique du formulaire d'adresse (même jeton que la proposition). */
+export function nfcDeliveryUrl(appBaseUrl: string, token: string): string {
+  return `${appBaseUrl.replace(/\/+$/, '')}/livraison/${encodeURIComponent(token)}`
+}
+
+/**
+ * Message WhatsApp envoyé à la main par l'admin pour réclamer l'adresse. Écrit
+ * au tutoiement : ce sont les seuls messages que Paul envoie lui-même.
+ */
+export function nfcDeliveryMessage(opts: { driverName: string; url: string }): string {
+  const firstName = opts.driverName.trim().split(/\s+/)[0] ?? ''
+  const hello = firstName ? `Salut ${firstName},` : 'Salut,'
+  return (
+    `${hello} il me manque juste l'adresse de livraison pour t'envoyer tes cartes. ` +
+    `Tu peux la remplir ici (2 minutes) : ${opts.url}`
+  )
+}
+
 // ─── QR code ─────────────────────────────────────────────────────────────────
 
 export interface QrMatrix {
