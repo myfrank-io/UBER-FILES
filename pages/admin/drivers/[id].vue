@@ -404,6 +404,16 @@ const statusLabels: Record<string, string> = {
           </p>
           <NuxtLink :to="`/admin/cartes-nfc/${data.id}`" class="btn-ghost mt-3 text-sm">Composer les cartes →</NuxtLink>
         </div>
+
+        <!-- Facturation : accès, paramétrage, cartes — factures émises à ce chauffeur. -->
+        <div class="card" data-testid="invoicing-card">
+          <h2 class="mb-1 font-semibold text-slate-900">🧾 Facturation</h2>
+          <p class="text-sm text-slate-600">
+            Factures de l'accès Ridewiz, du paramétrage et des cartes : lignes, échéancier
+            de règlement, PDF et envoi par email.
+          </p>
+          <NuxtLink to="/admin/factures" class="btn-ghost mt-3 text-sm">Ouvrir la facturation →</NuxtLink>
+        </div>
       </div>
     </div>
 

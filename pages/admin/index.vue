@@ -197,9 +197,14 @@ const filteredDrivers = computed(() => {
   <div class="mx-auto max-w-5xl px-5 py-8">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h1 class="font-serif text-2xl font-medium tracking-tight text-slate-900">Administration</h1>
-      <button class="-mr-3 rounded-lg px-3 py-2.5 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-700" @click="logout">
-        Déconnexion
-      </button>
+      <div class="flex items-center gap-1">
+        <NuxtLink to="/admin/factures" class="rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+          Facturation
+        </NuxtLink>
+        <button class="-mr-3 rounded-lg px-3 py-2.5 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-700" @click="logout">
+          Déconnexion
+        </button>
+      </div>
     </div>
 
     <!-- Stats -->

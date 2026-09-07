@@ -130,7 +130,10 @@ export default defineEventHandler((event) => {
       // tiles.openfreemap.org : style + tuiles vectorielles + glyphes de la
       // carte de suivi de course (chargés en fetch par MapLibre).
       "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://api.resend.com https://tiles.openfreemap.org",
-      "frame-src https://js.stripe.com https://hooks.stripe.com",
+      // 'self' : l'aperçu d'une facture dans l'admin affiche le PDF réel servi
+      // par notre propre API. Les réponses restent en X-Frame-Options: DENY,
+      // sauf celle du PDF qui passe en SAMEORIGIN.
+      "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
       "font-src 'self'",
       // MapLibre exécute son parsing de tuiles dans un Web Worker créé via blob:
       // (child-src : repli des navigateurs sans worker-src).
