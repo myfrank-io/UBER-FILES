@@ -4,16 +4,26 @@ import { formatMoney } from '~/lib/money'
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHOD_SHORT_LABELS, type PaymentMethod } from '~/lib/payment-methods'
 import { formatRideDate, formatRideDateTime, formatRideTime } from '~/lib/datetime'
 
+/** Pièce jointe : contenu en base64 (Resend accepte 40 Mo par email). */
+export interface EmailAttachment {
+  filename: string
+  content: string
+}
+
 interface SendArgs {
   to: string
   subject: string
   html: string
+  attachments?: EmailAttachment[]
 }
 
 export async function sendEmail(args: SendArgs): Promise<{ sent: boolean }> {
   const config = useRuntimeConfig()
   if (!config.resendApiKey) {
-    console.info(`[email:dev] → ${args.to} | ${args.subject}`)
+    console.info(
+      `[email:dev] → ${args.to} | ${args.subject}` +
+        (args.attachments?.length ? ` | PJ : ${args.attachments.map((a) => a.filename).join(', ')}` : ''),
+    )
     return { sent: false }
   }
   const res = await fetch('https://api.resend.com/emails', {
@@ -27,6 +37,7 @@ export async function sendEmail(args: SendArgs): Promise<{ sent: boolean }> {
       to: args.to,
       subject: args.subject,
       html: args.html,
+      ...(args.attachments?.length ? { attachments: args.attachments } : {}),
     }),
   })
   if (!res.ok) {
@@ -1144,4 +1155,71 @@ export const emailTemplates = {
       ),
     }
   },
+}
+
+/**
+ * Email interne envoyé à la production quand l'admin valide le design des
+ * cartes NFC d'un chauffeur. Les PDF (impression + prévisualisation) sont en
+ * pièces jointes ; le corps rappelle quantités, textes de la carte de visite,
+ * et surtout les URL à programmer sur les puces NFC (identiques aux QR).
+ */
+export function nfcCardOrderEmail(opts: {
+  driverName: string
+  slug: string
+  qtyReview: number
+  qtyBusiness: number
+  name: string
+  title: string
+  phone: string
+  /** URL encodée dans le QR / à programmer sur la puce de la carte « avis ». */
+  reviewQrUrl: string
+  /** Lien Google direct (fiche connectée ou lien manuel), null si non configuré. */
+  googleReviewUrl: string | null
+  /** URL encodée dans le QR / à programmer sur la puce de la carte de visite. */
+  cardUrl: string
+  publicPageUrl: string
+  cardPublished: boolean
+  bgColor: string
+  fgColor: string
+  attachmentNames: string[]
+}): { subject: string; html: string } {
+  const row = (label: string, value: string) =>
+    `<tr><td style="padding:6px 10px 6px 0;color:#9A8B72;font-size:13px;white-space:nowrap;vertical-align:top">${label}</td><td style="padding:6px 0;font-size:14px">${value}</td></tr>`
+  const link = (url: string) => `<a href="${esc(url)}" style="color:#B5793F;word-break:break-all">${esc(url)}</a>`
+  const parts = [
+    opts.qtyReview > 0 ? `${opts.qtyReview} avis Google` : '',
+    opts.qtyBusiness > 0 ? `${opts.qtyBusiness} cartes de visite` : '',
+  ].filter(Boolean)
+  const subject = `Cartes NFC — ${opts.driverName} : ${parts.join(' + ') || 'design'}`
+
+  const body = `
+    <p style="margin:0 0 14px">Design validé depuis l'admin Ridewiz pour <strong>${esc(opts.driverName)}</strong> (/${esc(opts.slug)}).
+    Les fichiers d'impression et la prévisualisation sont en pièces jointes.</p>
+
+    <h2 style="margin:20px 0 6px;font-size:15px;color:#0E1B2C">Quantités</h2>
+    <table style="border-collapse:collapse">
+      ${row('Avis Google', `<strong>${opts.qtyReview}</strong> carte(s)`)}
+      ${row('Carte de visite', `<strong>${opts.qtyBusiness}</strong> carte(s)`)}
+    </table>
+
+    <h2 style="margin:20px 0 6px;font-size:15px;color:#0E1B2C">URL à programmer (puces NFC = QR codes)</h2>
+    <table style="border-collapse:collapse">
+      ${row('Carte avis Google', link(opts.reviewQrUrl))}
+      ${row('Lien Google direct', opts.googleReviewUrl ? link(opts.googleReviewUrl) : '<em style="color:#b45309">Aucune fiche Google connectée : le tunnel affichera un message sans redirection.</em>')}
+      ${row('Carte de visite', `${link(opts.cardUrl)}${opts.cardPublished ? '' : ' <em style="color:#b45309">(carte non publiée pour l’instant)</em>'}`)}
+      ${row('Page publique', link(opts.publicPageUrl))}
+    </table>
+
+    <h2 style="margin:20px 0 6px;font-size:15px;color:#0E1B2C">Verso carte de visite</h2>
+    <table style="border-collapse:collapse">
+      ${row('Nom', esc(opts.name) || '—')}
+      ${row('Titre', esc(opts.title) || '—')}
+      ${row('Téléphone', esc(opts.phone) || '—')}
+      ${row('Couleurs', `fond <code>${esc(opts.bgColor)}</code> · éléments <code>${esc(opts.fgColor)}</code>`)}
+    </table>
+
+    <p style="margin:20px 0 0;font-size:13px;color:#9A8B72">Pièces jointes : ${opts.attachmentNames.map(esc).join(', ')}.
+    Fichiers d'impression : format CR80 54 × 85,6 mm + 2 mm de fond perdu, page 1 recto, page 2 verso, QR code réel inclus.</p>`
+
+  return { subject, html: wrap(`Cartes NFC pour ${esc(opts.driverName)}`, body) }
 }

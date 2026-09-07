@@ -106,6 +106,8 @@ export default defineNuxtConfig({
     // Resend
     resendApiKey: process.env.RESEND_API_KEY || '',
     emailFrom: process.env.EMAIL_FROM || 'Réservation VTC <onboarding@resend.dev>',
+    // Destinataire des designs de cartes NFC validés par l'admin (production).
+    nfcCardOrderEmail: process.env.NFC_CARD_ORDER_EMAIL || 'paul@myfrank.io',
     // Telegram
     telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
     telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || '',

@@ -394,6 +394,16 @@ const statusLabels: Record<string, string> = {
             </div>
           </dl>
         </div>
+
+        <!-- Cartes NFC physiques : design composé ici, jamais visible du chauffeur. -->
+        <div class="card" data-testid="nfc-cards-card">
+          <h2 class="mb-1 font-semibold text-slate-900">🪪 Cartes NFC</h2>
+          <p class="text-sm text-slate-600">
+            Cartes « Avis Google » et « Carte de visite en ligne » : logo, couleurs, QR codes,
+            puis envoi des fichiers d'impression à la production.
+          </p>
+          <NuxtLink :to="`/admin/cartes-nfc/${data.id}`" class="btn-ghost mt-3 text-sm">Composer les cartes →</NuxtLink>
+        </div>
       </div>
     </div>
 
