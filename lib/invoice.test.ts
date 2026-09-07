@@ -4,7 +4,6 @@ import {
   INVOICE_PRESETS,
   LATE_PAYMENT_MENTION,
   defaultInstallments,
-  evenShares,
   formatEuros,
   formatShare,
   formatSiret,
@@ -16,7 +15,8 @@ import {
   nextInvoiceNumber,
   normalizeSiret,
   paymentTermsSentence,
-  splitInstallments,
+  shareBasisPoints,
+  splitAmountsEvenly,
   vatMention,
 } from './invoice'
 
@@ -53,39 +53,54 @@ describe('invoiceTotals', () => {
   })
 })
 
-describe('splitInstallments', () => {
+describe('splitAmountsEvenly', () => {
+  // Partir de pourcentages donnait 33,34 / 33,33 / 33,33 %, soit
+  // 200,04 / 199,98 / 199,98 € sur 600 €. On part des montants : ils tombent ronds.
+  it('600 € en 3 fois = 200 / 200 / 200', () => {
+    expect(splitAmountsEvenly(60_000, 3)).toEqual([20_000, 20_000, 20_000])
+  })
   it('reproduit l’acompte 50 / 50 de la facture 2606-15 (200 € + 200 €)', () => {
-    const parts = splitInstallments(40_000, [
-      { shareBasisPoints: 5000, dueLabel: 'à la commande' },
-      { shareBasisPoints: 5000, dueLabel: 'à la livraison' },
-    ])
-    expect(parts.map((p) => p.amountCents)).toEqual([20_000, 20_000])
+    expect(splitAmountsEvenly(40_000, 2)).toEqual([20_000, 20_000])
   })
-  it('la somme des échéances est TOUJOURS le total, même en trois fois', () => {
-    const parts = splitInstallments(40_001, defaultInstallments(3))
-    expect(parts.reduce((sum, p) => sum + p.amountCents, 0)).toBe(40_001)
+  it('500 € en 3 fois = 167 / 167 / 166 : les euros en trop se répartissent', () => {
+    expect(splitAmountsEvenly(50_000, 3)).toEqual([16_700, 16_700, 16_600])
   })
-  it('met le reliquat d’arrondi sur la dernière échéance', () => {
-    const parts = splitInstallments(10_000, [
-      { shareBasisPoints: 3333, dueLabel: 'a' },
-      { shareBasisPoints: 3333, dueLabel: 'b' },
-      { shareBasisPoints: 3334, dueLabel: 'c' },
-    ])
-    expect(parts.reduce((sum, p) => sum + p.amountCents, 0)).toBe(10_000)
+  it('400 € en 3 fois = 134 / 133 / 133', () => {
+    expect(splitAmountsEvenly(40_000, 3)).toEqual([13_400, 13_300, 13_300])
   })
-  it('renvoie une liste vide sans échéance', () => {
-    expect(splitInstallments(40_000, [])).toEqual([])
+  it('chaque échéance est un nombre entier d’euros quand le total l’est', () => {
+    for (const total of [40_000, 50_000, 60_000, 75_000, 99_900]) {
+      for (const count of [2, 3, 4]) {
+        for (const part of splitAmountsEvenly(total, count)) {
+          expect(part % 100).toBe(0)
+        }
+      }
+    }
+  })
+  it('les centimes du total atterrissent sur la première échéance', () => {
+    expect(splitAmountsEvenly(40_050, 2)).toEqual([20_050, 20_000])
+  })
+  it('la somme vaut TOUJOURS exactement le total', () => {
+    for (const total of [1, 99, 40_000, 40_001, 50_000, 123_457]) {
+      for (const count of [1, 2, 3, 4, 5, 12]) {
+        expect(splitAmountsEvenly(total, count).reduce((a, b) => a + b, 0)).toBe(total)
+      }
+    }
+  })
+  it('en une fois, l’échéance porte tout le total', () => {
+    expect(splitAmountsEvenly(60_000, 1)).toEqual([60_000])
+  })
+  it('renvoie une liste vide pour zéro échéance', () => {
+    expect(splitAmountsEvenly(60_000, 0)).toEqual([])
   })
 })
 
-describe('evenShares', () => {
-  it('deux fois = 50 / 50', () => expect(evenShares(2)).toEqual([5000, 5000]))
-  it('quatre fois = 25 chacun', () => expect(evenShares(4)).toEqual([2500, 2500, 2500, 2500]))
-  it('trois fois : le reliquat va sur la première (34 / 33 / 33)', () => {
-    expect(evenShares(3)).toEqual([3334, 3333, 3333])
-    expect(evenShares(3).reduce((a, b) => a + b, 0)).toBe(10_000)
+describe('shareBasisPoints', () => {
+  it('déduit la part d’un montant', () => {
+    expect(shareBasisPoints(20_000, 40_000)).toBe(5000)
+    expect(shareBasisPoints(20_000, 60_000)).toBe(3333)
   })
-  it('une seule fois = 100 %', () => expect(evenShares(1)).toEqual([10_000]))
+  it('ne divise pas par zéro', () => expect(shareBasisPoints(0, 0)).toBe(0))
 })
 
 describe('formatEuros', () => {
@@ -98,7 +113,7 @@ describe('formatEuros', () => {
   // espace ordinaire.
   it('n’utilise que des caractères imprimables par le PDF', () => {
     expect(formatEuros(1_234_567)).toMatch(/^[\d ]+,\d{2} €$/)
-    expect(formatEuros(1_234_567)).not.toContain('\u202f')
+    expect(formatEuros(1_234_567)).not.toContain(' ')
   })
   it('gère un montant négatif (avoir)', () => expect(formatEuros(-20_000)).toBe('-200 €'))
 })
@@ -158,30 +173,33 @@ describe('SIRET / SIREN', () => {
 
 describe('paymentTermsSentence', () => {
   it('reproduit la phrase d’acompte de la facture 2606-15', () => {
-    const parts = splitInstallments(40_000, [
-      { shareBasisPoints: 5000, dueLabel: 'à la commande' },
-      { shareBasisPoints: 5000, dueLabel: 'à la livraison' },
-    ])
-    expect(paymentTermsSentence(parts)).toBe(
+    expect(paymentTermsSentence(defaultInstallments(40_000, 2))).toBe(
       'Modalités de paiement : acompte de 50 % à la commande, soit 200 €, à régler à réception de la ' +
         'présente facture. Le solde de 50 %, soit 200 €, sera dû à la livraison.',
     )
   })
   it('écrit un règlement comptant en une seule échéance', () => {
-    const parts = splitInstallments(60_000, defaultInstallments(1))
-    expect(paymentTermsSentence(parts)).toBe(
+    expect(paymentTermsSentence(defaultInstallments(60_000, 1))).toBe(
       'Modalités de paiement : règlement de la totalité, soit 600 €, à réception de la présente facture.',
     )
   })
-  it('énumère au-delà de deux échéances', () => {
-    const parts = splitInstallments(60_000, [
-      { shareBasisPoints: 4000, dueLabel: 'à la commande' },
-      { shareBasisPoints: 3000, dueLabel: 'à la livraison' },
-      { shareBasisPoints: 3000, dueLabel: 'sous 30 jours' },
-    ])
-    expect(paymentTermsSentence(parts)).toBe(
-      'Modalités de paiement : règlement en 3 fois — 40 % (240 €) à la commande, ' +
-        '30 % (180 €) à la livraison, 30 % (180 €) sous 30 jours.',
+  it('énumère des montants ronds au-delà de deux échéances', () => {
+    expect(paymentTermsSentence(defaultInstallments(60_000, 3))).toBe(
+      'Modalités de paiement : règlement en 3 fois — 200 € à la commande, 200 € échéance 2, ' +
+        '200 € à la livraison.',
+    )
+  })
+  // Un pourcentage qui ne tombe pas rond ne s'écrit pas : le client règle un
+  // montant, pas une fraction.
+  it('tait le pourcentage quand il ne tombe pas rond', () => {
+    expect(
+      paymentTermsSentence([
+        { amountCents: 25_000, dueLabel: 'à la commande' },
+        { amountCents: 35_000, dueLabel: 'à la livraison' },
+      ]),
+    ).toBe(
+      'Modalités de paiement : acompte de 250 € à la commande, à régler à réception de la présente ' +
+        'facture. Le solde, soit 350 €, sera dû à la livraison.',
     )
   })
   it('ne produit rien sans échéance', () => expect(paymentTermsSentence([])).toBe(''))
@@ -207,9 +225,7 @@ describe('préréglages', () => {
   it('a des clés uniques', () => {
     expect(new Set(INVOICE_PRESETS.map((p) => p.key)).size).toBe(INVOICE_PRESETS.length)
   })
-  // Deux boutons portant le même texte sont impossibles à distinguer : les
-  // libellés de pastille doivent différer, même quand la désignation imprimée
-  // commence pareil (« Accès Ridewiz »).
+  // Deux boutons portant le même texte sont impossibles à distinguer.
   it('a des libellés de pastille distincts', () => {
     expect(new Set(INVOICE_PRESETS.map((p) => p.chip)).size).toBe(INVOICE_PRESETS.length)
   })
@@ -221,12 +237,15 @@ describe('préréglages', () => {
 
 describe('defaultInstallments', () => {
   it('en deux fois : acompte à la commande, solde à la livraison', () => {
-    expect(defaultInstallments(2)).toEqual([
-      { shareBasisPoints: 5000, dueLabel: 'à la commande' },
-      { shareBasisPoints: 5000, dueLabel: 'à la livraison' },
+    expect(defaultInstallments(40_000, 2)).toEqual([
+      { amountCents: 20_000, dueLabel: 'à la commande' },
+      { amountCents: 20_000, dueLabel: 'à la livraison' },
     ])
   })
+  it('en trois fois sur 600 € : trois échéances de 200 €', () => {
+    expect(defaultInstallments(60_000, 3).map((p) => p.amountCents)).toEqual([20_000, 20_000, 20_000])
+  })
   it('en une fois : à réception', () => {
-    expect(defaultInstallments(1)[0]?.dueLabel).toBe('à réception de la présente facture')
+    expect(defaultInstallments(60_000, 1)[0]?.dueLabel).toBe('à réception de la présente facture')
   })
 })
