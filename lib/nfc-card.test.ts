@@ -199,7 +199,7 @@ describe('proposition au chauffeur', () => {
       qtyReview: 10,
       qtyBusiness: 10,
     })
-    expect(msg).toContain('Bonjour Job,')
+    expect(msg).toContain('Salut Job,')
     expect(msg).toContain('10 cartes avis Google et 10 cartes de visite')
     expect(msg).toContain('https://ridewiz.fr/cartes-nfc/abc')
   })
@@ -212,6 +212,6 @@ describe('proposition au chauffeur', () => {
 
   it('reste correct sans nom ni quantité', () => {
     const msg = nfcCardProposalMessage({ driverName: '', url: 'u', qtyReview: 0, qtyBusiness: 0 })
-    expect(msg.startsWith('Bonjour, voici la proposition')).toBe(true)
+    expect(msg.startsWith('Salut, voici la proposition')).toBe(true)
   })
 })

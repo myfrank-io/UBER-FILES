@@ -7,7 +7,9 @@ import {
   formatShare,
   formatSiret,
   invoiceNumberSortKey,
+  invoiceShareUrl,
   invoiceTotals,
+  invoiceWhatsAppMessage,
   isValidSiren,
   isValidSiret,
   discountLabel,
@@ -317,5 +319,51 @@ describe('defaultInstallments', () => {
   })
   it('en une fois : à réception', () => {
     expect(defaultInstallments(60_000, 1)[0]?.dueLabel).toBe('à réception de la présente facture')
+  })
+})
+
+describe('lien public et message WhatsApp', () => {
+  it('construit un lien court', () => {
+    expect(invoiceShareUrl('https://ridewiz.fr', 'abc123')).toBe('https://ridewiz.fr/facture/abc123')
+  })
+  it('ne double pas la barre oblique', () => {
+    expect(invoiceShareUrl('https://ridewiz.fr/', 'abc123')).toBe('https://ridewiz.fr/facture/abc123')
+  })
+
+  // Les chauffeurs sont tutoyés dans tous les messages qu'on leur adresse.
+  it('tutoie le chauffeur et l’appelle par son prénom', () => {
+    const message = invoiceWhatsAppMessage({
+      driverName: 'Miguel Fonsat',
+      number: '2606-17',
+      totalCents: 55_000,
+      url: 'https://ridewiz.fr/facture/abc123',
+      paymentTerms: 'Modalités de paiement : règlement à réception.',
+    })
+    expect(message).toContain('Salut Miguel')
+    expect(message).toContain('ta facture n°2606-17 — 550 € :')
+    expect(message).toContain('https://ridewiz.fr/facture/abc123')
+    expect(message).toContain('Modalités de paiement : règlement à réception.')
+    expect(message).toContain('si tu as une question')
+    expect(message).not.toMatch(/\b(vous|votre|vos)\b/i)
+  })
+  it('se passe de prénom quand on n’en a pas', () => {
+    const message = invoiceWhatsAppMessage({
+      driverName: '',
+      number: '2606-17',
+      totalCents: 55_000,
+      url: 'https://ridewiz.fr/facture/abc123',
+      paymentTerms: null,
+    })
+    expect(message.startsWith('Salut 👋')).toBe(true)
+  })
+  it('omet les modalités quand il n’y en a pas', () => {
+    const message = invoiceWhatsAppMessage({
+      driverName: 'Miguel',
+      number: '2606-17',
+      totalCents: 55_000,
+      url: 'https://ridewiz.fr/facture/abc123',
+      paymentTerms: null,
+    })
+    expect(message).not.toContain('Modalités')
   })
 })

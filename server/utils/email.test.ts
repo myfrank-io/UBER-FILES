@@ -379,7 +379,7 @@ describe('emailTemplates chauffeur', () => {
     expect(tpl.html).toContain('à encaisser sur place')
   })
 
-  it('bookingConfirmedDriver : « vous avez accepté » quand le chauffeur est à l\'origine', () => {
+  it('bookingConfirmedDriver : « tu as accepté » quand le chauffeur est à l\'origine', () => {
     const tpl = emailTemplates.bookingConfirmedDriver({
       ...base,
       amountCents: 8000,
@@ -389,7 +389,7 @@ describe('emailTemplates chauffeur', () => {
       acceptedByDriver: true,
       dashboardUrl: 'https://app.test/dashboard/reservations',
     })
-    expect(tpl.html).toContain('Vous avez accepté')
+    expect(tpl.html).toContain('Tu as accepté')
     expect(tpl.html).not.toContain('a confirmé sa course')
   })
 
@@ -439,7 +439,7 @@ describe('emailTemplates compte & sécurité', () => {
       verifyUrl: 'https://app.test/auth/verify-email?token=abc',
       dashboardUrl: 'https://app.test/dashboard',
     })
-    expect(tpl.subject).toContain('Confirmez votre adresse email')
+    expect(tpl.subject).toContain('Confirme ton adresse email')
     expect(tpl.html).toContain('Confirmer mon adresse email')
     expect(tpl.html).toContain('https://app.test/auth/verify-email?token=abc')
     expect(tpl.html).toContain('7 jours')
@@ -452,19 +452,19 @@ describe('emailTemplates compte & sécurité', () => {
     const tpl = emailTemplates.verifyEmailResend({
       verifyUrl: 'https://app.test/auth/verify-email?token=xyz',
     })
-    expect(tpl.subject).toContain('Confirmez votre adresse email')
+    expect(tpl.subject).toContain('Confirme ton adresse email')
     expect(tpl.html).toContain('https://app.test/auth/verify-email?token=xyz')
     expect(tpl.html).toContain('Confirmer mon adresse email')
   })
 
-  it('passwordChanged : confirme et alerte « ce n\'était pas vous »', () => {
+  it('passwordChanged : confirme et alerte « ce n\'était pas toi »', () => {
     const tpl = emailTemplates.passwordChanged({
       loginUrl: 'https://app.test/dashboard/login',
       supportEmail: 'support@ridewiz.fr',
     })
     expect(tpl.subject).toContain('mot de passe a été modifié')
     expect(tpl.html).toContain('modifié avec succès')
-    expect(tpl.html).toContain('Ce n\'était pas vous')
+    expect(tpl.html).toContain('Ce n\'était pas toi')
     expect(tpl.html).toContain('support@ridewiz.fr')
     expect(tpl.html).toContain('https://app.test/dashboard/login')
   })
@@ -496,5 +496,49 @@ describe('emailTemplates compte & sécurité', () => {
     expect(tpl.html).toContain('Un client')
     expect(tpl.html).toContain('★★★★☆')
     expect(tpl.html).not.toContain('réf.')
+  })
+})
+
+describe('tutoiement des chauffeurs', () => {
+  // Les chauffeurs sont des indépendants qu'on suit un par un : tous les
+  // messages qu'on leur adresse les tutoient. Les gabarits destinés à LEURS
+  // clients (devis, reçus, rappels de course) restent au vouvoiement — ce test
+  // ne couvre donc que les gabarits chauffeur.
+  const vouvoiement = /\b(vous|votre|vos)\b/i
+
+  it('aucun gabarit de compte chauffeur ne vouvoie', () => {
+    const templates = [
+      emailTemplates.driverWelcomePending({ displayName: 'Karim', dashboardUrl: 'https://app.test/dashboard' }),
+      emailTemplates.verifyEmail({
+        displayName: 'Karim',
+        verifyUrl: 'https://app.test/v',
+        dashboardUrl: 'https://app.test/dashboard',
+      }),
+      emailTemplates.verifyEmailResend({ verifyUrl: 'https://app.test/v' }),
+      emailTemplates.driverApproved({
+        displayName: 'Karim',
+        publicUrl: 'https://app.test/karim',
+        dashboardUrl: 'https://app.test/dashboard',
+      }),
+      emailTemplates.accountSuspended({ displayName: 'Karim' }),
+      emailTemplates.accountReactivated({
+        displayName: 'Karim',
+        publicUrl: 'https://app.test/karim',
+        dashboardUrl: 'https://app.test/dashboard',
+      }),
+      emailTemplates.driverInvitation({ firstName: 'Karim', inviteUrl: 'https://app.test/i' }),
+      emailTemplates.setupCode({ firstName: 'Karim', code: '123456', ttlMinutes: 10 }),
+      emailTemplates.passwordReset({ resetUrl: 'https://app.test/r' }),
+      emailTemplates.passwordChanged({ loginUrl: 'https://app.test/l' }),
+    ]
+    for (const tpl of templates) {
+      // Le pied de page porte la signature de marque « Votre chauffeur, votre
+      // signature. », qui s'adresse au passager : on ne teste que le corps.
+      const body = tpl.html.split('Ridewiz · «')[0]!
+      expect({ subject: tpl.subject, hit: vouvoiement.exec(body)?.[0] ?? null }).toEqual({
+        subject: tpl.subject,
+        hit: null,
+      })
+    }
   })
 })

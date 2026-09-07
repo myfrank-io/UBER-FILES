@@ -154,7 +154,7 @@ async function revokeSetupLink() {
 const setupMessage = computed(() => {
   if (!setupUrl.value || !data.value) return ''
   const first = data.value.displayName.split(/\s+/)[0]
-  return `Bonjour ${first}, voici votre lien pour configurer votre espace Ridewiz en quelques minutes : ${setupUrl.value}`
+  return `Salut ${first}, voici ton lien pour configurer ton espace Ridewiz en quelques minutes : ${setupUrl.value}`
 })
 const setupWhatsapp = computed(() => {
   const phone = data.value?.phone

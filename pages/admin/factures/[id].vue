@@ -6,12 +6,14 @@ import {
   formatEuros,
   formatShare,
   invoiceTotals,
+  invoiceWhatsAppMessage,
   isLineFree,
   lineNetCents,
   paymentTermsSentence,
   shareBasisPoints,
   splitAmountsEvenly,
 } from '~/lib/invoice'
+import { toWhatsAppDigits } from '~/lib/card-blocks'
 import type { CompanyMatch } from '~/server/utils/company-lookup'
 
 // Éditeur d'une facture : client, lignes, échéancier, mentions — avec l'aperçu
@@ -335,6 +337,53 @@ async function setStatus(status: Invoice['status']) {
   }
 }
 
+// ═══ Envoi par WhatsApp ═══
+// Le chauffeur ouvre sa facture depuis un lien public : il n'a pas de compte
+// sur l'espace d'administration, et WhatsApp ne sait pas joindre un PDF.
+const shareUrl = computed(() => data.value?.shareUrl ?? '')
+const shareCopied = ref(false)
+
+const whatsappMessage = computed(() =>
+  invoiceWhatsAppMessage({
+    driverName: data.value?.invoice.driver?.displayName || form.clientContactName || form.clientName,
+    number: form.number,
+    totalCents: totals.value.totalCents,
+    url: shareUrl.value,
+    paymentTerms: form.paymentTerms,
+  }),
+)
+
+const whatsappUrl = computed(() => {
+  const digits = toWhatsAppDigits(form.clientPhone)
+  return digits && shareUrl.value
+    ? `https://wa.me/${digits}?text=${encodeURIComponent(whatsappMessage.value)}`
+    : null
+})
+
+/**
+ * L'envoi part du navigateur : le serveur ne peut que consigner que la facture
+ * est partie. On le fait au clic, sans bloquer l'ouverture de WhatsApp.
+ */
+async function markSent() {
+  try {
+    const res = await $fetch<{ invoice: Invoice }>(`/api/admin/invoices/${id}/mark-sent`, { method: 'POST' })
+    form.status = res.invoice.status
+    await refresh()
+  } catch (e) {
+    toast.error(apiError(e, 'La facture n’a pas pu être marquée envoyée.'))
+  }
+}
+
+async function copyShareLink() {
+  try {
+    await navigator.clipboard.writeText(shareUrl.value)
+    shareCopied.value = true
+    setTimeout(() => (shareCopied.value = false), 2000)
+  } catch {
+    toast.error('Copie impossible : sélectionnez le lien à la main.')
+  }
+}
+
 const sending = ref(false)
 const sendOpen = ref(false)
 const sendTo = ref('')
@@ -400,7 +449,17 @@ async function removeInvoice() {
           {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
         </button>
         <a class="btn-ghost !min-h-0 !py-2.5 text-sm" :href="pdfUrl" target="_blank" rel="noopener">PDF ↗</a>
-        <button class="btn-ghost !min-h-0 !py-2.5 text-sm" @click="sendOpen = true">Envoyer</button>
+        <a
+          v-if="whatsappUrl"
+          class="btn-ghost !min-h-0 !py-2.5 text-sm"
+          :href="whatsappUrl"
+          target="_blank"
+          rel="noopener"
+          data-testid="whatsapp"
+          @click="markSent"
+          >WhatsApp ↗</a
+        >
+        <button class="btn-ghost !min-h-0 !py-2.5 text-sm" @click="sendOpen = true">Email</button>
       </div>
     </div>
 
@@ -783,6 +842,34 @@ async function removeInvoice() {
           <p v-if="data?.invoice.sentCount" class="mt-3 text-sm text-slate-500">
             Envoyée {{ data.invoice.sentCount }} fois.
           </p>
+
+          <!-- Lien public : le chauffeur ouvre sa facture sans compte. -->
+          <div class="mt-5 border-t border-slate-200 pt-4">
+            <h3 class="text-sm font-semibold text-slate-900">Envoyer au chauffeur</h3>
+            <p class="mt-1 text-sm text-slate-500">
+              WhatsApp ne sait pas joindre un PDF : le message porte un lien vers la facture, qui s’ouvre
+              sans compte et reste à jour après une correction.
+            </p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <a
+                v-if="whatsappUrl"
+                class="btn-primary !min-h-0 !py-2.5 text-sm"
+                :href="whatsappUrl"
+                target="_blank"
+                rel="noopener"
+                data-testid="whatsapp-main"
+                @click="markSent"
+                >Envoyer par WhatsApp</a
+              >
+              <p v-else class="text-sm text-amber-800">
+                Renseignez le téléphone du client pour l’envoyer par WhatsApp.
+              </p>
+              <button class="btn-ghost !min-h-0 !py-2.5 text-sm" data-testid="copy-link" @click="copyShareLink">
+                {{ shareCopied ? 'Lien copié ✓' : 'Copier le lien' }}
+              </button>
+            </div>
+            <p class="mt-2 break-all text-xs text-slate-400" data-testid="share-url">{{ shareUrl }}</p>
+          </div>
           <button
             v-if="form.status === 'DRAFT'"
             class="btn-ghost !min-h-0 mt-4 !py-2 text-sm !text-red-600"

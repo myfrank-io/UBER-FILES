@@ -940,6 +940,12 @@ model Invoice {
   lines        InvoiceLine[]
   installments InvoiceInstallment[]
 
+  /// Jeton du lien public : le chauffeur ouvre sa facture sans compte, depuis
+  /// le message qu'on lui envoie. Créé à la première ouverture de l'écran puis
+  /// stable — le PDF est régénéré à chaque appel, le lien reste donc valable
+  /// après une correction.
+  shareToken String? @unique
+
   sentAt    DateTime?
   sentCount Int       @default(0)
   paidAt    DateTime?
