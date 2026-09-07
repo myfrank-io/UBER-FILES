@@ -1,12 +1,18 @@
 // Facturation : logique pure, partagée entre l'API admin, l'écran de saisie et
 // le rendu PDF. Aucun accès base ni DOM ici — tout est testable en isolation.
 
+/** Forme d'une remise de ligne. « Offert » est un PERCENT à 100 %. */
+export type DiscountKind = 'NONE' | 'PERCENT' | 'AMOUNT'
+
 /** Une ligne de facture telle qu'elle est saisie. */
 export type InvoiceLineInput = {
   /** Désignation, éventuellement sur plusieurs lignes (« Accès Ridewiz\n+ paramétrage »). */
   label: string
   quantity: number
   unitPriceCents: number
+  discountKind?: DiscountKind
+  /** Centièmes de pour-cent si PERCENT (10000 = offert), centimes si AMOUNT. */
+  discountValue?: number
 }
 
 /**
@@ -23,9 +29,52 @@ export type InstallmentInput = {
   dueLabel: string
 }
 
-/** Montant d'une ligne. Les quantités sont entières, les prix en centimes. */
-export function lineAmountCents(line: Pick<InvoiceLineInput, 'quantity' | 'unitPriceCents'>): number {
+/** Montant d'une ligne AVANT remise. Les quantités sont entières, les prix en centimes. */
+export function lineGrossCents(line: Pick<InvoiceLineInput, 'quantity' | 'unitPriceCents'>): number {
   return Math.round(line.quantity * line.unitPriceCents)
+}
+
+/**
+ * Remise accordée sur une ligne, jamais supérieure au montant de la ligne :
+ * une remise ne crée pas un avoir au milieu d'une facture.
+ */
+export function lineDiscountCents(line: InvoiceLineInput): number {
+  const gross = lineGrossCents(line)
+  const value = line.discountValue ?? 0
+  if (value <= 0) return 0
+  const raw =
+    line.discountKind === 'PERCENT'
+      ? Math.round((gross * Math.min(value, 10_000)) / 10_000)
+      : line.discountKind === 'AMOUNT'
+        ? value
+        : 0
+  return Math.min(raw, gross)
+}
+
+/** Montant réellement facturé pour la ligne, remise déduite. */
+export function lineNetCents(line: InvoiceLineInput): number {
+  return lineGrossCents(line) - lineDiscountCents(line)
+}
+
+/** Une ligne offerte : entièrement remisée, mais dont la valeur reste affichée. */
+export function isLineFree(line: InvoiceLineInput): boolean {
+  const gross = lineGrossCents(line)
+  return gross > 0 && lineDiscountCents(line) === gross
+}
+
+/**
+ * Mention de remise imprimée sous la désignation. « Offert — valeur 50 € »
+ * plutôt qu'une ligne à zéro : le client doit voir ce qui lui a été donné.
+ */
+export function discountLabel(line: InvoiceLineInput): string | null {
+  const discount = lineDiscountCents(line)
+  if (discount === 0) return null
+  const gross = lineGrossCents(line)
+  if (isLineFree(line)) return `Offert — valeur ${formatEuros(gross)}`
+  if (line.discountKind === 'PERCENT') {
+    return `Remise ${formatShare(line.discountValue ?? 0)} — ${formatEuros(discount)}`
+  }
+  return `Remise — ${formatEuros(discount)}`
 }
 
 /**
@@ -34,9 +83,11 @@ export function lineAmountCents(line: Pick<InvoiceLineInput, 'quantity' | 'unitP
  * reste accepté pour le jour où la franchise ne s'appliquerait plus.
  */
 export function invoiceTotals(lines: InvoiceLineInput[], vatRateBasisPoints = 0) {
-  const subtotalCents = lines.reduce((sum, line) => sum + lineAmountCents(line), 0)
+  const grossCents = lines.reduce((sum, line) => sum + lineGrossCents(line), 0)
+  const discountCents = lines.reduce((sum, line) => sum + lineDiscountCents(line), 0)
+  const subtotalCents = grossCents - discountCents
   const vatCents = Math.round((subtotalCents * vatRateBasisPoints) / 10_000)
-  return { subtotalCents, vatCents, totalCents: subtotalCents + vatCents }
+  return { grossCents, discountCents, subtotalCents, vatCents, totalCents: subtotalCents + vatCents }
 }
 
 /**

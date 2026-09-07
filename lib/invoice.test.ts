@@ -10,7 +10,11 @@ import {
   invoiceTotals,
   isValidSiren,
   isValidSiret,
-  lineAmountCents,
+  discountLabel,
+  isLineFree,
+  lineDiscountCents,
+  lineGrossCents,
+  lineNetCents,
   nextInvoiceNumber,
   normalizeSiret,
   paymentTermsSentence,
@@ -19,33 +23,111 @@ import {
   vatMention,
 } from './invoice'
 
-describe('lineAmountCents', () => {
+describe('montant d’une ligne', () => {
   it('multiplie la quantité par le prix unitaire', () => {
-    expect(lineAmountCents({ quantity: 1, unitPriceCents: 40_000 })).toBe(40_000)
-    expect(lineAmountCents({ quantity: 3, unitPriceCents: 20_000 })).toBe(60_000)
+    expect(lineGrossCents({ label: 'x', quantity: 1, unitPriceCents: 40_000 })).toBe(40_000)
+    expect(lineGrossCents({ label: 'x', quantity: 3, unitPriceCents: 20_000 })).toBe(60_000)
   })
   it('gère une quantité nulle', () => {
-    expect(lineAmountCents({ quantity: 0, unitPriceCents: 40_000 })).toBe(0)
+    expect(lineGrossCents({ label: 'x', quantity: 0, unitPriceCents: 40_000 })).toBe(0)
+  })
+  it('sans remise, le net vaut le brut', () => {
+    const line = { label: 'x', quantity: 1, unitPriceCents: 40_000 }
+    expect(lineDiscountCents(line)).toBe(0)
+    expect(lineNetCents(line)).toBe(40_000)
+  })
+})
+
+describe('remise de ligne', () => {
+  const base = { label: 'Logo', quantity: 1, unitPriceCents: 5_000 }
+
+  it('applique un pourcentage', () => {
+    const line = { ...base, discountKind: 'PERCENT' as const, discountValue: 2000 }
+    expect(lineDiscountCents(line)).toBe(1_000)
+    expect(lineNetCents(line)).toBe(4_000)
+  })
+  it('applique un montant fixe', () => {
+    const line = { ...base, discountKind: 'AMOUNT' as const, discountValue: 1_500 }
+    expect(lineDiscountCents(line)).toBe(1_500)
+    expect(lineNetCents(line)).toBe(3_500)
+  })
+  it('« offert » = 100 %, la ligne tombe à zéro', () => {
+    const line = { ...base, discountKind: 'PERCENT' as const, discountValue: 10_000 }
+    expect(lineNetCents(line)).toBe(0)
+    expect(isLineFree(line)).toBe(true)
+  })
+  // Une remise supérieure à la ligne créerait un avoir au milieu de la facture.
+  it('ne dépasse jamais le montant de la ligne', () => {
+    expect(lineNetCents({ ...base, discountKind: 'AMOUNT', discountValue: 999_999 })).toBe(0)
+    expect(lineNetCents({ ...base, discountKind: 'PERCENT', discountValue: 99_999 })).toBe(0)
+  })
+  it('ignore une remise négative ou nulle', () => {
+    expect(lineDiscountCents({ ...base, discountKind: 'PERCENT', discountValue: 0 })).toBe(0)
+    expect(lineDiscountCents({ ...base, discountKind: 'AMOUNT', discountValue: -500 })).toBe(0)
+  })
+  it('ignore la valeur quand aucune remise n’est choisie', () => {
+    expect(lineDiscountCents({ ...base, discountKind: 'NONE', discountValue: 5_000 })).toBe(0)
+  })
+  it('tient compte de la quantité', () => {
+    const line = { label: 'x', quantity: 3, unitPriceCents: 10_000, discountKind: 'PERCENT' as const, discountValue: 1000 }
+    expect(lineDiscountCents(line)).toBe(3_000)
+  })
+  it('une ligne à zéro n’est pas « offerte »', () => {
+    expect(isLineFree({ label: 'x', quantity: 1, unitPriceCents: 0 })).toBe(false)
+  })
+})
+
+describe('discountLabel', () => {
+  it('annonce la valeur de ce qui est offert', () => {
+    expect(discountLabel({ label: 'Logo', quantity: 1, unitPriceCents: 5_000, discountKind: 'PERCENT', discountValue: 10_000 }))
+      .toBe('Offert — valeur 50 €')
+  })
+  it('annonce le pourcentage et le montant remisé', () => {
+    expect(discountLabel({ label: 'Logo', quantity: 1, unitPriceCents: 5_000, discountKind: 'PERCENT', discountValue: 2000 }))
+      .toBe('Remise 20 % — 10 €')
+  })
+  it('annonce un montant fixe', () => {
+    expect(discountLabel({ label: 'Logo', quantity: 1, unitPriceCents: 5_000, discountKind: 'AMOUNT', discountValue: 1_500 }))
+      .toBe('Remise — 15 €')
+  })
+  it('ne dit rien sans remise', () => {
+    expect(discountLabel({ label: 'Logo', quantity: 1, unitPriceCents: 5_000 })).toBeNull()
   })
 })
 
 describe('invoiceTotals', () => {
   it('additionne les lignes de la facture 2606-16 (400 + 200 = 600 €)', () => {
-    const { subtotalCents, vatCents, totalCents } = invoiceTotals([
+    const totals = invoiceTotals([
       { label: 'Accès Ridewiz', quantity: 1, unitPriceCents: 40_000 },
       { label: 'Création 20 cartes', quantity: 1, unitPriceCents: 20_000 },
     ])
-    expect(subtotalCents).toBe(60_000)
-    expect(vatCents).toBe(0)
-    expect(totalCents).toBe(60_000)
+    expect(totals.grossCents).toBe(60_000)
+    expect(totals.discountCents).toBe(0)
+    expect(totals.subtotalCents).toBe(60_000)
+    expect(totals.totalCents).toBe(60_000)
+  })
+  it('déduit les remises du total', () => {
+    const totals = invoiceTotals([
+      { label: 'Accès', quantity: 1, unitPriceCents: 40_000 },
+      { label: 'Logo', quantity: 1, unitPriceCents: 5_000, discountKind: 'PERCENT', discountValue: 10_000 },
+      { label: 'Cartes', quantity: 1, unitPriceCents: 20_000, discountKind: 'AMOUNT', discountValue: 2_000 },
+    ])
+    expect(totals.grossCents).toBe(65_000)
+    expect(totals.discountCents).toBe(7_000)
+    expect(totals.subtotalCents).toBe(58_000)
+    expect(totals.totalCents).toBe(58_000)
   })
   it('en franchise en base, le total est le sous-total', () => {
     expect(invoiceTotals([{ label: 'x', quantity: 1, unitPriceCents: 40_000 }]).totalCents).toBe(40_000)
   })
-  it('applique la TVA si un taux est fourni', () => {
-    const totals = invoiceTotals([{ label: 'x', quantity: 1, unitPriceCents: 10_000 }], 2000)
-    expect(totals.vatCents).toBe(2_000)
-    expect(totals.totalCents).toBe(12_000)
+  it('applique la TVA sur le montant remisé', () => {
+    const totals = invoiceTotals(
+      [{ label: 'x', quantity: 1, unitPriceCents: 10_000, discountKind: 'PERCENT', discountValue: 5000 }],
+      2000,
+    )
+    expect(totals.subtotalCents).toBe(5_000)
+    expect(totals.vatCents).toBe(1_000)
+    expect(totals.totalCents).toBe(6_000)
   })
   it('renvoie zéro sans ligne', () => {
     expect(invoiceTotals([]).totalCents).toBe(0)

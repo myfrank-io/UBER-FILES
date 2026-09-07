@@ -8,8 +8,12 @@ import type { InvoiceRenderInput } from './invoice-pdf'
 import {
   formatEuros,
   invoiceTotals,
+  lineDiscountCents,
+  lineGrossCents,
+  lineNetCents,
   nextInvoiceNumber,
   shareBasisPoints,
+  type DiscountKind,
   type InstallmentInput,
 } from '~/lib/invoice'
 
@@ -118,7 +122,11 @@ export function serializeInvoice(invoice: InvoiceWithRelations) {
       label: line.label,
       quantity: line.quantity,
       unitPriceCents: line.unitPriceCents,
-      amountCents: line.quantity * line.unitPriceCents,
+      discountKind: line.discountKind,
+      discountValue: line.discountValue,
+      grossCents: lineGrossCents(line),
+      discountCents: lineDiscountCents(line),
+      amountCents: lineNetCents(line),
     })),
     installments: invoice.installments.map((part) => ({
       id: part.id,
@@ -147,7 +155,7 @@ export interface InvoiceContent {
   issuedAt: Date
   dueDate: Date | null
   vatRateBps: number
-  lines: { label: string; quantity: number; unitPriceCents: number }[]
+  lines: { label: string; quantity: number; unitPriceCents: number; discountKind: DiscountKind; discountValue: number }[]
   installments: InstallmentInput[]
   paymentTerms: string | null
   notes: string | null
@@ -222,8 +230,12 @@ export function toRenderInput(
       label: line.label,
       quantity: line.quantity,
       unitPriceCents: line.unitPriceCents,
+      discountKind: line.discountKind,
+      discountValue: line.discountValue,
     })),
     vatRateBps: invoice.vatRateBps,
+    grossCents: invoice.lines.reduce((sum, line) => sum + lineGrossCents(line), 0),
+    discountCents: invoice.lines.reduce((sum, line) => sum + lineDiscountCents(line), 0),
     subtotalCents: invoice.subtotalCents,
     vatCents: invoice.vatCents,
     totalCents: invoice.totalCents,
@@ -273,6 +285,9 @@ export const invoiceContentSchema = z
           label: z.string().trim().min(1, 'Chaque ligne doit avoir une désignation.').max(500),
           quantity: z.number().int().min(1).max(10_000),
           unitPriceCents: z.number().int().min(0).max(100_000_000),
+          discountKind: z.enum(['NONE', 'PERCENT', 'AMOUNT']).default('NONE'),
+          // Centièmes de pour-cent si PERCENT (10000 = offert), centimes si AMOUNT.
+          discountValue: z.number().int().min(0).max(100_000_000).default(0),
         }),
       )
       .min(1, 'Ajoutez au moins une ligne à la facture.')

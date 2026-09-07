@@ -2,9 +2,12 @@
 import {
   DUE_LABEL_SUGGESTIONS,
   defaultInstallments,
+  discountLabel,
   formatEuros,
   formatShare,
   invoiceTotals,
+  isLineFree,
+  lineNetCents,
   paymentTermsSentence,
   shareBasisPoints,
   splitAmountsEvenly,
@@ -50,6 +53,10 @@ interface LineForm {
   label: string
   quantity: number
   priceEuros: number
+  /** « Aucune », un pourcentage, un montant fixe, ou offert (100 %). */
+  discountKind: 'NONE' | 'PERCENT' | 'AMOUNT'
+  /** Pour-cent si PERCENT, euros si AMOUNT. */
+  discountInput: number
 }
 interface InstallmentForm {
   amountEuros: number
@@ -103,6 +110,9 @@ function seed(invoice: Invoice) {
     label: line.label,
     quantity: line.quantity,
     priceEuros: line.unitPriceCents / 100,
+    discountKind: line.discountKind,
+    discountInput:
+      line.discountKind === 'PERCENT' ? line.discountValue / 100 : line.discountValue / 100,
   }))
   installments.value = invoice.installments.map((part) => ({
     amountEuros: part.amountCents / 100,
@@ -119,6 +129,10 @@ const contentLines = computed(() =>
     label: line.label,
     quantity: Number(line.quantity) || 0,
     unitPriceCents: Math.round((Number(line.priceEuros) || 0) * 100),
+    discountKind: line.discountKind,
+    // Un pourcentage se stocke en centièmes de pour-cent, un montant en centimes :
+    // dans les deux cas, la saisie est multipliée par cent.
+    discountValue: line.discountKind === 'NONE' ? 0 : Math.round((Number(line.discountInput) || 0) * 100),
   })),
 )
 const totals = computed(() => invoiceTotals(contentLines.value, 0))
@@ -190,10 +204,27 @@ function redistribute() {
 /** Ajoute un produit du catalogue. La ligne en est une COPIE : la modifier
  *  ensuite, ici ou dans le catalogue, ne change pas l'autre. */
 function addProduct(product: { label: string; unitPriceCents: number }) {
-  lines.value.push({ label: product.label, quantity: 1, priceEuros: product.unitPriceCents / 100 })
+  lines.value.push({
+    label: product.label,
+    quantity: 1,
+    priceEuros: product.unitPriceCents / 100,
+    discountKind: 'NONE',
+    discountInput: 0,
+  })
 }
 function addBlankLine() {
-  lines.value.push({ label: '', quantity: 1, priceEuros: 0 })
+  lines.value.push({ label: '', quantity: 1, priceEuros: 0, discountKind: 'NONE', discountInput: 0 })
+}
+
+/** « Offert » en un clic : une remise de 100 %, qui laisse la valeur visible. */
+function toggleFree(line: LineForm) {
+  if (line.discountKind === 'PERCENT' && line.discountInput === 100) {
+    line.discountKind = 'NONE'
+    line.discountInput = 0
+  } else {
+    line.discountKind = 'PERCENT'
+    line.discountInput = 100
+  }
 }
 function removeLine(index: number) {
   lines.value.splice(index, 1)
@@ -513,10 +544,73 @@ async function removeInvoice() {
                   :data-testid="`line-price-${index}`"
                 />
               </div>
-              <p class="ml-auto font-serif text-lg text-slate-900">
-                {{ formatEuros(Math.round((Number(line.quantity) || 0) * (Number(line.priceEuros) || 0) * 100)) }}
-              </p>
+              <div class="w-40">
+                <label class="label">Remise</label>
+                <select
+                  v-model="line.discountKind"
+                  class="field"
+                  :data-testid="`discount-kind-${index}`"
+                  @change="line.discountInput = line.discountKind === 'NONE' ? 0 : line.discountInput"
+                >
+                  <option value="NONE">Aucune</option>
+                  <option value="PERCENT">En pourcentage</option>
+                  <option value="AMOUNT">En euros</option>
+                </select>
+              </div>
+              <div v-if="line.discountKind !== 'NONE'" class="w-28">
+                <label class="label">&nbsp;</label>
+                <div class="relative">
+                  <input
+                    v-model.number="line.discountInput"
+                    class="field pr-7"
+                    type="number"
+                    min="0"
+                    :max="line.discountKind === 'PERCENT' ? 100 : undefined"
+                    step="1"
+                    :data-testid="`discount-value-${index}`"
+                  />
+                  <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    {{ line.discountKind === 'PERCENT' ? '%' : '€' }}
+                  </span>
+                </div>
+              </div>
+              <button
+                class="mb-3 rounded-full border px-3 py-1.5 text-xs font-semibold transition"
+                :class="
+                  isLineFree(contentLines[index] ?? { label: '', quantity: 0, unitPriceCents: 0 })
+                    ? 'border-green-600 bg-green-50 text-green-700'
+                    : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                "
+                :data-testid="`free-${index}`"
+                @click="toggleFree(line)"
+              >
+                Offert
+              </button>
+
+              <div class="ml-auto text-right">
+                <p
+                  v-if="(contentLines[index]?.discountValue ?? 0) > 0"
+                  class="text-xs text-slate-400 line-through"
+                >
+                  {{ formatEuros(Math.round((Number(line.quantity) || 0) * (Number(line.priceEuros) || 0) * 100)) }}
+                </p>
+                <p class="font-serif text-lg text-slate-900" :data-testid="`line-amount-${index}`">
+                  {{
+                    isLineFree(contentLines[index] ?? { label: '', quantity: 0, unitPriceCents: 0 })
+                      ? 'Offert'
+                      : formatEuros(lineNetCents(contentLines[index] ?? { label: '', quantity: 0, unitPriceCents: 0 }))
+                  }}
+                </p>
+              </div>
             </div>
+            <p
+              v-if="discountLabel(contentLines[index] ?? { label: '', quantity: 0, unitPriceCents: 0 })"
+              class="mt-2 text-xs italic text-slate-500"
+              :data-testid="`discount-note-${index}`"
+            >
+              {{ discountLabel(contentLines[index] ?? { label: '', quantity: 0, unitPriceCents: 0 }) }}
+              — imprimé sous la désignation.
+            </p>
           </div>
 
           <button class="btn-ghost !min-h-0 mt-4 !py-2 text-sm" data-testid="add-line" @click="addBlankLine">
@@ -524,7 +618,17 @@ async function removeInvoice() {
           </button>
 
           <div class="mt-5 border-t border-slate-200 pt-4 text-right">
-            <p class="text-sm text-slate-500">
+            <template v-if="totals.discountCents > 0">
+              <p class="text-sm text-slate-500">
+                Montant brut
+                <span class="ml-3 font-semibold text-slate-900">{{ formatEuros(totals.grossCents) }}</span>
+              </p>
+              <p class="mt-1 text-sm text-slate-500" data-testid="totals-discount">
+                Remises
+                <span class="ml-3 font-semibold text-slate-900">-{{ formatEuros(totals.discountCents) }}</span>
+              </p>
+            </template>
+            <p class="text-sm text-slate-500" :class="totals.discountCents > 0 ? 'mt-1' : ''">
               Sous-total <span class="ml-3 font-semibold text-slate-900">{{ formatEuros(totals.subtotalCents) }}</span>
             </p>
             <p v-if="totals.vatCents > 0" class="mt-1 text-sm text-slate-500">

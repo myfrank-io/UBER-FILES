@@ -6,7 +6,15 @@
 //
 // Aucun accès Prisma ici : tout arrive résolu dans `InvoiceRenderInput`.
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb, type RGB } from 'pdf-lib'
-import { LATE_PAYMENT_MENTION, formatEuros, lineAmountCents, vatMention } from '~/lib/invoice'
+import {
+  LATE_PAYMENT_MENTION,
+  discountLabel,
+  formatEuros,
+  isLineFree,
+  lineNetCents,
+  vatMention,
+  type DiscountKind,
+} from '~/lib/invoice'
 
 const MM = 72 / 25.4
 
@@ -34,6 +42,8 @@ export interface InvoiceRenderLine {
   label: string
   quantity: number
   unitPriceCents: number
+  discountKind: DiscountKind
+  discountValue: number
 }
 
 export interface InvoiceRenderInput {
@@ -62,6 +72,10 @@ export interface InvoiceRenderInput {
   }
   lines: InvoiceRenderLine[]
   vatRateBps: number
+  /** Montant des lignes avant remises. */
+  grossCents: number
+  /** Total des remises accordées, 0 s'il n'y en a aucune. */
+  discountCents: number
   subtotalCents: number
   vatCents: number
   totalCents: number
@@ -237,7 +251,7 @@ function drawLines(sheet: Sheet, fonts: Fonts, input: InvoiceRenderInput) {
   drawTableHead(sheet, fonts)
   for (const [index, line] of input.lines.entries()) {
     const wrapped = wrapText(fonts.regular, line.label, 9.5, LABEL_W)
-    const blockH = wrapped.length * ((9.5 * 1.4) / MM) + 9
+    const blockH = wrapped.length * ((9.5 * 1.4) / MM) + (discountLabel(line) ? (8 * 1.5) / MM : 0) + 9
 
     if (sheet.y + blockH > CONTENT_BOTTOM) {
       sheet.nextPage()
@@ -251,8 +265,22 @@ function drawLines(sheet: Sheet, fonts: Fonts, input: InvoiceRenderInput) {
       sheet.text(text, MARGIN, y, 9.5, fonts.regular)
       y += (9.5 * 1.4) / MM
     }
+    // Une remise s'annonce sous la désignation : le client doit voir ce qui lui
+    // a été consenti, pas seulement un montant plus bas que prévu.
+    const discount = discountLabel(line)
+    if (discount) {
+      sheet.text(discount, MARGIN, y + 0.6, 8, fonts.italic, MUTED)
+      y += (8 * 1.5) / MM
+    }
     sheet.text(String(line.quantity), QTY_X, rowTop, 9.5, fonts.regular)
-    sheet.textRight(formatEuros(lineAmountCents(line)), RIGHT_X, rowTop, 9.5, fonts.bold, AMOUNT)
+    sheet.textRight(
+      isLineFree(line) ? 'Offert' : formatEuros(lineNetCents(line)),
+      RIGHT_X,
+      rowTop,
+      9.5,
+      fonts.bold,
+      AMOUNT,
+    )
 
     sheet.y = Math.max(y, rowTop + 6) + 5
     if (index < input.lines.length - 1) {
@@ -268,6 +296,16 @@ function drawTotals(sheet: Sheet, fonts: Fonts, input: InvoiceRenderInput) {
   sheet.y += 7
 
   const labelRight = 160
+  // Avec des remises, le brut et le montant consenti apparaissent au-dessus du
+  // sous-total : sans cela, un « offert » ne se verrait nulle part dans les totaux.
+  if (input.discountCents > 0) {
+    sheet.textRight('Montant brut', labelRight, sheet.y, 8.5, fonts.regular, MUTED)
+    sheet.textRight(formatEuros(input.grossCents), RIGHT_X, sheet.y, 9, fonts.regular, INK)
+    sheet.y += 6
+    sheet.textRight('Remises', labelRight, sheet.y, 8.5, fonts.regular, MUTED)
+    sheet.textRight(`-${formatEuros(input.discountCents)}`, RIGHT_X, sheet.y, 9, fonts.regular, INK)
+    sheet.y += 6
+  }
   sheet.textRight('Sous-total', labelRight, sheet.y, 8.5, fonts.regular, MUTED)
   sheet.textRight(formatEuros(input.subtotalCents), RIGHT_X, sheet.y, 9, fonts.bold, AMOUNT)
   sheet.y += 6
