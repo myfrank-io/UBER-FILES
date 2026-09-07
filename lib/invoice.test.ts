@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   DUE_LABEL_SUGGESTIONS,
-  INVOICE_PRESETS,
   LATE_PAYMENT_MENTION,
   defaultInstallments,
   formatEuros,
@@ -217,19 +216,8 @@ describe('mentions légales', () => {
   })
 })
 
-describe('préréglages', () => {
-  it('propose l’accès à 400 € et les cartes à 200 €', () => {
-    expect(INVOICE_PRESETS.find((p) => p.key === 'acces')?.unitPriceCents).toBe(40_000)
-    expect(INVOICE_PRESETS.find((p) => p.key === 'cartes')?.unitPriceCents).toBe(20_000)
-  })
-  it('a des clés uniques', () => {
-    expect(new Set(INVOICE_PRESETS.map((p) => p.key)).size).toBe(INVOICE_PRESETS.length)
-  })
-  // Deux boutons portant le même texte sont impossibles à distinguer.
-  it('a des libellés de pastille distincts', () => {
-    expect(new Set(INVOICE_PRESETS.map((p) => p.chip)).size).toBe(INVOICE_PRESETS.length)
-  })
-  it('propose des échéances courantes', () => {
+describe('DUE_LABEL_SUGGESTIONS', () => {
+  it('propose les échéances courantes', () => {
     expect(DUE_LABEL_SUGGESTIONS).toContain('à la commande')
     expect(DUE_LABEL_SUGGESTIONS).toContain('à la livraison')
   })

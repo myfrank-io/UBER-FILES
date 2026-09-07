@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   DUE_LABEL_SUGGESTIONS,
-  INVOICE_PRESETS,
   defaultInstallments,
   formatEuros,
   formatShare,
@@ -188,10 +187,10 @@ function redistribute() {
 }
 
 // ═══ Lignes ═══
-function addPreset(key: string) {
-  const preset = INVOICE_PRESETS.find((p) => p.key === key)
-  if (!preset) return
-  lines.value.push({ label: preset.label, quantity: 1, priceEuros: preset.unitPriceCents / 100 })
+/** Ajoute un produit du catalogue. La ligne en est une COPIE : la modifier
+ *  ensuite, ici ou dans le catalogue, ne change pas l'autre. */
+function addProduct(product: { label: string; unitPriceCents: number }) {
+  lines.value.push({ label: product.label, quantity: 1, priceEuros: product.unitPriceCents / 100 })
 }
 function addBlankLine() {
   lines.value.push({ label: '', quantity: 1, priceEuros: 0 })
@@ -459,14 +458,21 @@ async function removeInvoice() {
             <h2 class="font-semibold text-slate-900">Prestations</h2>
             <div class="flex flex-wrap gap-2">
               <button
-                v-for="preset in INVOICE_PRESETS"
-                :key="preset.key"
+                v-for="product in data?.products ?? []"
+                :key="product.id"
                 class="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-brand-400 hover:bg-slate-50"
-                :data-testid="`preset-${preset.key}`"
-                @click="addPreset(preset.key)"
+                :data-testid="`product-${product.id}`"
+                @click="addProduct(product)"
               >
-                + {{ preset.chip }} ({{ formatEuros(preset.unitPriceCents) }})
+                + {{ product.name }} ({{ formatEuros(product.unitPriceCents) }})
               </button>
+              <NuxtLink
+                v-if="(data?.products ?? []).length === 0"
+                to="/admin/factures"
+                class="text-xs font-semibold text-brand-700 hover:underline"
+              >
+                Créer un produit →
+              </NuxtLink>
             </div>
           </div>
 

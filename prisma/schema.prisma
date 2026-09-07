@@ -996,3 +996,26 @@ model InvoiceIssuer {
 
   updatedAt DateTime @updatedAt
 }
+
+/// Produit du catalogue : ce que l'exploitant vend habituellement (accès,
+/// paramétrage, cartes…), pour l'ajouter à une facture en un clic.
+///
+/// Une facture COPIE la désignation et le prix au moment où la ligne est
+/// ajoutée : corriger un prix ici, ou supprimer un produit, ne touche aucune
+/// facture déjà émise — un document comptable ne se réécrit pas.
+model InvoiceProduct {
+  id String @id @default(cuid())
+
+  /// Nom court, affiché sur le bouton d'ajout de l'éditeur.
+  name           String
+  /// Désignation imprimée sur la facture, éventuellement sur plusieurs lignes.
+  label          String
+  unitPriceCents Int
+  /// Ordre d'affichage dans le catalogue et parmi les boutons.
+  position       Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([position])
+}
