@@ -15,6 +15,7 @@ import {
   type NfcCardProduct,
 } from '~/lib/nfc-card'
 import { driverReviewUrl } from '~/lib/review-link'
+import { parseLogoRecipe } from '~/lib/logo-bank'
 import type { NfcCardRenderInput } from '~/server/utils/nfc-card-pdf'
 
 /** Design sans le blob du logo (omis globalement par le client Prisma). */
@@ -64,6 +65,7 @@ export function serializeNfcCardDesign(driverId: string, design: NfcCardDesignRo
     phone: design.phone ?? '',
     qtyReview: design.qtyReview,
     qtyBusiness: design.qtyBusiness,
+    logoRecipe: parseLogoRecipe(design.logoRecipe),
     sentAt: design.sentAt,
     sentCount: design.sentCount,
     updatedAt: design.updatedAt,
