@@ -1980,6 +1980,9 @@ async function call(key: string, fn: () => Promise<unknown>) {
           </button>
         </div>
       </form>
+
+      <!-- Application mobile (PWA) -->
+      <DashboardInstallCard />
     </div>
   </div>
 </template>

@@ -2,6 +2,17 @@
 // Layout du back-office chauffeur : navigation latérale (desktop) / barre basse (mobile).
 const { user, session, clear, fetch: refreshSession } = useUserSession()
 
+// Métadonnées « app » iOS pour l'ajout à l'écran d'accueil. Le manifeste PWA est
+// lié par <NuxtPwaManifest /> dans ce layout seulement : la page publique des
+// chauffeurs n'est pas une app. Barre d'état par défaut (le dashboard est clair,
+// un texte blanc y serait illisible).
+useHead({
+  meta: [
+    { name: 'apple-mobile-web-app-title', content: 'Ridewiz' },
+    { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
+  ],
+})
+
 // Usurpation admin : quand un admin visite l'espace d'un chauffeur, la session
 // mémorise son identité. On affiche alors un bandeau pour revenir à l'admin.
 const impersonator = computed(
@@ -68,6 +79,8 @@ async function logout() {
   <!-- pb mobile : dégage la barre basse (56px + safe-area) ET le bouton flottant
        « Partager » qui la surplombe, pour qu'aucun contenu ne reste masqué en fin de scroll. -->
   <div class="min-h-screen bg-slate-50 pb-[calc(9.5rem+env(safe-area-inset-bottom))] sm:flex sm:pb-0">
+    <!-- <link rel="manifest"> dans <head> (aucun DOM rendu ici) -->
+    <NuxtPwaManifest />
     <!-- Sidebar desktop -->
     <aside class="hidden w-60 shrink-0 border-r border-slate-200 bg-white p-5 sm:block">
       <div class="flex items-center gap-2.5">
@@ -160,6 +173,9 @@ async function logout() {
           réactiver votre compte.
         </p>
       </div>
+
+      <!-- Nouvelle version de l'app déployée depuis l'ouverture (PWA) -->
+      <PwaUpdateBanner />
 
       <slot />
     </main>

@@ -3,7 +3,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
 
-  modules: ['@nuxtjs/tailwindcss', '@nuxtjs/i18n', 'nuxt-auth-utils', '@nuxt/fonts'],
+  modules: ['@nuxtjs/tailwindcss', '@nuxtjs/i18n', 'nuxt-auth-utils', '@nuxt/fonts', '@vite-pwa/nuxt'],
 
   css: ['~/assets/css/main.css'],
 
@@ -49,6 +49,13 @@ export default defineNuxtConfig({
     // Parcours de configuration guidée (session chauffeur) : même politique.
     '/configuration': { ssr: false, swr: false },
     '/configuration/**': { ssr: false },
+    // Service worker + manifeste PWA : revalidés à chaque chargement, sinon une
+    // nouvelle version de l'app pourrait traîner derrière un cache.
+    '/sw.js': { swr: false, headers: { 'Cache-Control': 'public, max-age=0, must-revalidate' } },
+    '/manifest.webmanifest': {
+      swr: false,
+      headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'public, max-age=0, must-revalidate' },
+    },
   },
 
   typescript: {
@@ -139,6 +146,70 @@ export default defineNuxtConfig({
   nitro: {
     // Le webhook Stripe a besoin du corps brut pour vérifier la signature.
     // Géré au niveau du handler via readRawBody.
+  },
+
+  // PWA — l'espace chauffeur s'installe sur l'écran d'accueil (Android : invite
+  // native, iOS : Partager → « Sur l'écran d'accueil »), sans store. Le manifeste
+  // n'est lié que par le layout dashboard et le service worker n'est enregistré
+  // que sur /dashboard (plugins/pwa.client.ts) : la page publique d'un chauffeur
+  // reste un site classique pour ses clients. Icônes générées depuis favicon.svg.
+  pwa: {
+    // Nouvelle version = bandeau « Actualiser » (PwaUpdateBanner), jamais de
+    // rechargement automatique en pleine saisie.
+    registerType: 'prompt',
+    // Enregistrement maison (plugins/pwa.client.ts), limité au dashboard.
+    client: { registerPlugin: false },
+    manifest: {
+      id: '/dashboard',
+      name: 'Ridewiz',
+      short_name: 'Ridewiz',
+      description: 'Votre espace chauffeur : demandes, courses, agenda.',
+      lang: 'fr',
+      // Périmètre = espace chauffeur. Hors périmètre (sa page publique, ouverte
+      // depuis l'app), le système affiche une vue navigateur avec bouton de
+      // fermeture — sinon, sur iOS, le chauffeur y resterait coincé sans
+      // bouton « précédent ».
+      scope: '/dashboard',
+      start_url: '/dashboard',
+      display: 'standalone',
+      background_color: '#FBF7F0',
+      theme_color: '#0E1B2C',
+      icons: [
+        { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    },
+    workbox: {
+      // Précache : le build hashé (JS/CSS) et les icônes. Jamais /api/** ni le
+      // HTML (rendu serveur, données propres à chaque chauffeur) : rien de
+      // personnel n'est mis en cache, l'isolation entre chauffeurs reste
+      // entièrement côté serveur. Pas les polices non plus : découpées par
+      // unicode-range, le navigateur ne charge que les sous-ensembles utiles et
+      // les garde en cache HTTP immuable — les précacher toutes coûterait des Mo
+      // pour rien.
+      globPatterns: [
+        '_nuxt/**/*.{js,css}',
+        'pwa-*.png',
+        'maskable-icon-*.png',
+        'favicon*',
+        'apple-touch-icon.png',
+      ],
+      // Un seul fichier sw.js (pas de workbox-*.js à côté).
+      inlineWorkboxRuntime: true,
+      cleanupOutdatedCaches: true,
+      clientsClaim: true,
+    },
+    devOptions: { enabled: false },
+  },
+
+  hooks: {
+    // Le module impose un `navigateFallback: '/'` pensé pour les sites statiques.
+    // En SSR, aucun `/` n'est précaché : le service worker refuserait de
+    // s'installer. On retire l'option — les navigations vont toujours au réseau.
+    'pwa:beforeBuildServiceWorker'(options) {
+      delete options.workbox.navigateFallback
+    },
   },
 
   app: {
