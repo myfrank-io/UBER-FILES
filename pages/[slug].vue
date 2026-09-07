@@ -119,6 +119,9 @@ useHead(() => {
     title: t('public.metaTitle', { name: d.displayName }),
     meta: [
       { name: 'description', content: description },
+      // Marque blanche : ajoutée à l'écran d'accueil iOS, la page porte le nom
+      // du chauffeur (remplace le « Ridewiz » du head global).
+      { name: 'apple-mobile-web-app-title', content: d.displayName },
       // Open Graph
       { property: 'og:title', content: d.displayName },
       { property: 'og:description', content: description },

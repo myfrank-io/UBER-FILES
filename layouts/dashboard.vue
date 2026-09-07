@@ -2,15 +2,12 @@
 // Layout du back-office chauffeur : navigation latérale (desktop) / barre basse (mobile).
 const { user, session, clear, fetch: refreshSession } = useUserSession()
 
-// Métadonnées « app » iOS pour l'ajout à l'écran d'accueil. Le manifeste PWA est
-// lié par <NuxtPwaManifest /> dans ce layout seulement : la page publique des
-// chauffeurs n'est pas une app. Barre d'état par défaut (le dashboard est clair,
-// un texte blanc y serait illisible).
+// Ajout à l'écran d'accueil iOS : barre d'état par défaut (le dashboard est
+// clair, un texte blanc y serait illisible). Le nom « Ridewiz » vient du head
+// global (nuxt.config) ; le manifeste PWA est lié par <NuxtPwaManifest /> dans
+// ce layout seulement : la page publique des chauffeurs n'est pas une app.
 useHead({
-  meta: [
-    { name: 'apple-mobile-web-app-title', content: 'Ridewiz' },
-    { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
-  ],
+  meta: [{ name: 'apple-mobile-web-app-status-bar-style', content: 'default' }],
 })
 
 // Usurpation admin : quand un admin visite l'espace d'un chauffeur, la session
