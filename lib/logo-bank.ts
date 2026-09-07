@@ -158,11 +158,55 @@ export const LOGO_COLOR_PRESETS: { label: string; color: string }[] = [
 
 export const DEFAULT_LOGO_ACCENT = '#C9A24D'
 
+/**
+ * Jetons de couleur « suit le thème » : la couleur n'est pas figée dans le
+ * logo, elle est résolue au rendu depuis la palette de la carte. Le logo
+ * change donc de couleur en même temps que la carte.
+ */
+export const LOGO_THEME_COLORS = {
+  elements: 'theme:elements',
+  background: 'theme:background',
+} as const
+
+export type LogoThemeColor = (typeof LOGO_THEME_COLORS)[keyof typeof LOGO_THEME_COLORS]
+
+export const LOGO_THEME_COLOR_LABELS: Record<LogoThemeColor, string> = {
+  [LOGO_THEME_COLORS.elements]: 'Éléments du thème',
+  [LOGO_THEME_COLORS.background]: 'Fond du thème',
+}
+
+/** Par défaut le texte du logo suit la couleur des éléments de la carte. */
+export const DEFAULT_LOGO_PRIMARY: LogoThemeColor = LOGO_THEME_COLORS.elements
+
 const hex = z
   .string()
   .trim()
   .regex(/^#[0-9a-fA-F]{6}$/, 'Couleur invalide (format #RRGGBB).')
   .transform((v) => v.toUpperCase())
+
+/** Une couleur de logo : un hex figé, ou un jeton qui suit le thème. */
+const logoColorValue = z.union([hex, z.nativeEnum(LOGO_THEME_COLORS)])
+
+export type LogoColorValue = z.infer<typeof logoColorValue>
+
+export function isLogoThemeColor(value: string): value is LogoThemeColor {
+  return value === LOGO_THEME_COLORS.elements || value === LOGO_THEME_COLORS.background
+}
+
+/** Palette de la carte à laquelle un logo « suit le thème » se réfère. */
+export interface LogoTheme {
+  /** Couleur des éléments de la carte. */
+  elements: string
+  /** Couleur de fond de la carte. */
+  background: string
+}
+
+/** Couleur effective d'un jeton : le hex tel quel, ou la couleur du thème. */
+export function resolveLogoColor(value: string, theme: LogoTheme): string {
+  if (value === LOGO_THEME_COLORS.elements) return theme.elements
+  if (value === LOGO_THEME_COLORS.background) return theme.background
+  return value
+}
 
 /**
  * Recette d'un logo généré : tout ce qu'il faut pour le re-rendre à
@@ -175,12 +219,20 @@ export const logoRecipeSchema = z.object({
   initials: z.string().max(3),
   name: z.string().max(40),
   tagline: z.string().max(40),
-  primary: hex,
-  accent: hex,
+  primary: logoColorValue,
+  accent: logoColorValue,
   metallic: z.boolean(),
 })
 
 export type LogoRecipe = z.infer<typeof logoRecipeSchema>
+
+/**
+ * Vrai si au moins une couleur suit le thème : le logo doit alors être
+ * re-rendu quand la palette de la carte change.
+ */
+export function logoRecipeFollowsTheme(recipe: LogoRecipe): boolean {
+  return isLogoThemeColor(recipe.primary) || isLogoThemeColor(recipe.accent)
+}
 
 /** Recette lisible ou null (JSON d'une ancienne version, champ absent…). */
 export function parseLogoRecipe(raw: unknown): LogoRecipe | null {

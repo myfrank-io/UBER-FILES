@@ -24,7 +24,8 @@ import {
   type NfcCardProduct,
 } from '~/lib/nfc-card'
 import { MAX_PHOTO_SOURCE_BYTES, resizeImageToDataUrl } from '~/composables/useImageResize'
-import type { LogoRecipe } from '~/lib/logo-bank'
+import { logoRecipeFollowsTheme, type LogoRecipe } from '~/lib/logo-bank'
+import { renderLogoFromRecipe } from '~/composables/useLogoRenderer'
 
 definePageMeta({ layout: 'default', middleware: 'admin' })
 
@@ -168,6 +169,23 @@ function onLogoUpdated(recipe: LogoRecipe, dataUrl: string | null) {
   }
   scheduleAutosave()
 }
+
+// Un logo dont les couleurs suivent le thème est re-rendu et ré-enregistré
+// dès que la palette de la carte change : changer de palette recolore le logo.
+let themeTimer: ReturnType<typeof setTimeout> | null = null
+watch([() => form.bgColor, () => form.fgColor], () => {
+  const recipe = currentRecipe.value
+  if (!recipe?.templateId || !logoRecipeFollowsTheme(recipe)) return
+  if (themeTimer) clearTimeout(themeTimer)
+  themeTimer = setTimeout(async () => {
+    const dataUrl = await renderLogoFromRecipe(recipe, { elements: form.fgColor, background: form.bgColor })
+    if (!dataUrl) return
+    pendingLogo.value = dataUrl
+    pendingRecipe.value = recipe
+    useCardLogo.value = false
+    scheduleAutosave()
+  }, 250)
+})
 
 function takeCardLogo() {
   // Aperçu impossible avant sauvegarde (le blob est côté serveur) : on
