@@ -170,7 +170,8 @@ const hex = z
  * Enregistrée avec le design ; NULL quand le logo a été importé.
  */
 export const logoRecipeSchema = z.object({
-  templateId: z.string().min(1).max(40),
+  /** Modèle choisi ; null = réglages enregistrés sans modèle encore choisi. */
+  templateId: z.string().min(1).max(40).nullable(),
   initials: z.string().max(3),
   name: z.string().max(40),
   tagline: z.string().max(40),
@@ -184,7 +185,9 @@ export type LogoRecipe = z.infer<typeof logoRecipeSchema>
 /** Recette lisible ou null (JSON d'une ancienne version, champ absent…). */
 export function parseLogoRecipe(raw: unknown): LogoRecipe | null {
   const r = logoRecipeSchema.safeParse(raw)
-  return r.success && findLogoTemplate(r.data.templateId) ? r.data : null
+  if (!r.success) return null
+  // Un modèle disparu de la banque ne bloque rien : on garde les réglages.
+  return r.data.templateId && !findLogoTemplate(r.data.templateId) ? { ...r.data, templateId: null } : r.data
 }
 
 export const DEFAULT_LOGO_TAGLINE = 'Chauffeur Privé'

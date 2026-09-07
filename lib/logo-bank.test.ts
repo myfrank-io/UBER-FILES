@@ -114,8 +114,12 @@ describe('parseLogoRecipe', () => {
     expect(parseLogoRecipe(recipe)?.primary).toBe('#F3EBDD')
   })
 
-  it('rejette un modèle inconnu, une couleur invalide ou un JSON étranger', () => {
-    expect(parseLogoRecipe({ ...recipe, templateId: 'nope' })).toBeNull()
+  it('garde les réglages d’un modèle disparu, accepte un brouillon sans modèle', () => {
+    expect(parseLogoRecipe({ ...recipe, templateId: 'nope' })?.templateId).toBeNull()
+    expect(parseLogoRecipe({ ...recipe, templateId: null })?.name).toBe("Same's Driver")
+  })
+
+  it('rejette une couleur invalide ou un JSON étranger', () => {
     expect(parseLogoRecipe({ ...recipe, accent: 'gold' })).toBeNull()
     expect(parseLogoRecipe(null)).toBeNull()
     expect(parseLogoRecipe('x')).toBeNull()

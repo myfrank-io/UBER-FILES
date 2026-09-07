@@ -29,7 +29,16 @@ const props = defineProps<{
   recipe?: LogoRecipe | null
 }>()
 
-const emit = defineEmits<{ (e: 'close'): void; (e: 'pick', dataUrl: string, recipe: LogoRecipe): void }>()
+const emit = defineEmits<{
+  (e: 'close'): void
+  /** Un modèle cliqué : logo rendu, à appliquer et enregistrer. */
+  (e: 'pick', dataUrl: string, recipe: LogoRecipe): void
+  /**
+   * Réglages modifiés (textes, couleurs, métal) : à enregistrer. `dataUrl`
+   * est le logo re-rendu quand un modèle est déjà choisi, null sinon.
+   */
+  (e: 'update', recipe: LogoRecipe, dataUrl: string | null): void
+}>()
 
 const baseName = props.companyName?.trim() || props.driverName
 const fields = reactive({
@@ -97,20 +106,41 @@ watch(
   },
 )
 
-function pick(id: string) {
-  const template = LOGO_TEMPLATES.find((t) => t.id === id)
-  if (!template) return
-  const input = normalizeLogoInput(fields)
-  // 1600 px de large pour 40 mm imprimés : largement au-dessus des 300 dpi.
-  const dataUrl = logoSceneToDataUrl(template.build(input), colors.value, { width: 1600 })
-  emit('pick', dataUrl, {
-    templateId: template.id,
-    ...input,
+function currentRecipe(templateId: string | null): LogoRecipe {
+  return {
+    templateId,
+    ...normalizeLogoInput(fields),
     primary: colors.value.primary.toUpperCase(),
     accent: colors.value.accent.toUpperCase(),
     metallic: metallic.value,
-  })
+  }
 }
+
+/** PNG final : 1600 px de large pour 40 mm imprimés, largement au-dessus des 300 dpi. */
+function renderFinal(templateId: string): string | null {
+  const template = LOGO_TEMPLATES.find((t) => t.id === templateId)
+  if (!template) return null
+  return logoSceneToDataUrl(template.build(normalizeLogoInput(fields)), colors.value, { width: 1600 })
+}
+
+function pick(id: string) {
+  const dataUrl = renderFinal(id)
+  if (!dataUrl) return
+  selectedId.value = id
+  emit('pick', dataUrl, currentRecipe(id))
+}
+
+// Tout changement de réglage est poussé au parent (qui l'enregistre) : avec
+// le logo re-rendu si un modèle est déjà choisi, sinon les réglages seuls,
+// pour les retrouver à la prochaine ouverture.
+let updateTimer: ReturnType<typeof setTimeout> | null = null
+watch([() => fields.initials, () => fields.name, () => fields.tagline, primary, accent, metallic], () => {
+  if (updateTimer) clearTimeout(updateTimer)
+  updateTimer = setTimeout(() => {
+    const id = selectedId.value
+    emit('update', currentRecipe(id), id ? renderFinal(id) : null)
+  }, 600)
+})
 </script>
 
 <template>
@@ -118,7 +148,9 @@ function pick(id: string) {
     <div class="flex items-start justify-between gap-3">
       <div>
         <h2 class="font-serif text-xl font-medium text-slate-900">Créer un logo</h2>
-        <p class="mt-1 text-sm text-slate-500">Choisissez un modèle : il devient le logo du recto, fond transparent.</p>
+        <p class="mt-1 text-sm text-slate-500">
+          Choisissez un modèle : il devient le logo du recto, fond transparent. Vos réglages sont enregistrés automatiquement.
+        </p>
       </div>
       <button type="button" class="text-slate-400 hover:text-slate-700" aria-label="Fermer" @click="emit('close')">✕</button>
     </div>
