@@ -7,6 +7,7 @@ import {
   deriveInitials,
   findLogoTemplate,
   normalizeLogoInput,
+  parseLogoRecipe,
   regularPolygon,
   sceneWithinBounds,
   splitName,
@@ -95,5 +96,28 @@ describe('LOGO_TEMPLATES', () => {
   it('findLogoTemplate', () => {
     expect(findLogoTemplate('seal')?.label).toBe('Sceau')
     expect(findLogoTemplate('nope')).toBeUndefined()
+  })
+})
+
+describe('parseLogoRecipe', () => {
+  const recipe = {
+    templateId: 'diamond-crest',
+    initials: 'SD',
+    name: "Same's Driver",
+    tagline: 'VTC Premium',
+    primary: '#f3ebdd',
+    accent: '#C9A24D',
+    metallic: false,
+  }
+
+  it('accepte une recette valide et normalise les couleurs', () => {
+    expect(parseLogoRecipe(recipe)?.primary).toBe('#F3EBDD')
+  })
+
+  it('rejette un modèle inconnu, une couleur invalide ou un JSON étranger', () => {
+    expect(parseLogoRecipe({ ...recipe, templateId: 'nope' })).toBeNull()
+    expect(parseLogoRecipe({ ...recipe, accent: 'gold' })).toBeNull()
+    expect(parseLogoRecipe(null)).toBeNull()
+    expect(parseLogoRecipe('x')).toBeNull()
   })
 })

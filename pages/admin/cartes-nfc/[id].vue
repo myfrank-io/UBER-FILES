@@ -24,6 +24,7 @@ import {
   type NfcCardProduct,
 } from '~/lib/nfc-card'
 import { MAX_PHOTO_SOURCE_BYTES, resizeImageToDataUrl } from '~/composables/useImageResize'
+import type { LogoRecipe } from '~/lib/logo-bank'
 
 definePageMeta({ layout: 'default', middleware: 'admin' })
 
@@ -56,6 +57,8 @@ const form = reactive({
 // encore sauvegardée), soit rien. `pendingLogo` voyage avec la sauvegarde.
 const savedLogoUrl = ref<string | null>(null)
 const pendingLogo = ref<string | null | undefined>(undefined) // undefined = inchangé, null = supprimé
+// Recette du logo en attente : fournie par la banque, nulle pour un import.
+const pendingRecipe = ref<LogoRecipe | null>(null)
 const useCardLogo = ref(false)
 const logoSrc = computed(() => (pendingLogo.value === undefined ? savedLogoUrl.value : pendingLogo.value))
 
@@ -74,8 +77,14 @@ function loadFromServer() {
   form.qtyBusiness = d.qtyBusiness
   savedLogoUrl.value = d.logoUrl
   pendingLogo.value = undefined
+  pendingRecipe.value = null
   useCardLogo.value = false
 }
+
+// Recette à rouvrir dans la banque : celle en attente, sinon celle enregistrée.
+const currentRecipe = computed<LogoRecipe | null>(() =>
+  pendingLogo.value !== undefined ? pendingRecipe.value : ((data.value?.design.logoRecipe as LogoRecipe | null) ?? null),
+)
 loadFromServer()
 
 const dirty = ref(false)
@@ -106,6 +115,7 @@ async function onLogoFile(file: File | undefined) {
     // 1400 px de côté : ~40 mm imprimés à 300 dpi demandent 470 px, on garde
     // de la marge pour un logo agrandi. PNG pour préserver la transparence.
     pendingLogo.value = await resizeImageToDataUrl(file, 1400, { mimeType: 'image/png' })
+    pendingRecipe.value = null
     useCardLogo.value = false
   } catch (e) {
     toast.error((e as Error).message || 'Image illisible.')
@@ -127,14 +137,16 @@ function onLogoDrop(e: DragEvent) {
 
 function removeLogo() {
   pendingLogo.value = null
+  pendingRecipe.value = null
   useCardLogo.value = false
 }
 
 // Banque de logos : un modèle choisi devient le logo importé (PNG transparent),
 // à enregistrer comme n'importe quel logo.
 const logoBank = ref(false)
-function onLogoPicked(dataUrl: string) {
+function onLogoPicked(dataUrl: string, recipe: LogoRecipe) {
   pendingLogo.value = dataUrl
+  pendingRecipe.value = recipe
   useCardLogo.value = false
   logoBank.value = false
   resetLogoPlacement()
@@ -189,7 +201,7 @@ async function save(): Promise<boolean> {
       body: {
         ...form,
         ...(useCardLogo.value ? { useCardLogo: true } : {}),
-        ...(pendingLogo.value !== undefined ? { logo: pendingLogo.value } : {}),
+        ...(pendingLogo.value !== undefined ? { logo: pendingLogo.value, logoRecipe: pendingRecipe.value } : {}),
       },
     })
     await refresh()
@@ -298,7 +310,7 @@ const productLabels = NFC_CARD_PRODUCT_LABELS
             </div>
             <input ref="logoInput" type="file" accept="image/png,image/jpeg" class="hidden" @change="onLogoInput" />
             <button v-if="logoSrc" type="button" class="mt-2 mr-3 text-xs text-brand-700 hover:underline" @click="logoBank = true">
-              ✨ Créer un autre logo
+              {{ currentRecipe ? '✨ Modifier le logo (couleurs, textes, modèle)' : '✨ Créer un autre logo' }}
             </button>
             <button
               v-if="data.driver.cardLogoAvailable"
@@ -471,6 +483,7 @@ const productLabels = NFC_CARD_PRODUCT_LABELS
       :title="form.title"
       :bg-color="form.bgColor"
       :fg-color="form.fgColor"
+      :recipe="currentRecipe"
       @close="logoBank = false"
       @pick="onLogoPicked"
     />

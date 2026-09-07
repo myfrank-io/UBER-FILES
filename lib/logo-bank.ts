@@ -10,6 +10,8 @@
 // éléments de la carte), `accent` (cuivre, or…) et `inverse` (fond de la carte,
 // pour un texte « découpé » dans une forme pleine).
 
+import { z } from 'zod'
+
 export const LOGO_W = 1000
 export const LOGO_H = 650
 
@@ -139,15 +141,51 @@ export interface LogoTemplate {
   build: (input: LogoInput) => LogoScene
 }
 
-/** Accents proposés dans l'éditeur ; `null` = même couleur que les éléments. */
-export const LOGO_ACCENTS: { key: string; label: string; color: string | null }[] = [
-  { key: 'copper', label: 'Cuivre', color: '#B5793F' },
-  { key: 'gold', label: 'Or', color: '#C9A24D' },
-  { key: 'champagne', label: 'Champagne', color: '#E0B579' },
-  { key: 'silver', label: 'Argent', color: '#9AA3AD' },
-  { key: 'navy', label: 'Nuit', color: '#0E1B2C' },
-  { key: 'mono', label: 'Assorti', color: null },
+/**
+ * Couleurs proposées en raccourci dans l'éditeur, pour le texte comme pour
+ * l'accent ; une couleur libre reste possible à côté.
+ */
+export const LOGO_COLOR_PRESETS: { label: string; color: string }[] = [
+  { label: 'Or', color: '#C9A24D' },
+  { label: 'Cuivre', color: '#B5793F' },
+  { label: 'Champagne', color: '#E0B579' },
+  { label: 'Argent', color: '#9AA3AD' },
+  { label: 'Blanc', color: '#FFFFFF' },
+  { label: 'Crème', color: '#F6F1E9' },
+  { label: 'Nuit', color: '#0E1B2C' },
+  { label: 'Noir', color: '#111111' },
 ]
+
+export const DEFAULT_LOGO_ACCENT = '#C9A24D'
+
+const hex = z
+  .string()
+  .trim()
+  .regex(/^#[0-9a-fA-F]{6}$/, 'Couleur invalide (format #RRGGBB).')
+  .transform((v) => v.toUpperCase())
+
+/**
+ * Recette d'un logo généré : tout ce qu'il faut pour le re-rendre à
+ * l'identique ou le modifier (modèle, textes, couleurs, effet métal).
+ * Enregistrée avec le design ; NULL quand le logo a été importé.
+ */
+export const logoRecipeSchema = z.object({
+  templateId: z.string().min(1).max(40),
+  initials: z.string().max(3),
+  name: z.string().max(40),
+  tagline: z.string().max(40),
+  primary: hex,
+  accent: hex,
+  metallic: z.boolean(),
+})
+
+export type LogoRecipe = z.infer<typeof logoRecipeSchema>
+
+/** Recette lisible ou null (JSON d'une ancienne version, champ absent…). */
+export function parseLogoRecipe(raw: unknown): LogoRecipe | null {
+  const r = logoRecipeSchema.safeParse(raw)
+  return r.success && findLogoTemplate(r.data.templateId) ? r.data : null
+}
 
 export const DEFAULT_LOGO_TAGLINE = 'Chauffeur Privé'
 

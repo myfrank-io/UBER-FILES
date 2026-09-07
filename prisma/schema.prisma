@@ -860,6 +860,10 @@ model NfcCardDesign {
   logoOffsetX Float   @default(0) // mm
   logoOffsetY Float   @default(0) // mm
 
+  // Recette du logo quand il vient de la banque de logos (modèle, textes,
+  // couleurs) : permet de le rouvrir et de le modifier. NULL = logo importé.
+  logoRecipe Json?
+
   // Logo Google du verso « avis » : monochrome (couleur des éléments) ou officiel.
   googleLogoStyle String @default("mono")
 

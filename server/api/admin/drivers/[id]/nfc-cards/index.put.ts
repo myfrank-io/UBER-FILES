@@ -1,7 +1,9 @@
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import { requireAdmin } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import { nfcCardDesignSchema } from '~/lib/nfc-card'
+import { logoRecipeSchema } from '~/lib/logo-bank'
 import { loadOrCreateNfcCardDesign, nfcDriverSelect, serializeNfcCardDesign } from '~/server/utils/nfc-card'
 
 // Enregistrement du design. Le logo voyage à part des réglages :
@@ -19,6 +21,9 @@ const schema = nfcCardDesignSchema.extend({
     .nullable()
     .optional(),
   useCardLogo: z.boolean().optional(),
+  // Recette de la banque de logos : fournie avec un logo généré, `null` avec
+  // un logo importé ou retiré, absente si le logo ne change pas.
+  logoRecipe: logoRecipeSchema.nullable().optional(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -32,9 +37,9 @@ export default defineEventHandler(async (event) => {
   if (!body.success) {
     throw createError({ statusCode: 400, statusMessage: body.error.errors.map((e) => e.message).join(' ') })
   }
-  const { logo, useCardLogo, ...fields } = body.data
+  const { logo, useCardLogo, logoRecipe, ...fields } = body.data
 
-  let logoPatch: { logoData: string | null; logoMime: string | null } | null = null
+  let logoPatch: { logoData: string | null; logoMime: string | null; logoRecipe?: Prisma.InputJsonValue | typeof Prisma.JsonNull } | null = null
   if (useCardLogo) {
     const img = await prisma.cardImage.findFirst({
       where: { role: 'logo', profile: { driverId: id } },
@@ -55,6 +60,12 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: 'Logo invalide.' })
     }
     logoPatch = { logoData: data, logoMime: match[1]!.toLowerCase() }
+  }
+
+  // La recette suit le logo : un logo importé ou retiré l'efface, un logo
+  // généré la remplace, un logo inchangé la laisse telle quelle.
+  if (logoPatch) {
+    logoPatch.logoRecipe = logoRecipe && logoPatch.logoData ? logoRecipe : Prisma.JsonNull
   }
 
   await loadOrCreateNfcCardDesign(driver)

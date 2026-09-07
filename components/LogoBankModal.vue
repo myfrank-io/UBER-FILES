@@ -5,14 +5,16 @@
 // la carte, et un clic sur une vignette produit le PNG final (fond
 // transparent) qui devient le logo du design.
 import {
+  DEFAULT_LOGO_ACCENT,
   DEFAULT_LOGO_TAGLINE,
-  LOGO_ACCENTS,
   LOGO_CATEGORIES,
   LOGO_CATEGORY_LABELS,
+  LOGO_COLOR_PRESETS,
   LOGO_TEMPLATES,
   deriveInitials,
   normalizeLogoInput,
   type LogoCategory,
+  type LogoRecipe,
 } from '~/lib/logo-bank'
 import { ensureLogoFonts, logoSceneToDataUrl, type LogoColors } from '~/composables/useLogoRenderer'
 
@@ -23,25 +25,39 @@ const props = defineProps<{
   title?: string
   bgColor: string
   fgColor: string
+  /** Recette du logo actuel, pour le rouvrir tel quel et le modifier. */
+  recipe?: LogoRecipe | null
 }>()
 
-const emit = defineEmits<{ (e: 'close'): void; (e: 'pick', dataUrl: string): void }>()
+const emit = defineEmits<{ (e: 'close'): void; (e: 'pick', dataUrl: string, recipe: LogoRecipe): void }>()
 
 const baseName = props.companyName?.trim() || props.driverName
 const fields = reactive({
-  initials: deriveInitials(baseName),
-  name: baseName,
-  tagline: props.title?.trim() || DEFAULT_LOGO_TAGLINE,
+  initials: props.recipe?.initials ?? deriveInitials(baseName),
+  name: props.recipe?.name ?? baseName,
+  tagline: props.recipe?.tagline ?? (props.title?.trim() || DEFAULT_LOGO_TAGLINE),
 })
-const accentKey = ref(LOGO_ACCENTS[0]!.key)
-// Or plat par défaut : le dégradé métal reste disponible en option.
-const metallic = ref(false)
+// Couleurs du logo, indépendantes de la carte : texte/éléments (par défaut la
+// couleur des éléments de la carte) et accent (or par défaut). Or plat par
+// défaut, le dégradé métal reste en option.
+const primary = ref(props.recipe?.primary ?? props.fgColor.toUpperCase())
+const accent = ref(props.recipe?.accent ?? DEFAULT_LOGO_ACCENT)
+const metallic = ref(props.recipe?.metallic ?? false)
 const category = ref<LogoCategory | 'all'>('all')
+const selectedId = ref<string | null>(props.recipe?.templateId ?? null)
 
-const colors = computed<LogoColors>(() => {
-  const accent = LOGO_ACCENTS.find((a) => a.key === accentKey.value)?.color
-  return { primary: props.fgColor, accent: accent ?? props.fgColor, inverse: props.bgColor, metallic: metallic.value }
-})
+const HEX = /^#[0-9a-fA-F]{6}$/
+const colors = computed<LogoColors>(() => ({
+  primary: HEX.test(primary.value) ? primary.value : props.fgColor,
+  accent: HEX.test(accent.value) ? accent.value : DEFAULT_LOGO_ACCENT,
+  inverse: props.bgColor,
+  metallic: metallic.value,
+}))
+
+const colorControls = [
+  { key: 'primary', label: 'Texte & éléments', model: primary },
+  { key: 'accent', label: 'Accent (diamant, filets…)', model: accent },
+] as const
 
 const templates = computed(() =>
   category.value === 'all' ? LOGO_TEMPLATES : LOGO_TEMPLATES.filter((t) => t.category === category.value),
@@ -73,7 +89,7 @@ onMounted(async () => {
 })
 
 watch(
-  [() => fields.initials, () => fields.name, () => fields.tagline, accentKey, metallic, () => props.bgColor, () => props.fgColor],
+  [() => fields.initials, () => fields.name, () => fields.tagline, primary, accent, metallic, () => props.bgColor, () => props.fgColor],
   () => {
     if (!fontsLoaded.value) return
     if (timer) clearTimeout(timer)
@@ -84,9 +100,16 @@ watch(
 function pick(id: string) {
   const template = LOGO_TEMPLATES.find((t) => t.id === id)
   if (!template) return
+  const input = normalizeLogoInput(fields)
   // 1600 px de large pour 40 mm imprimés : largement au-dessus des 300 dpi.
-  const dataUrl = logoSceneToDataUrl(template.build(normalizeLogoInput(fields)), colors.value, { width: 1600 })
-  emit('pick', dataUrl)
+  const dataUrl = logoSceneToDataUrl(template.build(input), colors.value, { width: 1600 })
+  emit('pick', dataUrl, {
+    templateId: template.id,
+    ...input,
+    primary: colors.value.primary.toUpperCase(),
+    accent: colors.value.accent.toUpperCase(),
+    metallic: metallic.value,
+  })
 }
 </script>
 
@@ -115,22 +138,26 @@ function pick(id: string) {
       </div>
     </div>
 
-    <div class="mt-3 flex flex-wrap items-center gap-2">
-      <span class="text-xs font-semibold text-slate-500">Accent</span>
-      <button
-        v-for="a in LOGO_ACCENTS"
-        :key="a.key"
-        type="button"
-        class="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
-        :class="accentKey === a.key ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-300'"
-        @click="accentKey = a.key"
-      >
-        <span class="inline-block h-3.5 w-3.5 rounded-full ring-1 ring-slate-300" :style="{ background: a.color ?? fgColor }"></span>
-        {{ a.label }}
-      </button>
-      <label class="ml-auto flex cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-700">
+    <div class="mt-3 space-y-2">
+      <div v-for="c in colorControls" :key="c.key" class="flex flex-wrap items-center gap-1.5" :data-testid="`logo-color-${c.key}`">
+        <span class="w-full text-xs font-semibold text-slate-500 sm:w-auto sm:min-w-[150px]">{{ c.label }}</span>
+        <button
+          v-for="p in LOGO_COLOR_PRESETS"
+          :key="p.color"
+          type="button"
+          class="h-6 w-6 rounded-full ring-1 ring-slate-300 transition hover:scale-110"
+          :class="c.model.value.toUpperCase() === p.color ? 'ring-2 ring-brand-500 ring-offset-1' : ''"
+          :style="{ background: p.color }"
+          :title="p.label"
+          :aria-label="p.label"
+          @click="c.model.value = p.color"
+        ></button>
+        <input v-model="c.model.value" type="color" class="h-6 w-8 cursor-pointer rounded border border-slate-300 bg-white p-0" :title="`${c.label} : couleur libre`" />
+        <input v-model="c.model.value" class="field !w-24 !px-2 !py-1 font-mono !text-xs uppercase" maxlength="7" />
+      </div>
+      <label class="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-700">
         <input v-model="metallic" type="checkbox" class="accent-brand-600" data-testid="logo-metallic" />
-        Effet métal
+        Effet métal (dégradé brossé sur l'accent)
       </label>
     </div>
 
@@ -153,7 +180,8 @@ function pick(id: string) {
         v-for="t in templates"
         :key="t.id"
         type="button"
-        class="group overflow-hidden rounded-xl border border-slate-200 text-left transition hover:border-brand-500 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+        class="group overflow-hidden rounded-xl border text-left transition hover:border-brand-500 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+        :class="selectedId === t.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200'"
         :data-testid="`logo-template-${t.id}`"
         @click="pick(t.id)"
       >
