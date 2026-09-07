@@ -93,7 +93,11 @@ const features = [
 const faq = [
   {
     q: 'Combien Ridewiz prélève sur mes courses ?',
-    a: 'Zéro. Aucune commission sur vos courses : le prix que paie votre client est le prix que vous encaissez. Ridewiz fonctionne au forfait mensuel simple, sans engagement.',
+    a: 'Zéro. Aucune commission sur vos courses : le prix que paie votre client est le prix que vous encaissez, intégralement.',
+  },
+  {
+    q: 'Y a-t-il un abonnement mensuel ?',
+    a: 'Non. L’accès à Ridewiz se paie une seule fois, à l’inscription. Aucun prélèvement chaque mois, aucun pourcentage sur vos courses : une fois votre page en ligne, elle vous appartient.',
   },
   {
     q: 'Comment mes clients paient-ils ?',
@@ -322,13 +326,13 @@ const faq = [
           <div class="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full border border-[#E0B579]/20" />
           <div>
             <p class="rw-serif text-2xl leading-tight sm:text-4xl">
-              Un forfait simple.<br />
-              <span class="text-[#E0B579]">Zéro commission sur vos courses.</span>
+              Un paiement unique.<br />
+              <span class="text-[#E0B579]">Zéro commission, zéro abonnement.</span>
             </p>
             <p class="mt-4 max-w-lg text-sm leading-relaxed text-[#C9D2DC] sm:mt-5 sm:text-[15px]">
-              Pas de pourcentage prélevé, pas de surprise en fin de mois : le prix payé par
-              votre client est le montant que vous encaissez. Ridewiz se rémunère par un
-              forfait mensuel unique, sans engagement.
+              Aucun pourcentage prélevé sur vos courses, aucun prélèvement tous les mois :
+              l’accès à Ridewiz se paie une seule fois, à l’inscription. Le prix payé par
+              votre client est le montant que vous encaissez, aujourd’hui comme dans deux ans.
             </p>
             <ul class="mt-7 hidden space-y-3 text-[15px] text-[#C9D2DC] sm:block">
               <li class="flex items-center gap-3">
@@ -350,7 +354,7 @@ const faq = [
             <p class="rw-serif mt-2 text-5xl text-[#F6F1E9] sm:mt-3 sm:text-6xl">100 %</p>
             <p class="mt-2 text-sm text-[#C9D2DC]">du montant de vos courses</p>
             <NuxtLink to="/inscription" class="rw-btn mt-5 w-full !py-4 sm:mt-7">Commencer maintenant</NuxtLink>
-            <p class="mt-3 text-xs text-[#96A6B8]">Sans engagement · Profil vérifié sous 48 h</p>
+            <p class="mt-3 text-xs text-[#96A6B8]">Paiement unique · Profil vérifié sous 48 h</p>
           </div>
         </div>
       </div>

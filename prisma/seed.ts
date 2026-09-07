@@ -198,7 +198,7 @@ async function main() {
   await prisma.subscription.upsert({
     where: { driverId: driver.id },
     update: {},
-    create: { driverId: driver.id, planName: 'Standard', monthlyFeeCents: 4900, status: 'ACTIVE' },
+    create: { driverId: driver.id, planName: 'Standard', status: 'ACTIVE' },
   })
 
   // Un client existant
