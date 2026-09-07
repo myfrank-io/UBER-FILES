@@ -32,8 +32,9 @@ describe('layout fixe', () => {
     }
     // Le logo Google est sous le QR, jamais dessus.
     expect(GOOGLE_LOGO_BOX.y).toBeGreaterThan(QR_BOX.y + QR_BOX.h)
-    // Le QR est centré horizontalement.
+    // Le QR est parfaitement centré sur la carte, en x comme en y.
     expect(QR_BOX.x + QR_BOX.w / 2).toBeCloseTo(CARD_W / 2)
+    expect(QR_BOX.y + QR_BOX.h / 2).toBeCloseTo(CARD_H / 2)
   })
 
   it('logoBox : échelle et décalage autour du centre de base', () => {
@@ -93,6 +94,14 @@ describe('QR', () => {
     const m = qrMatrix('https://ridewiz.fr/carte/guy')
     const rects = qrModuleRects(m, QR_BOX)
     expect(rects.length).toBeGreaterThan(0)
+    // Les modules (coins de repérage inclus) sont symétriques autour du
+    // centre de la carte : le QR imprimé est centré au dixième de mm près.
+    const minX = Math.min(...rects.map((r) => r.x))
+    const maxX = Math.max(...rects.map((r) => r.x + r.w))
+    const minY = Math.min(...rects.map((r) => r.y))
+    const maxY = Math.max(...rects.map((r) => r.y + r.h))
+    expect((minX + maxX) / 2).toBeCloseTo(CARD_W / 2, 1)
+    expect((minY + maxY) / 2).toBeCloseTo(CARD_H / 2, 1)
     for (const r of rects) {
       expect(r.x).toBeGreaterThan(QR_BOX.x)
       expect(r.y).toBeGreaterThan(QR_BOX.y)
