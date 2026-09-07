@@ -5,7 +5,7 @@
 // mentions légales, bandeau d'identité en pied de page.
 //
 // Aucun accès Prisma ici : tout arrive résolu dans `InvoiceRenderInput`.
-import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb, type RGB } from 'pdf-lib'
+import { LineCapStyle, PDFDocument, PDFFont, PDFPage, StandardFonts, rgb, type RGB } from 'pdf-lib'
 import {
   LATE_PAYMENT_MENTION,
   discountLabel,
@@ -28,15 +28,24 @@ const QTY_X = 118
 const RIGHT_X = PAGE_W - MARGIN
 /** Largeur maximale d'une désignation avant retour à la ligne. */
 const LABEL_W = QTY_X - MARGIN - 6
+/** Hauteur du bandeau nuit qui coiffe la première page. */
+const BAND_H = 34
 /** Le contenu ne descend jamais dans le bandeau de pied de page. */
 const CONTENT_BOTTOM = 246
 const FOOTER_TOP = 252
 
-const INK = rgb(0.07, 0.07, 0.07)
-const MUTED = rgb(0.42, 0.42, 0.42)
-const RULE = rgb(0.82, 0.82, 0.82)
-const AMOUNT = rgb(0.09, 0.64, 0.29)
-const FOOTER_BG = rgb(0.94, 0.94, 0.94)
+// Charte Ridewiz « Signature » — mêmes valeurs que tailwind.config.ts.
+const NIGHT = rgb(0x0e / 255, 0x1b / 255, 0x2c / 255) // #0E1B2C
+const GOLD = rgb(0xe0 / 255, 0xb5 / 255, 0x79 / 255) // #E0B579
+const COPPER = rgb(0xb5 / 255, 0x79 / 255, 0x3f / 255) // #B5793F
+const CREAM = rgb(0xf1 / 255, 0xea / 255, 0xdb / 255) // #F1EADB
+const INK = rgb(0x16 / 255, 0x28 / 255, 0x3d / 255) // #16283D
+const LABEL = rgb(0x9a / 255, 0x8b / 255, 0x72 / 255) // #9A8B72
+const MUTED = rgb(0x6c / 255, 0x78 / 255, 0x89 / 255) // #6C7889
+const RULE = rgb(0xe4 / 255, 0xdc / 255, 0xcc / 255) // #E4DCCC
+const WHITE = rgb(1, 1, 1)
+/** Les montants portent le cuivre de la charte. */
+const AMOUNT = COPPER
 
 export interface InvoiceRenderLine {
   label: string
@@ -100,10 +109,65 @@ function safeText(font: PDFFont, s: string): string {
   return out
 }
 
+/**
+ * Picto Ridewiz (public/favicon.svg) redessiné en vectoriel : carré nuit à
+ * coins arrondis, itinéraire A→B en or. Vectoriel plutôt qu'une image : net à
+ * toute taille, aucun fichier à embarquer, et la charte reste la seule source.
+ *
+ * Le dessin source tient dans une boîte de 64 ; le groupe intérieur y est posé
+ * en (15, 15) à l'échelle 34/32, avec un viewBox commençant à y = -2 — d'où
+ * l'origine décalée du groupe.
+ */
+function drawRidewizLogo(page: PDFPage, leftMm: number, topMm: number, sizeMm: number, withPlate = true) {
+  const left = leftMm * MM
+  const top = (PAGE_H - topMm) * MM
+
+  if (withPlate) {
+    // Carré nuit à coins arrondis (r = 14 dans la boîte de 64).
+    const s = (sizeMm / 64) * MM
+    page.drawSvgPath(
+      'M14 0 H50 A14 14 0 0 1 64 14 V50 A14 14 0 0 1 50 64 H14 A14 14 0 0 1 0 50 V14 A14 14 0 0 1 14 0 Z',
+      { x: left, y: top, scale: s, color: NIGHT },
+    )
+  }
+
+  // Marque seule : sur un fond déjà nuit, la plaque serait invisible et ne
+  // ferait que rétrécir le picto. On cale alors l'itinéraire sur toute la boîte.
+  const markBox = withPlate ? sizeMm * (34 / 64) : sizeMm
+  const offset = withPlate ? (15 / 64) * sizeMm : 0
+  // Le dessin source tient dans « 0 -2 32 32 » : 32 de large, 32 de haut.
+  const gs = (markBox / 32) * MM
+  const gx = left + offset * MM
+  const gy = top - offset * MM + 2 * gs
+
+  const circle = (cx: number, cy: number, r: number) =>
+    `M${cx - r} ${cy} a${r} ${r} 0 1 0 ${2 * r} 0 a${r} ${r} 0 1 0 ${-2 * r} 0 Z`
+
+  // Point de départ plein, point d'arrivée en anneau, itinéraire entre les deux.
+  page.drawSvgPath(circle(7, 24, 3.1), { x: gx, y: gy, scale: gs, color: GOLD })
+  page.drawSvgPath(circle(25, 3.5, 3.1), {
+    x: gx,
+    y: gy,
+    scale: gs,
+    borderColor: GOLD,
+    borderWidth: 2.2 * gs,
+  })
+  page.drawSvgPath('M9.5 23.5h7.5a5 5 0 0 0 0-10h-4a5 5 0 0 1 0-10H20.8', {
+    x: gx,
+    y: gy,
+    scale: gs,
+    borderColor: GOLD,
+    borderWidth: 2.2 * gs,
+    borderLineCap: LineCapStyle.Round,
+  })
+}
+
 interface Fonts {
   regular: PDFFont
   bold: PDFFont
   italic: PDFFont
+  /** Serif éditorial de la charte, réservé aux titres et aux prix. */
+  serifBold: PDFFont
 }
 
 /**
@@ -195,21 +259,43 @@ class Sheet {
   }
 }
 
-/** En-tête : numéro de facture et date à gauche, émetteur à droite. */
+/**
+ * En-tête : bandeau nuit pleine largeur, picto et nom Ridewiz à gauche, numéro
+ * de facture et date à droite. L'identité légale de l'émetteur reste en pied de
+ * page, où elle est complète.
+ */
 function drawHeader(sheet: Sheet, fonts: Fonts, input: InvoiceRenderInput) {
-  sheet.y = 30
-  sheet.text(`FACTURE N°${input.number}`, MARGIN, sheet.y, 17, fonts.bold)
-  sheet.textRight(input.issuer.name.toUpperCase(), RIGHT_X, sheet.y, 17, fonts.bold)
-  sheet.y += 6
-  sheet.text(input.issuedAtLabel, MARGIN, sheet.y, 8.5, fonts.regular)
-  if (input.dueDateLabel) {
-    sheet.textRight(`Échéance : ${input.dueDateLabel}`, RIGHT_X, sheet.y, 8.5, fonts.regular, MUTED)
-  }
+  sheet.page.drawRectangle({
+    x: 0,
+    y: (PAGE_H - BAND_H) * MM,
+    width: PAGE_W * MM,
+    height: BAND_H * MM,
+    color: NIGHT,
+  })
+  // Filet or au pied du bandeau, comme la ligne d'accent de la charte.
+  sheet.page.drawRectangle({
+    x: 0,
+    y: (PAGE_H - BAND_H) * MM,
+    width: PAGE_W * MM,
+    height: 0.8 * MM,
+    color: GOLD,
+  })
+
+  const logoSize = 11
+  const logoTop = (BAND_H - logoSize) / 2 - 1
+  drawRidewizLogo(sheet.page, MARGIN, logoTop, logoSize, false)
+  sheet.text('Ridewiz', MARGIN + logoSize + 5, logoTop + logoSize - 1.2, 19, fonts.serifBold, GOLD)
+
+  sheet.textRight(`FACTURE N°${input.number}`, RIGHT_X, 16, 15, fonts.bold, WHITE)
+  const dates = input.dueDateLabel
+    ? `${input.issuedAtLabel} · échéance ${input.dueDateLabel}`
+    : input.issuedAtLabel
+  sheet.textRight(dates, RIGHT_X, 22.5, 8.5, fonts.regular, GOLD)
 }
 
 /** Bloc client : raison sociale à gauche, coordonnées en deux colonnes à droite. */
 function drawClient(sheet: Sheet, fonts: Fonts, input: InvoiceRenderInput) {
-  sheet.y = 58
+  sheet.y = 50
   const top = sheet.y
   let leftY = sheet.y
   leftY = sheet.paragraph(input.client.name.toUpperCase(), MARGIN, leftY, 12, fonts.bold, 60)
@@ -228,7 +314,7 @@ function drawClient(sheet: Sheet, fonts: Fonts, input: InvoiceRenderInput) {
 
   let rightY = top
   for (const [label, value] of rows) {
-    sheet.text(label, labelX, rightY, 8.5, fonts.bold)
+    sheet.text(label, labelX, rightY, 8.5, fonts.bold, LABEL)
     rightY = sheet.paragraph(value, valueX, rightY, 8.5, fonts.regular, RIGHT_X - valueX)
     rightY += 1.2
   }
@@ -238,12 +324,12 @@ function drawClient(sheet: Sheet, fonts: Fonts, input: InvoiceRenderInput) {
 
 /** En-tête du tableau, redessiné en haut de chaque page en cas de débordement. */
 function drawTableHead(sheet: Sheet, fonts: Fonts) {
-  sheet.rule(sheet.y, 1.1, INK)
+  sheet.rule(sheet.y, 1.1, NIGHT)
   sheet.y += 6
-  sheet.text('DÉSIGNATION', MARGIN, sheet.y, 8.5, fonts.bold)
-  sheet.textRight('MONTANT', RIGHT_X, sheet.y, 8.5, fonts.bold)
+  sheet.text('DÉSIGNATION', MARGIN, sheet.y, 8.5, fonts.bold, LABEL)
+  sheet.textRight('MONTANT', RIGHT_X, sheet.y, 8.5, fonts.bold, LABEL)
   sheet.y += 3
-  sheet.rule(sheet.y, 1.1, INK)
+  sheet.rule(sheet.y, 1.1, NIGHT)
   sheet.y += 9
 }
 
@@ -317,8 +403,9 @@ function drawTotals(sheet: Sheet, fonts: Fonts, input: InvoiceRenderInput) {
   }
 
   sheet.y += 6
-  sheet.textRight('TOTAL', labelRight, sheet.y, 17, fonts.bold)
-  sheet.textRight(formatEuros(input.totalCents), RIGHT_X, sheet.y, 17, fonts.bold, AMOUNT)
+  // La charte réserve le serif aux titres et aux prix : le total en est un.
+  sheet.textRight('TOTAL', labelRight, sheet.y, 17, fonts.serifBold, NIGHT)
+  sheet.textRight(formatEuros(input.totalCents), RIGHT_X, sheet.y, 18, fonts.serifBold, AMOUNT)
   sheet.y += 6
 
   // En franchise en base, l'article 293 B du CGI est une mention obligatoire.
@@ -349,12 +436,20 @@ function drawFooter(sheet: Sheet, fonts: Fonts, input: InvoiceRenderInput) {
     y: 0,
     width: PAGE_W * MM,
     height: (PAGE_H - FOOTER_TOP) * MM,
-    color: FOOTER_BG,
+    color: CREAM,
+  })
+  // Filet or : le même accent qu'en tête de page.
+  sheet.page.drawRectangle({
+    x: 0,
+    y: (PAGE_H - FOOTER_TOP - 0.8) * MM,
+    width: PAGE_W * MM,
+    height: 0.8 * MM,
+    color: GOLD,
   })
 
   let y = FOOTER_TOP + 12
   const title = issuer.legalForm ? `${issuer.name.toUpperCase()} - ${issuer.legalForm}` : issuer.name.toUpperCase()
-  sheet.text(title, MARGIN, y, 12, fonts.bold)
+  sheet.text(title, MARGIN, y, 12, fonts.bold, NIGHT)
   y += 8
 
   if (issuer.email) {
@@ -387,6 +482,9 @@ export async function generateInvoicePdf(input: InvoiceRenderInput): Promise<Uin
     regular: await pdf.embedFont(StandardFonts.Helvetica),
     bold: await pdf.embedFont(StandardFonts.HelveticaBold),
     italic: await pdf.embedFont(StandardFonts.HelveticaOblique),
+    // DM Serif Display n'est pas embarquable sans fontkit : Times Bold en tient
+    // lieu à l'impression, même rôle éditorial.
+    serifBold: await pdf.embedFont(StandardFonts.TimesRomanBold),
   }
   pdf.setTitle(`Facture ${input.number} — ${input.client.name}`)
   pdf.setAuthor(input.issuer.name)
@@ -406,6 +504,25 @@ export async function generateInvoicePdf(input: InvoiceRenderInput): Promise<Uin
   drawTotals(sheet, fonts, input)
   drawMentions(sheet, fonts, input)
   drawFooter(sheet, fonts, input)
+
+  // Rappel du numéro sur les pages de suite : une facture qui se feuillette
+  // doit s'identifier partout, pas seulement sur sa première page. La
+  // pagination n'est connue qu'une fois le document terminé.
+  const pages = pdf.getPages()
+  if (pages.length > 1) {
+    for (const [index, page] of pages.entries()) {
+      if (index === 0) continue
+      const text = safeText(fonts.regular, `Facture n°${input.number} · page ${index + 1}/${pages.length}`)
+      const width = fonts.regular.widthOfTextAtSize(text, 8)
+      page.drawText(text, {
+        x: RIGHT_X * MM - width,
+        y: (PAGE_H - 14) * MM,
+        size: 8,
+        font: fonts.regular,
+        color: LABEL,
+      })
+    }
+  }
 
   return pdf.save()
 }
