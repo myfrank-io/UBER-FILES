@@ -22,7 +22,8 @@ const schema = nfcCardDesignSchema.extend({
     .optional(),
   useCardLogo: z.boolean().optional(),
   // Recette de la banque de logos : fournie avec un logo généré, `null` avec
-  // un logo importé ou retiré, absente si le logo ne change pas.
+  // un logo importé ou retiré, seule pour enregistrer des réglages (textes,
+  // couleurs) modifiés sans nouveau rendu, absente si rien ne change.
   logoRecipe: logoRecipeSchema.nullable().optional(),
 })
 
@@ -39,7 +40,7 @@ export default defineEventHandler(async (event) => {
   }
   const { logo, useCardLogo, logoRecipe, ...fields } = body.data
 
-  let logoPatch: { logoData: string | null; logoMime: string | null; logoRecipe?: Prisma.InputJsonValue | typeof Prisma.JsonNull } | null = null
+  let logoPatch: { logoData: string | null; logoMime: string | null } | null = null
   if (useCardLogo) {
     const img = await prisma.cardImage.findFirst({
       where: { role: 'logo', profile: { driverId: id } },
@@ -63,15 +64,19 @@ export default defineEventHandler(async (event) => {
   }
 
   // La recette suit le logo : un logo importé ou retiré l'efface, un logo
-  // généré la remplace, un logo inchangé la laisse telle quelle.
-  if (logoPatch) {
-    logoPatch.logoRecipe = logoRecipe && logoPatch.logoData ? logoRecipe : Prisma.JsonNull
-  }
+  // généré la remplace. Sans changement de logo, une recette envoyée seule
+  // met à jour les réglages (brouillon de la modale).
+  const recipePatch =
+    logoPatch
+      ? { logoRecipe: logoRecipe && logoPatch.logoData ? logoRecipe : Prisma.JsonNull }
+      : logoRecipe !== undefined
+        ? { logoRecipe: logoRecipe ?? Prisma.JsonNull }
+        : {}
 
   await loadOrCreateNfcCardDesign(driver)
   const design = await prisma.nfcCardDesign.update({
     where: { driverId: id },
-    data: { ...fields, ...(logoPatch ?? {}) },
+    data: { ...fields, ...(logoPatch ?? {}), ...recipePatch },
   })
 
   return { ok: true, design: serializeNfcCardDesign(id, design) }

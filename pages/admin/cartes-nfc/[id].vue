@@ -57,8 +57,9 @@ const form = reactive({
 // encore sauvegardée), soit rien. `pendingLogo` voyage avec la sauvegarde.
 const savedLogoUrl = ref<string | null>(null)
 const pendingLogo = ref<string | null | undefined>(undefined) // undefined = inchangé, null = supprimé
-// Recette du logo en attente : fournie par la banque, nulle pour un import.
-const pendingRecipe = ref<LogoRecipe | null>(null)
+// Recette du logo en attente : fournie par la banque (avec ou sans modèle),
+// nulle pour un import ou un retrait, undefined si inchangée.
+const pendingRecipe = ref<LogoRecipe | null | undefined>(undefined)
 const useCardLogo = ref(false)
 const logoSrc = computed(() => (pendingLogo.value === undefined ? savedLogoUrl.value : pendingLogo.value))
 
@@ -77,19 +78,19 @@ function loadFromServer() {
   form.qtyBusiness = d.qtyBusiness
   savedLogoUrl.value = d.logoUrl
   pendingLogo.value = undefined
-  pendingRecipe.value = null
+  pendingRecipe.value = undefined
   useCardLogo.value = false
 }
 
 // Recette à rouvrir dans la banque : celle en attente, sinon celle enregistrée.
 const currentRecipe = computed<LogoRecipe | null>(() =>
-  pendingLogo.value !== undefined ? pendingRecipe.value : ((data.value?.design.logoRecipe as LogoRecipe | null) ?? null),
+  pendingRecipe.value !== undefined ? pendingRecipe.value : ((data.value?.design.logoRecipe as LogoRecipe | null) ?? null),
 )
 loadFromServer()
 
 const dirty = ref(false)
 watch(form, () => (dirty.value = true), { deep: true })
-watch([pendingLogo, useCardLogo], () => (dirty.value = true))
+watch([pendingLogo, pendingRecipe, useCardLogo], () => (dirty.value = true))
 
 // ─── QR codes (les vrais : même matrice que le PDF) ──────────────────────────
 const qr = computed(() => {
@@ -141,15 +142,31 @@ function removeLogo() {
   useCardLogo.value = false
 }
 
-// Banque de logos : un modèle choisi devient le logo importé (PNG transparent),
-// à enregistrer comme n'importe quel logo.
+// Banque de logos : un modèle choisi devient le logo (PNG transparent) et le
+// design est enregistré aussitôt. Les réglages modifiés dans la modale
+// (textes, couleurs) sont eux aussi enregistrés au fil de l'eau, avec le logo
+// re-rendu quand un modèle est déjà choisi.
 const logoBank = ref(false)
+let autosaveTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleAutosave() {
+  if (autosaveTimer) clearTimeout(autosaveTimer)
+  autosaveTimer = setTimeout(() => void save({ silent: true }), 400)
+}
 function onLogoPicked(dataUrl: string, recipe: LogoRecipe) {
   pendingLogo.value = dataUrl
   pendingRecipe.value = recipe
   useCardLogo.value = false
   logoBank.value = false
   resetLogoPlacement()
+  scheduleAutosave()
+}
+function onLogoUpdated(recipe: LogoRecipe, dataUrl: string | null) {
+  pendingRecipe.value = recipe
+  if (dataUrl) {
+    pendingLogo.value = dataUrl
+    useCardLogo.value = false
+  }
+  scheduleAutosave()
 }
 
 function takeCardLogo() {
@@ -193,7 +210,7 @@ function apiError(e: unknown): string {
   return (e as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Une erreur est survenue.'
 }
 
-async function save(): Promise<boolean> {
+async function save(opts: { silent?: boolean } = {}): Promise<boolean> {
   saving.value = true
   try {
     await $fetch(`/api/admin/drivers/${id}/nfc-cards`, {
@@ -201,7 +218,8 @@ async function save(): Promise<boolean> {
       body: {
         ...form,
         ...(useCardLogo.value ? { useCardLogo: true } : {}),
-        ...(pendingLogo.value !== undefined ? { logo: pendingLogo.value, logoRecipe: pendingRecipe.value } : {}),
+        ...(pendingLogo.value !== undefined ? { logo: pendingLogo.value } : {}),
+        ...(pendingRecipe.value !== undefined ? { logoRecipe: pendingRecipe.value } : {}),
       },
     })
     await refresh()
@@ -210,7 +228,7 @@ async function save(): Promise<boolean> {
     // retombe à « propre » une fois qu'il est passé.
     await nextTick()
     dirty.value = false
-    toast.success('Design enregistré.')
+    if (!opts.silent) toast.success('Design enregistré.')
     return true
   } catch (e) {
     toast.error(apiError(e))
@@ -310,7 +328,7 @@ const productLabels = NFC_CARD_PRODUCT_LABELS
             </div>
             <input ref="logoInput" type="file" accept="image/png,image/jpeg" class="hidden" @change="onLogoInput" />
             <button v-if="logoSrc" type="button" class="mt-2 mr-3 text-xs text-brand-700 hover:underline" @click="logoBank = true">
-              {{ currentRecipe ? '✨ Modifier le logo (couleurs, textes, modèle)' : '✨ Créer un autre logo' }}
+              {{ currentRecipe?.templateId ? '✨ Modifier le logo (couleurs, textes, modèle)' : '✨ Créer un autre logo' }}
             </button>
             <button
               v-if="data.driver.cardLogoAvailable"
@@ -486,6 +504,7 @@ const productLabels = NFC_CARD_PRODUCT_LABELS
       :recipe="currentRecipe"
       @close="logoBank = false"
       @pick="onLogoPicked"
+      @update="onLogoUpdated"
     />
 
     <!-- Confirmation d'envoi -->
