@@ -73,13 +73,7 @@ interface Bounds {
  * vertical calé sur la hauteur de l'élément : reflet clair en haut, teinte au
  * milieu, ombre en bas — l'effet or brossé des logos haut de gamme.
  */
-function luminance(hex: string): number {
-  const n = parseInt(hex.replace('#', ''), 16)
-  return 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)
-}
-
 function paint(ctx: Ctx, token: LogoColorToken, colors: LogoColors, b: Bounds): string | CanvasGradient {
-  if (token === 'ink') return luminance(colors.primary) <= luminance(colors.inverse) ? colors.primary : colors.inverse
   if (token !== 'accent' || !colors.metallic) return colors[token]
   const y0 = Math.min(b.y0, b.y1)
   const y1 = Math.max(b.y0, b.y1) + (b.y1 === b.y0 ? 1 : 0)

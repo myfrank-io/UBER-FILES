@@ -16,10 +16,12 @@ export const LOGO_W = 1000
 export const LOGO_H = 650
 
 /**
- * `ink` = la plus sombre des deux couleurs de la carte (éléments / fond) : un
- * diamant noir reste noir sur carte crème, et devient un contour or sur carte noire.
+ * Jetons de couleur d'une scène, résolus au rendu :
+ * `primary` = texte et éléments du logo, `accent` = ornements (facettes,
+ * filets, étoiles), `inverse` = fond de la carte (une forme peinte avec ce
+ * jeton se fond dans la carte, comme le corps d'un diamant).
  */
-export type LogoColorToken = 'primary' | 'accent' | 'inverse' | 'ink'
+export type LogoColorToken = 'primary' | 'accent' | 'inverse'
 
 /** Polices disponibles au rendu (cf. FONT_STACKS dans le composable). */
 export type LogoFont =
@@ -365,9 +367,9 @@ const brilliantOutline = (x: number, y: number, size: number, lw = 1.2): PathIte
   icon(LOGO_ICONS.brilliantFacets, x, y, size, { fill: undefined, stroke: 'accent', lw: lw * 0.8 }),
 ]
 
-/** Diamant noir serti : corps sombre, facettes or. */
+/** Diamant serti : le corps prend le fond de la carte, les facettes l'accent. */
 const brilliantSolid = (x: number, y: number, size: number): PathItem[] => [
-  icon(LOGO_ICONS.brilliantBody, x, y, size, { fill: 'ink', stroke: 'accent', lw: 1.4 }),
+  icon(LOGO_ICONS.brilliantBody, x, y, size, { fill: 'inverse', stroke: 'accent', lw: 1.4 }),
   icon(LOGO_ICONS.brilliantFacets, x, y, size, { fill: undefined, stroke: 'accent', lw: 1 }),
 ]
 
@@ -381,9 +383,9 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
     build: ({ initials, name, tagline: tl }) =>
       scene([
         ...brilliantSolid(320, 6, 360),
-        text({ text: initials, x: CX, y: 262, size: 150, font: 'caps', color: 'accent', tracking: 0.04, maxWidth: 210 }),
-        ...(name ? [text({ text: name, x: CX, y: 468, size: 98, font: 'caps', color: 'accent', tracking: 0.2, upper: true, maxWidth: 940 })] : []),
-        ...tagline(tl, 545, 'accent', 40),
+        text({ text: initials, x: CX, y: 262, size: 150, font: 'caps', color: 'primary', tracking: 0.04, maxWidth: 210 }),
+        ...(name ? [text({ text: name, x: CX, y: 468, size: 98, font: 'caps', color: 'primary', tracking: 0.2, upper: true, maxWidth: 940 })] : []),
+        ...tagline(tl, 545, 'primary', 40),
       ]),
   },
   {
@@ -395,7 +397,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
       scene([
         ...brilliantOutline(350, 0, 300, 1.1),
         ...nameCaps(name, 430, 92, 'elegant', 0.36),
-        ...tagline(tl, 510, 'accent', 34),
+        ...tagline(tl, 510, 'primary', 34),
       ]),
   },
   {
@@ -409,7 +411,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
         text({ text: initials, x: CX, y: 345, size: 250, font: 'elegant', color: 'primary', tracking: 0.02 }),
         rule(400, 120, 'accent', 1.5),
         ...nameCaps(name, 475, 58, 'elegant', 0.42),
-        ...tagline(tl, 545, 'accent', 30),
+        ...tagline(tl, 545, 'primary', 30),
       ]),
   },
   {
@@ -441,7 +443,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
           ? [{ t: 'arcText', text: name, cx: CX, cy: 325, r: 236, size: 38, font: 'elegant', color: 'primary', side: 'top', spread: 140, upper: true } as ArcTextItem]
           : []),
         ...(tl
-          ? [{ t: 'arcText', text: tl, cx: CX, cy: 325, r: 236, size: 30, font: 'sans', color: 'accent', side: 'bottom', spread: 110, upper: true } as ArcTextItem]
+          ? [{ t: 'arcText', text: tl, cx: CX, cy: 325, r: 236, size: 30, font: 'sans', color: 'primary', side: 'bottom', spread: 110, upper: true } as ArcTextItem]
           : []),
       ]),
   },
@@ -454,7 +456,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
       scene([
         text({ text: name, x: CX, y: 320, size: 175, font: 'elegantItalic', color: 'primary', maxWidth: 940 }),
         ...brilliantOutline(471, 352, 58, 1.6),
-        ...tagline(tl, 500, 'accent', 34),
+        ...tagline(tl, 500, 'primary', 34),
       ]),
   },
   {
@@ -471,7 +473,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
         items.push(
           // Le mot est borné à 300 px de large : les diamants restent au-delà.
           ...brilliantOutline(CX - 232, 336, 44, 1.6),
-          text({ text: rest, x: CX, y: 378, size: 60, font: 'elegant', color: 'accent', tracking: 0.5, upper: true, maxWidth: 300 }),
+          text({ text: rest, x: CX, y: 378, size: 60, font: 'elegant', color: 'primary', tracking: 0.5, upper: true, maxWidth: 300 }),
           ...brilliantOutline(CX + 188, 336, 44, 1.6),
         )
       } else {
@@ -494,11 +496,11 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
       const items: LogoItem[] = []
       if (letters.length >= 2) {
         items.push(
-          text({ text: letters[0]!, x: CX - 70, y: 350, size: 360, font: 'elegant', color: 'accent' }),
-          text({ text: letters.slice(1).join(''), x: CX + 75, y: 350, size: 360, font: 'elegantItalic', color: 'accent' }),
+          text({ text: letters[0]!, x: CX - 70, y: 350, size: 360, font: 'elegant', color: 'primary' }),
+          text({ text: letters.slice(1).join(''), x: CX + 75, y: 350, size: 360, font: 'elegantItalic', color: 'primary' }),
         )
       } else {
-        items.push(text({ text: initials, x: CX, y: 350, size: 360, font: 'elegant', color: 'accent' }))
+        items.push(text({ text: initials, x: CX, y: 350, size: 360, font: 'elegant', color: 'primary' }))
       }
       items.push(
         rule(400, 430, 'primary', 1.5),
@@ -521,7 +523,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
           ? [{ t: 'arcText', text: name, cx: CX, cy: 325, r: 228, size: 40, font: 'sans', color: 'primary', side: 'top', spread: 150, upper: true } as ArcTextItem]
           : []),
         ...(tl
-          ? [{ t: 'arcText', text: tl, cx: CX, cy: 325, r: 228, size: 32, font: 'sans', color: 'accent', side: 'bottom', spread: 130, upper: true } as ArcTextItem]
+          ? [{ t: 'arcText', text: tl, cx: CX, cy: 325, r: 228, size: 32, font: 'sans', color: 'primary', side: 'bottom', spread: 130, upper: true } as ArcTextItem]
           : []),
       ]),
   },
@@ -535,7 +537,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
         { t: 'circle', cx: CX, cy: 250, r: 190, stroke: 'accent', lw: 2 },
         text({ text: initials, x: CX, y: 305, size: 170, font: 'serif', color: 'inverse', tracking: 0.06 }),
         ...nameCaps(name, 555, 54),
-        ...tagline(tl, 615, 'accent', 28),
+        ...tagline(tl, 615, 'primary', 28),
       ]),
   },
   {
@@ -548,7 +550,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
         { t: 'poly', points: regularPolygon(CX, 245, 205, 4), stroke: 'primary', lw: 2 },
         text({ text: initials, x: CX, y: 300, size: 150, font: 'elegant', color: 'primary', tracking: 0.06 }),
         ...nameCaps(name, 565, 52, 'elegant', 0.22),
-        ...tagline(tl, 620, 'accent', 26),
+        ...tagline(tl, 620, 'primary', 26),
       ]),
   },
   {
@@ -561,7 +563,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
         { t: 'poly', points: regularPolygon(CX, 250, 200, 6, -90), stroke: 'accent', lw: 2 },
         text({ text: initials, x: CX, y: 305, size: 160, font: 'grotesk', color: 'primary', tracking: 0.02 }),
         ...nameCaps(name, 560, 50, 'grotesk', 0.28),
-        ...tagline(tl, 618, 'accent', 26),
+        ...tagline(tl, 618, 'primary', 26),
       ]),
   },
   {
@@ -595,7 +597,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
         },
         text({ text: initials, x: CX, y: 290, size: 160, font: 'caps', color: 'inverse', tracking: 0.04 }),
         ...nameCaps(name, 560, 50, 'caps', 0.2),
-        ...tagline(tl, 618, 'accent', 26),
+        ...tagline(tl, 618, 'primary', 26),
       ]),
   },
   {
@@ -620,7 +622,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
         { t: 'poly', points: [[318, 58], [682, 58], [682, 422], [318, 422]], stroke: 'accent', lw: 1.5 },
         text({ text: initials, x: CX, y: 300, size: 180, font: 'serif', color: 'primary', tracking: 0.08 }),
         ...nameCaps(name, 555, 52),
-        ...tagline(tl, 615, 'accent', 26),
+        ...tagline(tl, 615, 'primary', 26),
       ]),
   },
   {
@@ -639,7 +641,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
       } else {
         items.push(text({ text: initials, x: CX, y: 330, size: 300, font: 'serif', color: 'primary' }))
       }
-      items.push(...nameCaps(name, 500, 54, 'serif', 0.2), ...tagline(tl, 570, 'accent', 28))
+      items.push(...nameCaps(name, 500, 54, 'serif', 0.2), ...tagline(tl, 570, 'primary', 28))
       return scene(items)
     },
   },
@@ -703,7 +705,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
         text({ text: first, x: CX, y: 300, size: 200, font: 'serif', color: 'primary', maxWidth: 940 }),
         ...(rest ? nameCaps(rest, 400, 60, 'sans', 0.4) : []),
         rule(455, 60, 'accent', 3),
-        ...tagline(tl, 540, 'accent', 30),
+        ...tagline(tl, 540, 'primary', 30),
       ])
     },
   },
@@ -739,7 +741,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
     build: ({ name, tagline: tl }) =>
       scene([
         ...nameCaps(name, 330, 130, 'caps', 0.12),
-        ...(tl ? tagline(`· ${tl} ·`, 440, 'accent', 34) : []),
+        ...(tl ? tagline(`· ${tl} ·`, 440, 'primary', 34) : []),
       ]),
   },
   {
@@ -789,7 +791,7 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
         { t: 'line', x1: CX - 22, y1: 140, x2: CX - 100, y2: 100, stroke: 'primary', lw: 14 },
         { t: 'line', x1: CX + 22, y1: 140, x2: CX + 100, y2: 100, stroke: 'primary', lw: 14 },
         ...nameCaps(name, 420, 96, 'grotesk', 0.22),
-        ...tagline(tl, 505, 'accent', 30),
+        ...tagline(tl, 505, 'primary', 30),
       ]),
   },
   {
