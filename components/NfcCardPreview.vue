@@ -14,9 +14,9 @@ import {
   GOOGLE_G_PATHS,
   GOOGLE_G_VIEWBOX,
   GOOGLE_LOGO_BOX,
-  ICON_STROKE,
   NFC_ICON_BOX,
   NFC_ICON_PATHS,
+  NFC_ICON_SOURCE,
   QR_BOX,
   REVIEW_BACK_TEXT,
   REVIEW_BACK_TEXT_VALUES,
@@ -24,6 +24,7 @@ import {
   logoBox,
   qrModuleRects,
   squareInBox,
+  fitSourceInBox,
   type GoogleLogoStyle,
   type NfcCardProduct,
   type NfcCardSide,
@@ -73,7 +74,7 @@ const logo = computed(() =>
   logoBox({ logoScale: props.logoScale, logoOffsetX: props.logoOffsetX, logoOffsetY: props.logoOffsetY }),
 )
 
-const nfcIcon = squareInBox(NFC_ICON_BOX, 100)
+const nfcIcon = fitSourceInBox(NFC_ICON_BOX, NFC_ICON_SOURCE)
 const googleIcon = squareInBox(GOOGLE_LOGO_BOX, GOOGLE_G_VIEWBOX)
 
 const qrRects = computed(() => (props.qr ? qrModuleRects(props.qr, QR_BOX) : []))
@@ -181,17 +182,11 @@ function onLogoPointerDown(e: PointerEvent) {
           {{ l.text }}
         </text>
 
-        <g :transform="`translate(${nfcIcon.x} ${nfcIcon.y}) scale(${nfcIcon.scale})`">
-          <path
-            v-for="(d, i) in NFC_ICON_PATHS"
-            :key="i"
-            :d="d"
-            fill="none"
-            :stroke="fgColor"
-            :stroke-width="ICON_STROKE"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
+        <g
+          :transform="`translate(${nfcIcon.x} ${nfcIcon.y}) scale(${nfcIcon.scale}) translate(${-NFC_ICON_SOURCE.x} ${-NFC_ICON_SOURCE.y})`"
+          :fill="fgColor"
+        >
+          <path v-for="(d, i) in NFC_ICON_PATHS" :key="i" :d="d" />
         </g>
       </template>
 

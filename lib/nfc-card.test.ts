@@ -17,6 +17,9 @@ import {
   qrMatrix,
   qrModuleRects,
   squareInBox,
+  fitSourceInBox,
+  NFC_ICON_SOURCE,
+  NFC_ICON_PATHS,
 } from './nfc-card'
 
 describe('layout fixe', () => {
@@ -52,6 +55,18 @@ describe('layout fixe', () => {
     expect(tall.h).toBe(20)
     expect(tall.x).toBeCloseTo(27.5)
     expect(fitInBox(box, 0, 0)).toEqual(box)
+  })
+
+  it('fitSourceInBox : l’icône NFC entre dans sa boîte, centrée, sans déformation', () => {
+    const p = fitSourceInBox(NFC_ICON_BOX, NFC_ICON_SOURCE)
+    const w = NFC_ICON_SOURCE.w * p.scale
+    const h = NFC_ICON_SOURCE.h * p.scale
+    expect(Math.max(w, h)).toBeLessThanOrEqual(Math.min(NFC_ICON_BOX.w, NFC_ICON_BOX.h) + 1e-9)
+    expect(p.x + w / 2).toBeCloseTo(NFC_ICON_BOX.x + NFC_ICON_BOX.w / 2)
+    expect(p.y + h / 2).toBeCloseTo(NFC_ICON_BOX.y + NFC_ICON_BOX.h / 2)
+    // Tracé MyFrank : 7 formes pleines, toutes en coordonnées absolues.
+    expect(NFC_ICON_PATHS).toHaveLength(7)
+    for (const d of NFC_ICON_PATHS) expect(d.startsWith('M ')).toBe(true)
   })
 
   it('squareInBox : échelle uniforme, centrée', () => {

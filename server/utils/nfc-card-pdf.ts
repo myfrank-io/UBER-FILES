@@ -8,7 +8,6 @@
 // Toutes les positions viennent de lib/nfc-card.ts (mm), partagées avec
 // l'aperçu SVG : une seule table, jamais deux implémentations qui divergent.
 import {
-  LineCapStyle,
   PDFDocument,
   PDFFont,
   PDFImage,
@@ -30,14 +29,15 @@ import {
   GOOGLE_G_PATHS,
   GOOGLE_G_VIEWBOX,
   GOOGLE_LOGO_BOX,
-  ICON_STROKE,
   NFC_CARD_PRODUCT_LABELS,
   NFC_ICON_BOX,
   NFC_ICON_PATHS,
+  NFC_ICON_SOURCE,
   QR_BOX,
   REVIEW_BACK_TEXT,
   REVIEW_BACK_TEXT_VALUES,
   fitInBox,
+  fitSourceInBox,
   lineText,
   logoBox,
   qrMatrix,
@@ -186,16 +186,17 @@ class CardCanvas {
   }
 
   nfcIcon() {
-    const p = squareInBox(NFC_ICON_BOX, 100)
+    const p = fitSourceInBox(NFC_ICON_BOX, NFC_ICON_SOURCE)
     const scale = p.scale * this.s * MM
+    // Le tracé est en coordonnées absolues du dessin source : on décale
+    // l'origine pour que (source.x, source.y) tombe sur le coin de la boîte
+    // (l'axe y du tracé pointe vers le bas, celui du PDF vers le haut).
     for (const d of NFC_ICON_PATHS) {
       this.page.drawSvgPath(d, {
-        x: this.x(p.x),
-        y: this.y(p.y),
+        x: this.x(p.x) - NFC_ICON_SOURCE.x * scale,
+        y: this.y(p.y) + NFC_ICON_SOURCE.y * scale,
         scale,
-        borderColor: this.fg,
-        borderWidth: ICON_STROKE * scale,
-        borderLineCap: LineCapStyle.Round,
+        color: this.fg,
       })
     }
   }
