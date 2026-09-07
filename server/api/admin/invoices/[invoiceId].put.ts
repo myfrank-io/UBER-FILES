@@ -7,6 +7,7 @@ import {
   invoiceContentSchema,
   invoiceWriteData,
   serializeInvoice,
+  syncInvoiceStatus,
 } from '~/server/utils/invoice'
 
 // Mise à jour complète d'une facture. Lignes et échéances sont remplacées d'un
@@ -45,6 +46,14 @@ export default defineEventHandler(async (event) => {
     if (!driver) throw createError({ statusCode: 404, statusMessage: 'Chauffeur introuvable.' })
   }
 
+  // Les échéances sont recréées, mais les ENCAISSEMENTS déjà constatés ne
+  // doivent pas disparaître parce qu'on a corrigé une ligne. On les reporte par
+  // RANG : la 1re échéance reste la 1re, même si son montant ou son libellé a
+  // changé. Une échéance supprimée emporte son encaissement — c'est le seul cas
+  // où l'admin perd l'information, et il l'a demandé explicitement.
+  const paidByPosition = new Map(current.installments.map((part) => [part.position, part.paidAt]))
+  const withPayments = installments.map((part) => ({ ...part, paidAt: paidByPosition.get(part.position) ?? null }))
+
   const updated = await prisma.$transaction(async (tx) => {
     await tx.invoiceLine.deleteMany({ where: { invoiceId: id } })
     await tx.invoiceInstallment.deleteMany({ where: { invoiceId: id } })
@@ -54,11 +63,14 @@ export default defineEventHandler(async (event) => {
         ...invoice,
         number,
         lines: { create: lines },
-        installments: { create: installments },
+        installments: { create: withPayments },
       },
       include: INVOICE_INCLUDE,
     })
   })
 
-  return { ok: true, invoice: serializeInvoice(updated) }
+  // Changer l'échéancier peut solder ou dé-solder la facture (passer de 2 à 3
+  // échéances laisse la 3e impayée) : le statut est recalculé, jamais laissé
+  // en contradiction avec les encaissements.
+  return { ok: true, invoice: serializeInvoice(await syncInvoiceStatus(updated.id)) }
 })

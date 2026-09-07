@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // Back-office admin : pilotage des chauffeurs, activité, facturation.
+import { formatEuros } from '~/lib/invoice'
 definePageMeta({ layout: 'default', middleware: 'admin' })
 useHead({ title: 'Administration' })
 const { formatMoney, formatDateTime } = useFormat()
@@ -212,7 +213,37 @@ const filteredDrivers = computed(() => {
       <StatCard title="Chauffeurs" :value="data.stats.driversTotal" />
       <StatCard title="Actifs" :value="data.stats.driversActive" />
       <StatCard title="Courses" :value="data.stats.bookingsConfirmed" />
-      <StatCard title="Volume encaissé" :value="formatMoney(data.stats.gmvCents)" />
+      <StatCard title="Volume chauffeurs" :value="formatMoney(data.stats.gmvCents)" />
+    </div>
+
+    <!-- Trésorerie Ridewiz : ce que les chauffeurs NOUS doivent. Distinct du
+         « volume chauffeurs » ci-dessus, qui est ce qu'eux encaissent. -->
+    <div v-if="data" class="mt-3 grid gap-3 sm:grid-cols-2" data-testid="cash">
+      <NuxtLink
+        to="/admin/factures"
+        class="card !p-4 border-green-200 bg-green-50/60 transition hover:border-green-300 hover:bg-green-50"
+      >
+        <p class="text-xs font-semibold text-green-800">💶 Cash encaissé</p>
+        <p class="mt-1 font-serif text-2xl font-medium tracking-tight text-green-800" data-testid="cash-collected">
+          {{ formatEuros(data.cash.collectedCents) }}
+        </p>
+        <p class="mt-0.5 text-xs text-green-800/70">Échéances de facture déjà reçues.</p>
+      </NuxtLink>
+      <NuxtLink
+        to="/admin/factures"
+        class="card !p-4 border-amber-200 bg-amber-50/60 transition hover:border-amber-300 hover:bg-amber-50"
+      >
+        <p class="text-xs font-semibold text-amber-800">⏳ Cash à recevoir</p>
+        <p class="mt-1 font-serif text-2xl font-medium tracking-tight text-amber-900" data-testid="cash-outstanding">
+          {{ formatEuros(data.cash.outstandingCents) }}
+        </p>
+        <p class="mt-0.5 text-xs text-amber-800/70">
+          Échéances envoyées, pas encore encaissées.
+          <template v-if="data.cash.draftCents > 0">
+            {{ formatEuros(data.cash.draftCents) }} en brouillon, non comptés.
+          </template>
+        </p>
+      </NuxtLink>
     </div>
 
     <!-- Invitation d'un chauffeur -->

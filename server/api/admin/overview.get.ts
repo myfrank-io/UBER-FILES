@@ -1,12 +1,14 @@
 import { requireAdmin } from '~/server/utils/auth'
 import { prisma } from '~/server/utils/prisma'
 import { setupLinkStatus } from '~/lib/setup-flow'
+import { SETTLEMENT_SELECT, type SettlementRow } from '~/server/utils/invoice'
+import { cashPosition } from '~/lib/invoice'
 
 // Tableau de bord admin (Chams) : chauffeurs, volume de courses, facturation.
 export default defineEventHandler(async (event) => {
   await requireAdmin(event)
 
-  const [drivers, bookingCount, revenue] = await Promise.all([
+  const [drivers, bookingCount, revenue, invoices] = await Promise.all([
     prisma.driver.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
@@ -19,7 +21,13 @@ export default defineEventHandler(async (event) => {
     }),
     prisma.booking.count({ where: { status: 'CONFIRMED' } }),
     prisma.payment.aggregate({ where: { status: 'PAID' }, _sum: { amountCents: true } }),
+    // Facturation Ridewiz : on ne charge que ce que le calcul de règlement lit.
+    prisma.invoice.findMany({ select: SETTLEMENT_SELECT }),
   ])
+
+  // Trésorerie de Ridewiz : ce qui est réellement rentré, et ce qui est dû.
+  // Rien à voir avec `gmvCents`, qui est le volume encaissé par les chauffeurs.
+  const cash = cashPosition(invoices as SettlementRow[])
 
   return {
     stats: {
@@ -29,6 +37,7 @@ export default defineEventHandler(async (event) => {
       // Volume encaissé par les chauffeurs (ils sont merchant of record via SumUp).
       gmvCents: revenue._sum.amountCents ?? 0,
     },
+    cash,
     drivers: drivers.map((d) => ({
       id: d.id,
       slug: d.slug,
