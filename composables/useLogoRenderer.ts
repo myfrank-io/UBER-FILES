@@ -2,7 +2,18 @@
 // de l'éditeur et PNG final (fond transparent) qui devient le logo du chauffeur.
 // Les polices sont celles de la page (auto-hébergées par @nuxt/fonts) : le
 // canvas y accède directement, contrairement à un SVG chargé comme image.
-import type { LogoColorToken, LogoFont, LogoItem, LogoScene, TextItem } from '~/lib/logo-bank'
+import {
+  findLogoTemplate,
+  normalizeLogoInput,
+  resolveLogoColor,
+  type LogoColorToken,
+  type LogoFont,
+  type LogoItem,
+  type LogoRecipe,
+  type LogoScene,
+  type LogoTheme,
+  type TextItem,
+} from '~/lib/logo-bank'
 
 export interface LogoColors {
   primary: string
@@ -239,4 +250,32 @@ export function renderLogoScene(scene: LogoScene, colors: LogoColors, opts: Rend
 
 export function logoSceneToDataUrl(scene: LogoScene, colors: LogoColors, opts: RenderOptions): string {
   return renderLogoScene(scene, colors, opts).toDataURL('image/png')
+}
+
+/** Couleurs de rendu d'une recette, jetons « suit le thème » résolus. */
+export function logoColorsFromRecipe(recipe: LogoRecipe, theme: LogoTheme): LogoColors {
+  return {
+    primary: resolveLogoColor(recipe.primary, theme),
+    accent: resolveLogoColor(recipe.accent, theme),
+    inverse: theme.background,
+    metallic: recipe.metallic,
+  }
+}
+
+/**
+ * Re-rend le PNG final d'une recette (1600 px de large : ~40 mm imprimés à
+ * bien plus de 300 dpi). Renvoie null si la recette n'a pas de modèle ou si
+ * le modèle a disparu de la banque.
+ */
+export async function renderLogoFromRecipe(
+  recipe: LogoRecipe,
+  theme: LogoTheme,
+  width = 1600,
+): Promise<string | null> {
+  if (!recipe.templateId) return null
+  const template = findLogoTemplate(recipe.templateId)
+  if (!template) return null
+  await ensureLogoFonts()
+  const scene = template.build(normalizeLogoInput(recipe))
+  return logoSceneToDataUrl(scene, logoColorsFromRecipe(recipe, theme), { width })
 }

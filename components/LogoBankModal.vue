@@ -6,15 +6,20 @@
 // transparent) qui devient le logo du design.
 import {
   DEFAULT_LOGO_ACCENT,
+  DEFAULT_LOGO_PRIMARY,
   DEFAULT_LOGO_TAGLINE,
   LOGO_CATEGORIES,
   LOGO_CATEGORY_LABELS,
   LOGO_COLOR_PRESETS,
   LOGO_TEMPLATES,
+  LOGO_THEME_COLORS,
   deriveInitials,
+  isLogoThemeColor,
   normalizeLogoInput,
+  resolveLogoColor,
   type LogoCategory,
   type LogoRecipe,
+  type LogoTheme,
 } from '~/lib/logo-bank'
 import { ensureLogoFonts, logoSceneToDataUrl, type LogoColors } from '~/composables/useLogoRenderer'
 
@@ -46,19 +51,34 @@ const fields = reactive({
   name: props.recipe?.name ?? baseName,
   tagline: props.recipe?.tagline ?? (props.title?.trim() || DEFAULT_LOGO_TAGLINE),
 })
-// Couleurs du logo, indépendantes de la carte : texte/éléments (par défaut la
-// couleur des éléments de la carte) et accent (or par défaut). Or plat par
-// défaut, le dégradé métal reste en option.
-const primary = ref(props.recipe?.primary ?? props.fgColor.toUpperCase())
-const accent = ref(props.recipe?.accent ?? DEFAULT_LOGO_ACCENT)
+// Couleurs du logo : soit une couleur figée, soit un jeton qui SUIT LE THÈME
+// de la carte (le logo se recolore alors avec la palette). Par défaut, le
+// texte suit les éléments du thème et l'accent est l'or, plat.
+const primary = ref<string>(props.recipe?.primary ?? DEFAULT_LOGO_PRIMARY)
+const accent = ref<string>(props.recipe?.accent ?? DEFAULT_LOGO_ACCENT)
 const metallic = ref(props.recipe?.metallic ?? false)
 const category = ref<LogoCategory | 'all'>('all')
 const selectedId = ref<string | null>(props.recipe?.templateId ?? null)
 
+const theme = computed<LogoTheme>(() => ({ elements: props.fgColor, background: props.bgColor }))
+
 const HEX = /^#[0-9a-fA-F]{6}$/
+
+/** Couleur affichée/rendue : jeton résolu sur le thème, ou hex saisi. */
+function displayColor(value: string, key: 'primary' | 'accent'): string {
+  if (isLogoThemeColor(value)) return resolveLogoColor(value, theme.value)
+  if (HEX.test(value)) return value.toUpperCase()
+  return key === 'primary' ? props.fgColor : DEFAULT_LOGO_ACCENT
+}
+
+/** Valeur stockée dans la recette : le jeton tel quel, ou le hex normalisé. */
+function storedColor(value: string, key: 'primary' | 'accent'): string {
+  return isLogoThemeColor(value) ? value : displayColor(value, key)
+}
+
 const colors = computed<LogoColors>(() => ({
-  primary: HEX.test(primary.value) ? primary.value : props.fgColor,
-  accent: HEX.test(accent.value) ? accent.value : DEFAULT_LOGO_ACCENT,
+  primary: displayColor(primary.value, 'primary'),
+  accent: displayColor(accent.value, 'accent'),
   inverse: props.bgColor,
   metallic: metallic.value,
 }))
@@ -66,6 +86,12 @@ const colors = computed<LogoColors>(() => ({
 const colorControls = [
   { key: 'primary', label: 'Texte & éléments', model: primary },
   { key: 'accent', label: 'Accent (diamant, filets…)', model: accent },
+] as const
+
+/** Raccourcis « suit le thème », proposés avant les couleurs figées. */
+const themeSwatches = [
+  { value: LOGO_THEME_COLORS.elements, label: 'Thème' },
+  { value: LOGO_THEME_COLORS.background, label: 'Fond' },
 ] as const
 
 const templates = computed(() =>
@@ -110,8 +136,8 @@ function currentRecipe(templateId: string | null): LogoRecipe {
   return {
     templateId,
     ...normalizeLogoInput(fields),
-    primary: colors.value.primary.toUpperCase(),
-    accent: colors.value.accent.toUpperCase(),
+    primary: storedColor(primary.value, 'primary'),
+    accent: storedColor(accent.value, 'accent'),
     metallic: metallic.value,
   }
 }
@@ -173,6 +199,19 @@ watch([() => fields.initials, () => fields.name, () => fields.tagline, primary, 
     <div class="mt-3 space-y-2">
       <div v-for="c in colorControls" :key="c.key" class="flex flex-wrap items-center gap-1.5" :data-testid="`logo-color-${c.key}`">
         <span class="w-full text-xs font-semibold text-slate-500 sm:w-auto sm:min-w-[150px]">{{ c.label }}</span>
+        <!-- Suit la palette de la carte : le logo se recolore avec le thème. -->
+        <button
+          v-for="t in themeSwatches"
+          :key="t.value"
+          type="button"
+          class="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition"
+          :class="c.model.value === t.value ? 'border-brand-500 bg-brand-50 text-brand-800 ring-2 ring-brand-200' : 'border-slate-300 text-slate-600 hover:border-slate-400'"
+          :title="`Suit le thème de la carte (${t.label.toLowerCase()})`"
+          @click="c.model.value = t.value"
+        >
+          <span class="inline-block h-3 w-3 rounded-full ring-1 ring-slate-300" :style="{ background: resolveLogoColor(t.value, theme) }"></span>
+          {{ t.label }}
+        </button>
         <button
           v-for="p in LOGO_COLOR_PRESETS"
           :key="p.color"
@@ -184,8 +223,22 @@ watch([() => fields.initials, () => fields.name, () => fields.tagline, primary, 
           :aria-label="p.label"
           @click="c.model.value = p.color"
         ></button>
-        <input v-model="c.model.value" type="color" class="h-6 w-8 cursor-pointer rounded border border-slate-300 bg-white p-0" :title="`${c.label} : couleur libre`" />
-        <input v-model="c.model.value" class="field !w-24 !px-2 !py-1 font-mono !text-xs uppercase" maxlength="7" />
+        <input
+          type="color"
+          class="h-6 w-8 cursor-pointer rounded border border-slate-300 bg-white p-0"
+          :value="displayColor(c.model.value, c.key)"
+          :title="`${c.label} : couleur libre`"
+          @input="c.model.value = ($event.target as HTMLInputElement).value.toUpperCase()"
+        />
+        <input
+          v-if="!isLogoThemeColor(c.model.value)"
+          v-model="c.model.value"
+          class="field !w-24 !px-2 !py-1 font-mono !text-xs uppercase"
+          maxlength="7"
+        />
+        <span v-else class="rounded bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-500">
+          auto {{ displayColor(c.model.value, c.key) }}
+        </span>
       </div>
       <label class="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-700">
         <input v-model="metallic" type="checkbox" class="accent-brand-600" data-testid="logo-metallic" />

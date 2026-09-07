@@ -6,8 +6,12 @@ import {
   LOGO_W,
   deriveInitials,
   findLogoTemplate,
+  LOGO_THEME_COLORS,
+  isLogoThemeColor,
+  logoRecipeFollowsTheme,
   normalizeLogoInput,
   parseLogoRecipe,
+  resolveLogoColor,
   regularPolygon,
   sceneWithinBounds,
   splitName,
@@ -123,5 +127,35 @@ describe('parseLogoRecipe', () => {
     expect(parseLogoRecipe({ ...recipe, accent: 'gold' })).toBeNull()
     expect(parseLogoRecipe(null)).toBeNull()
     expect(parseLogoRecipe('x')).toBeNull()
+  })
+})
+
+describe('couleurs liées au thème', () => {
+  const theme = { elements: '#E0B579', background: '#0E1B2C' }
+
+  it('résout les jetons sur la palette de la carte, laisse un hex intact', () => {
+    expect(resolveLogoColor(LOGO_THEME_COLORS.elements, theme)).toBe('#E0B579')
+    expect(resolveLogoColor(LOGO_THEME_COLORS.background, theme)).toBe('#0E1B2C')
+    expect(resolveLogoColor('#C9A24D', theme)).toBe('#C9A24D')
+  })
+
+  it('isLogoThemeColor distingue jeton et hex', () => {
+    expect(isLogoThemeColor(LOGO_THEME_COLORS.elements)).toBe(true)
+    expect(isLogoThemeColor('#C9A24D')).toBe(false)
+  })
+
+  it('une recette avec un jeton suit le thème et reste valide', () => {
+    const recipe = parseLogoRecipe({
+      templateId: 'diamond-crest',
+      initials: 'SD',
+      name: "Same's Driver",
+      tagline: 'VTC Premium',
+      primary: LOGO_THEME_COLORS.elements,
+      accent: '#C9A24D',
+      metallic: false,
+    })
+    expect(recipe?.primary).toBe(LOGO_THEME_COLORS.elements)
+    expect(logoRecipeFollowsTheme(recipe!)).toBe(true)
+    expect(logoRecipeFollowsTheme({ ...recipe!, primary: '#FFFFFF' })).toBe(false)
   })
 })
