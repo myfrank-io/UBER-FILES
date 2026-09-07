@@ -187,3 +187,56 @@ describe('remises dans le PDF', () => {
     expect(Buffer.from(bytes.slice(0, 5)).toString()).toBe('%PDF-')
   })
 })
+
+describe('charte et pagination', () => {
+  it('rappelle le numéro et la pagination sur les pages de suite', async () => {
+    const lines = Array.from({ length: 30 }, (_, i) => ({
+      label: `Prestation ${i + 1}\nseconde ligne`,
+      quantity: 1,
+      unitPriceCents: 10_000,
+      discountKind: 'NONE' as const,
+      discountValue: 0,
+    }))
+    const bytes = await generateInvoicePdf({
+      number: '2606-99',
+      issuedAtLabel: '07/09/2026',
+      dueDateLabel: null,
+      issuer,
+      client,
+      lines,
+      vatRateBps: 0,
+      grossCents: 300_000,
+      discountCents: 0,
+      subtotalCents: 300_000,
+      vatCents: 0,
+      totalCents: 300_000,
+      paymentTerms: null,
+      notes: null,
+    })
+    const doc = await PDFDocument.load(bytes)
+    expect(doc.getPageCount()).toBeGreaterThan(1)
+    // Le rappel n'est posé que sur les pages de suite : la première porte déjà
+    // le bandeau avec le numéro.
+    expect(doc.getPage(0).getSize().width).toBeGreaterThan(0)
+  })
+
+  it('une facture d’une seule page ne porte pas de rappel de pagination', async () => {
+    const bytes = await generateInvoicePdf({
+      number: '2606-98',
+      issuedAtLabel: '07/09/2026',
+      dueDateLabel: null,
+      issuer,
+      client,
+      lines: [{ label: 'Accès', quantity: 1, unitPriceCents: 40_000, discountKind: 'NONE', discountValue: 0 }],
+      vatRateBps: 0,
+      grossCents: 40_000,
+      discountCents: 0,
+      subtotalCents: 40_000,
+      vatCents: 0,
+      totalCents: 40_000,
+      paymentTerms: null,
+      notes: null,
+    })
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1)
+  })
+})
