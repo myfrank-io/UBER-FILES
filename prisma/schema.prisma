@@ -229,6 +229,7 @@ model Driver {
   subscription     Subscription?
   cardProfile      CardProfile?
   nfcCardDesign    NfcCardDesign?
+  invoices         Invoice[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -875,5 +876,123 @@ model NfcCardDesign {
   sentCount Int       @default(0)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Statut d'une facture. Brouillon tant qu'elle se modifie, puis figée.
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  CANCELLED
+}
+
+/// Facture émise par l'exploitant Ridewiz à un chauffeur (accès, paramétrage,
+/// cartes…). L'identité du client et les montants sont FIGÉS sur la facture :
+/// un document comptable ne doit pas changer parce qu'une fiche chauffeur a
+/// bougé depuis. Le lien vers le chauffeur n'est qu'un confort de navigation,
+/// il peut disparaître sans emporter la facture.
+model Invoice {
+  id     String        @id @default(cuid())
+  /// Numéro de la série, unique et non réutilisable (obligation légale).
+  number String        @unique
+  status InvoiceStatus @default(DRAFT)
+
+  driver   Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  driverId String?
+
+  // Client, tel qu'il s'imprime sur la facture.
+  clientName        String
+  clientContactName String?
+  clientEmail       String?
+  clientPhone       String?
+  clientAddress     String?
+  clientSiret       String?
+  clientVatNumber   String?
+
+  issuedAt DateTime  @default(now())
+  dueDate  DateTime?
+
+  currency   String @default("eur")
+  /// Taux de TVA en centièmes de pour-cent. 0 = franchise en base (art. 293 B).
+  vatRateBps Int    @default(0)
+
+  // Totaux recalculés à chaque écriture depuis les lignes : la facture reste
+  // lisible même si la logique de calcul évolue.
+  subtotalCents Int @default(0)
+  vatCents      Int @default(0)
+  totalCents    Int @default(0)
+
+  /// Phrase des modalités de paiement, telle qu'imprimée (proposée puis modifiable).
+  paymentTerms String?
+  /// Note libre ajoutée sous le tableau.
+  notes        String?
+
+  lines        InvoiceLine[]
+  installments InvoiceInstallment[]
+
+  sentAt    DateTime?
+  sentCount Int       @default(0)
+  paidAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([driverId])
+  @@index([issuedAt])
+}
+
+/// Ligne du tableau « Désignation / Montant ». La désignation peut tenir sur
+/// plusieurs lignes (retours à la ligne conservés jusqu'au PDF).
+model InvoiceLine {
+  id        String  @id @default(cuid())
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId String
+  position  Int
+
+  label          String
+  quantity       Int    @default(1)
+  unitPriceCents Int
+
+  @@index([invoiceId])
+}
+
+/// Échéance de règlement (« acompte de 50 % à la commande »). Le montant est
+/// stocké : c'est lui qui fait foi, pas un pourcentage recalculé plus tard.
+model InvoiceInstallment {
+  id        String  @id @default(cuid())
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId String
+  position  Int
+
+  /// Part du total en centièmes de pour-cent (5000 = 50 %).
+  shareBps    Int
+  dueLabel    String
+  amountCents Int
+
+  @@index([invoiceId])
+}
+
+/// Identité légale de l'émetteur des factures — une seule ligne, éditée depuis
+/// l'admin. En base plutôt qu'en variables d'environnement : ce sont des
+/// coordonnées personnelles, elles n'ont rien à faire dans un dépôt public, et
+/// les corriger ne doit pas demander un redéploiement.
+model InvoiceIssuer {
+  id String @id @default("singleton")
+
+  name        String @default("")
+  /// Mention de forme juridique imprimée après le nom (« EI », « SASU »…).
+  legalForm   String @default("")
+  email       String @default("")
+  phone       String @default("")
+  addressLine String @default("")
+  postalCode  String @default("")
+  city        String @default("")
+  siret       String @default("")
+
+  vatNumber String?
+  /// Préfixe proposé pour le prochain numéro quand aucune facture n'existe.
+  numberPrefix String @default("")
+
   updatedAt DateTime @updatedAt
 }

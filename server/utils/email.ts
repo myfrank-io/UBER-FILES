@@ -1223,3 +1223,34 @@ export function nfcCardOrderEmail(opts: {
 
   return { subject, html: wrap(`Cartes NFC pour ${esc(opts.driverName)}`, body) }
 }
+
+/**
+ * Envoi d'une facture au client, le PDF en pièce jointe. Autonome comme
+ * `nfcCardOrderEmail` : ce n'est pas un email de course, il ne partage rien
+ * avec les gabarits de réservation.
+ */
+export function invoiceEmail(opts: {
+  number: string
+  clientName: string
+  /** Total déjà formaté (« 600 € ») : le calcul appartient à lib/invoice. */
+  totalLabel: string
+  paymentTerms: string | null
+  issuerName: string
+  issuerEmail: string | null
+}): { subject: string; html: string } {
+  const subject = `Facture n°${opts.number} — ${opts.totalLabel}`
+  const body = `
+    <p style="margin:0 0 14px">Bonjour ${esc(opts.clientName)},</p>
+    <p style="margin:0 0 14px">Vous trouverez en pièce jointe la facture
+    <strong>n°${esc(opts.number)}</strong> d'un montant de <strong>${esc(opts.totalLabel)}</strong>.</p>
+    ${
+      opts.paymentTerms
+        ? `<div style="margin:18px 0;padding:14px 16px;background:#FBF7F0;border:1px solid #EFE7D8;border-radius:12px;font-size:14px">${esc(opts.paymentTerms)}</div>`
+        : ''
+    }
+    <p style="margin:18px 0 0;font-size:14px">Pour toute question, répondez simplement à cet email${
+      opts.issuerEmail ? ` ou écrivez à <a href="mailto:${esc(opts.issuerEmail)}" style="color:#B5793F">${esc(opts.issuerEmail)}</a>` : ''
+    }.</p>
+    <p style="margin:14px 0 0;font-size:14px">${esc(opts.issuerName)}</p>`
+  return { subject, html: wrap(`Facture n°${esc(opts.number)}`, body) }
+}
