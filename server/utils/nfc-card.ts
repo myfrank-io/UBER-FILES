@@ -2,6 +2,7 @@
 // La logique pure (layout, schéma, URLs, QR) vit dans lib/nfc-card.ts ; le
 // dessin PDF dans nfc-card-pdf.ts. Ici : charger/créer le design d'un
 // chauffeur, le sérialiser pour l'éditeur, et préparer les entrées du rendu.
+import { randomBytes } from 'node:crypto'
 import type { Driver, NfcCardDesign } from '@prisma/client'
 import { prisma } from '~/server/utils/prisma'
 import {
@@ -38,6 +39,21 @@ export async function loadOrCreateNfcCardDesign(driver: DriverForCards): Promise
       phone: formatCardPhone(driver.phone),
     },
   })
+}
+
+/**
+ * Jeton du lien public de proposition, créé à la première demande puis stable :
+ * le PDF est régénéré à chaque ouverture, le lien reste donc valable après
+ * chaque modification du design.
+ */
+export async function ensureNfcCardProposalToken(design: NfcCardDesignRow): Promise<string> {
+  if (design.proposalToken) return design.proposalToken
+  const updated = await prisma.nfcCardDesign.update({
+    where: { id: design.id },
+    data: { proposalToken: randomBytes(18).toString('base64url') },
+    select: { proposalToken: true },
+  })
+  return updated.proposalToken!
 }
 
 /** URL versionnée du logo pour l'éditeur (immuable : changer le logo change l'URL). */

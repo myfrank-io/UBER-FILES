@@ -875,6 +875,11 @@ model NfcCardDesign {
   qtyReview   Int @default(10)
   qtyBusiness Int @default(10)
 
+  // Lien public (court) vers le PDF de proposition envoyé au chauffeur.
+  // Créé à la première demande, stable ensuite : le PDF est régénéré à chaque
+  // ouverture, donc le lien reflète toujours le design enregistré.
+  proposalToken String? @unique
+
   // Dernier envoi du design validé à la production.
   sentAt    DateTime?
   sentCount Int       @default(0)

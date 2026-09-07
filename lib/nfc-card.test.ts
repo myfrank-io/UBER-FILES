@@ -12,6 +12,8 @@ import {
   formatCardPhone,
   logoBox,
   nfcCardDesignSchema,
+  nfcCardProposalMessage,
+  nfcCardProposalUrl,
   nfcCardTargetUrl,
   qrContrastWarning,
   qrMatrix,
@@ -181,5 +183,35 @@ describe('contraste', () => {
     expect(qrContrastWarning('#F6F1E9', '#111111')).toBeNull()
     expect(qrContrastWarning('#F6F1E9', '#E9DCC5')).toMatch(/Contraste/)
     expect(qrContrastWarning('#0E1B2C', '#E0B579')).toMatch(/fond sombre/)
+  })
+})
+
+describe('proposition au chauffeur', () => {
+  it('nfcCardProposalUrl : lien court, jeton encodé', () => {
+    expect(nfcCardProposalUrl('https://ridewiz.fr/', 'abc123')).toBe('https://ridewiz.fr/cartes-nfc/abc123')
+    expect(nfcCardProposalUrl('https://ridewiz.fr', 'a/b')).toBe('https://ridewiz.fr/cartes-nfc/a%2Fb')
+  })
+
+  it('nfcCardProposalMessage : prénom, quantités et lien', () => {
+    const msg = nfcCardProposalMessage({
+      driverName: 'Job Kerkar',
+      url: 'https://ridewiz.fr/cartes-nfc/abc',
+      qtyReview: 10,
+      qtyBusiness: 10,
+    })
+    expect(msg).toContain('Bonjour Job,')
+    expect(msg).toContain('10 cartes avis Google et 10 cartes de visite')
+    expect(msg).toContain('https://ridewiz.fr/cartes-nfc/abc')
+  })
+
+  it('n’annonce que les produits réellement commandés', () => {
+    const msg = nfcCardProposalMessage({ driverName: 'Guy', url: 'u', qtyReview: 0, qtyBusiness: 10 })
+    expect(msg).toContain('(10 cartes de visite)')
+    expect(msg).not.toContain('avis Google')
+  })
+
+  it('reste correct sans nom ni quantité', () => {
+    const msg = nfcCardProposalMessage({ driverName: '', url: 'u', qtyReview: 0, qtyBusiness: 0 })
+    expect(msg.startsWith('Bonjour, voici la proposition')).toBe(true)
   })
 })

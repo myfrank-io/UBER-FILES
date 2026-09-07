@@ -19,6 +19,8 @@ const RULES: RateRule[] = [
   { pattern: /^\/api\/public\/[^/]+\/review-feedback$/, limit: 5, windowMs: 60 * 60 * 1000 },
   // Autocomplete / geocode : 60 / minute par IP
   { pattern: /^\/api\/public\/(autocomplete|geocode)$/, limit: 60, windowMs: 60 * 1000 },
+  // Proposition de cartes NFC (génère un PDF) : 30 / minute par IP
+  { pattern: /^\/cartes-nfc\/[^/]+$/, limit: 30, windowMs: 60 * 1000 },
   // Login : 10 tentatives / 15 minutes par IP
   { pattern: /^\/api\/auth\/login$/, limit: 10, windowMs: 15 * 60 * 1000 },
   // Reset password : 3 / heure par IP

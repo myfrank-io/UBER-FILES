@@ -18,6 +18,7 @@ import {
   NFC_CARD_PRODUCT_LABELS,
   defaultCardName,
   formatCardPhone,
+  nfcCardProposalMessage,
   qrContrastWarning,
   qrMatrix,
   type GoogleLogoStyle,
@@ -25,6 +26,7 @@ import {
 } from '~/lib/nfc-card'
 import { MAX_PHOTO_SOURCE_BYTES, resizeImageToDataUrl } from '~/composables/useImageResize'
 import { logoRecipeFollowsTheme, type LogoRecipe } from '~/lib/logo-bank'
+import { toWhatsAppDigits } from '~/lib/card-blocks'
 import { renderLogoFromRecipe } from '~/composables/useLogoRenderer'
 
 definePageMeta({ layout: 'default', middleware: 'admin' })
@@ -279,6 +281,38 @@ function pdfUrl(kind: 'preview' | NfcCardProduct) {
   return `/api/admin/drivers/${id}/nfc-cards/pdf?kind=${kind}`
 }
 
+// ─── Proposition au chauffeur ────────────────────────────────────────────────
+// Le PDF est généré à l'ouverture du lien, depuis le design ENREGISTRÉ : les
+// actions restent donc désactivées tant qu'il reste des modifications en cours.
+const proposalMessage = computed(() =>
+  nfcCardProposalMessage({
+    driverName: data.value?.driver.displayName ?? '',
+    url: data.value?.proposalUrl ?? '',
+    qtyReview: form.qtyReview,
+    qtyBusiness: form.qtyBusiness,
+  }),
+)
+
+const proposalWhatsapp = computed(() => {
+  const digits = toWhatsAppDigits(data.value?.driver.phone)
+  return digits && data.value?.proposalUrl
+    ? `https://wa.me/${digits}?text=${encodeURIComponent(proposalMessage.value)}`
+    : null
+})
+
+const proposalCopied = ref(false)
+function copyProposalLink() {
+  const url = data.value?.proposalUrl
+  if (!url) return
+  navigator.clipboard
+    ?.writeText(url)
+    .then(() => {
+      proposalCopied.value = true
+      setTimeout(() => (proposalCopied.value = false), 2500)
+    })
+    .catch(() => toast.error('Copie impossible : ouvrez le lien depuis la carte « Liens ».'))
+}
+
 const products: NfcCardProduct[] = ['review', 'business']
 const productLabels = NFC_CARD_PRODUCT_LABELS
 </script>
@@ -305,6 +339,29 @@ const productLabels = NFC_CARD_PRODUCT_LABELS
             class="btn-ghost whitespace-nowrap text-sm"
           >Aperçu PDF ↗</a>
           <span v-else class="btn-ghost whitespace-nowrap text-sm opacity-50" title="Enregistrez d'abord">Aperçu PDF ↗</span>
+          <!-- Proposition au chauffeur : WhatsApp pré-rempli avec le lien du PDF. -->
+          <a
+            v-if="!dirty && proposalWhatsapp"
+            :href="proposalWhatsapp"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-xl border border-green-600/40 bg-green-50 px-4 text-sm font-semibold text-green-800 transition hover:bg-green-100"
+            data-testid="nfc-whatsapp"
+          >
+            💬 Envoyer au chauffeur
+          </a>
+          <button
+            v-else-if="!dirty"
+            type="button"
+            class="btn-ghost whitespace-nowrap text-sm"
+            title="Ce chauffeur n'a pas de numéro : copiez le lien et envoyez-le vous-même."
+            @click="copyProposalLink"
+          >
+            {{ proposalCopied ? 'Lien copié' : '🔗 Copier la proposition' }}
+          </button>
+          <span v-else class="btn-ghost whitespace-nowrap text-sm opacity-50" title="Enregistrez d'abord">
+            💬 Envoyer au chauffeur
+          </span>
           <button class="btn-ghost whitespace-nowrap text-sm" :disabled="saving || sending || !dirty" @click="save">
             {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
           </button>
@@ -450,6 +507,13 @@ const productLabels = NFC_CARD_PRODUCT_LABELS
           <section class="card text-sm">
             <h2 class="font-semibold text-slate-900">Liens encodés (QR = puce NFC)</h2>
             <dl class="mt-2 space-y-2 break-all">
+              <div>
+                <dt class="text-xs text-slate-500">Proposition PDF (lien envoyé au chauffeur)</dt>
+                <dd>
+                  <a v-if="data.proposalUrl" :href="data.proposalUrl" target="_blank" rel="noopener" class="text-brand-700 hover:underline">{{ data.proposalUrl }}</a>
+                  <span v-if="dirty" class="ml-1 text-xs text-amber-700">(enregistrez pour que le PDF soit à jour)</span>
+                </dd>
+              </div>
               <div><dt class="text-xs text-slate-500">Carte avis Google</dt><dd><a :href="data.links.review" target="_blank" class="text-brand-700 hover:underline">{{ data.links.review }}</a></dd></div>
               <div>
                 <dt class="text-xs text-slate-500">Lien Google direct</dt>
