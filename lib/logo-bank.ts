@@ -13,7 +13,11 @@
 export const LOGO_W = 1000
 export const LOGO_H = 650
 
-export type LogoColorToken = 'primary' | 'accent' | 'inverse'
+/**
+ * `ink` = la plus sombre des deux couleurs de la carte (éléments / fond) : un
+ * diamant noir reste noir sur carte crème, et devient un contour or sur carte noire.
+ */
+export type LogoColorToken = 'primary' | 'accent' | 'inverse' | 'ink'
 
 /** Polices disponibles au rendu (cf. FONT_STACKS dans le composable). */
 export type LogoFont =
@@ -109,10 +113,11 @@ export interface LogoScene {
   items: LogoItem[]
 }
 
-export const LOGO_CATEGORIES = ['monogram', 'type', 'symbol'] as const
+export const LOGO_CATEGORIES = ['diamond', 'monogram', 'type', 'symbol'] as const
 export type LogoCategory = (typeof LOGO_CATEGORIES)[number]
 
 export const LOGO_CATEGORY_LABELS: Record<LogoCategory, string> = {
+  diamond: 'Diamant',
   monogram: 'Monogramme',
   type: 'Typographique',
   symbol: 'Symbole',
@@ -207,12 +212,11 @@ export function starPolygon(cx: number, cy: number, outer: number, inner: number
 
 export const LOGO_ICONS = {
   crown: 'M10 78 L10 38 L32 56 L50 22 L68 56 L90 38 L90 78 Z',
-  gem: 'M20 34 L34 16 L66 16 L80 34 L50 86 Z M20 34 L80 34 M34 16 L42 34 L50 86 M66 16 L58 34 L50 86',
-  // Aile gauche : trois plumes effilées en éventail, pointe vers les initiales (x = 100).
-  wingLeft:
-    'M100 52 C82 26 50 14 6 22 C34 28 58 38 76 52 Z M100 58 C78 46 48 42 10 48 C36 52 62 58 84 68 Z M100 66 C82 64 56 68 24 82 C50 78 74 80 96 90 Z',
-  wingRight:
-    'M0 52 C18 26 50 14 94 22 C66 28 42 38 24 52 Z M0 58 C22 46 52 42 90 48 C64 52 38 58 16 68 Z M0 66 C18 64 44 68 76 82 C50 78 26 80 4 90 Z',
+  // Diamant taille brillant, vu de profil : table, couronne, rondiste, pavillon.
+  // `brilliantBody` = contour fermé (remplissage), `brilliantFacets` = arêtes.
+  brilliantBody: 'M30 14 L70 14 L92 40 L50 94 L8 40 Z',
+  brilliantFacets:
+    'M8 40 L92 40 M30 14 L20 40 M30 14 L40 40 M50 14 L40 40 M50 14 L60 40 M70 14 L60 40 M70 14 L80 40 M20 40 L50 94 M40 40 L50 94 M60 40 L50 94 M80 40 L50 94',
   car: 'M6 64 L12 46 Q20 34 38 33 L62 33 Q78 34 86 44 L94 50 Q97 56 94 64 Z',
   // Vitres de la berline, découpées dans la carrosserie (couleur inverse).
   carWindows: 'M24 46 L30 38 L47 37 L47 46 Z M52 37 L64 37 Q72 38 78 46 L52 46 Z',
@@ -262,8 +266,155 @@ const icon = (d: string, x: number, y: number, size: number, extra: Partial<Path
   ...extra,
 })
 
+/** Petit diamant (contour or) : icône d'ornement réutilisée par la famille « Diamant ». */
+const brilliantOutline = (x: number, y: number, size: number, lw = 1.2): PathItem[] => [
+  icon(LOGO_ICONS.brilliantBody, x, y, size, { fill: undefined, stroke: 'accent', lw }),
+  icon(LOGO_ICONS.brilliantFacets, x, y, size, { fill: undefined, stroke: 'accent', lw: lw * 0.8 }),
+]
+
+/** Diamant noir serti : corps sombre, facettes or. */
+const brilliantSolid = (x: number, y: number, size: number): PathItem[] => [
+  icon(LOGO_ICONS.brilliantBody, x, y, size, { fill: 'ink', stroke: 'accent', lw: 1.4 }),
+  icon(LOGO_ICONS.brilliantFacets, x, y, size, { fill: undefined, stroke: 'accent', lw: 1 }),
+]
+
 export const LOGO_TEMPLATES: LogoTemplate[] = [
+  // ═══ Diamant — la famille « black premium » : diamant à facettes, or, serif fin ═══
+  {
+    // Diamant noir serti des initiales dorées, nom en capitales serif dorées.
+    id: 'diamond-crest',
+    label: 'Diamant serti',
+    category: 'diamond',
+    build: ({ initials, name, tagline: tl }) =>
+      scene([
+        ...brilliantSolid(320, 6, 360),
+        text({ text: initials, x: CX, y: 262, size: 150, font: 'caps', color: 'accent', tracking: 0.04, maxWidth: 210 }),
+        ...(name ? [text({ text: name, x: CX, y: 468, size: 98, font: 'caps', color: 'accent', tracking: 0.2, upper: true, maxWidth: 940 })] : []),
+        ...tagline(tl, 545, 'accent', 40),
+      ]),
+  },
+  {
+    // Diamant filaire seul, nom en capitales serif largement espacées.
+    id: 'diamond-line',
+    label: 'Diamant filaire',
+    category: 'diamond',
+    build: ({ name, tagline: tl }) =>
+      scene([
+        ...brilliantOutline(350, 0, 300, 1.1),
+        ...nameCaps(name, 430, 92, 'elegant', 0.36),
+        ...tagline(tl, 510, 'accent', 34),
+      ]),
+  },
+  {
+    // Petit diamant en couronne au-dessus d'un grand monogramme serif.
+    id: 'diamond-monogram',
+    label: 'Diamant monogramme',
+    category: 'diamond',
+    build: ({ initials, name, tagline: tl }) =>
+      scene([
+        ...brilliantOutline(445, 0, 110, 1.4),
+        text({ text: initials, x: CX, y: 345, size: 250, font: 'elegant', color: 'primary', tracking: 0.02 }),
+        rule(400, 120, 'accent', 1.5),
+        ...nameCaps(name, 475, 58, 'elegant', 0.42),
+        ...tagline(tl, 545, 'accent', 30),
+      ]),
+  },
+  {
+    // Nom en capitales serif, ornement filet — diamant — filet, sous-titre.
+    id: 'diamond-ornament',
+    label: 'Diamant & filets',
+    category: 'diamond',
+    build: ({ name, tagline: tl }) =>
+      scene([
+        ...nameCaps(name, 300, 118, 'elegant', 0.22),
+        { t: 'line', x1: 110, y1: 372, x2: 440, y2: 372, stroke: 'accent', lw: 1.5 },
+        ...brilliantOutline(470, 342, 60, 1.6),
+        { t: 'line', x1: 560, y1: 372, x2: 890, y2: 372, stroke: 'accent', lw: 1.5 },
+        ...tagline(tl, 470, 'primary', 34),
+      ]),
+  },
+  {
+    // Sceau : double anneau, nom en arc, initiales et diamant au centre.
+    id: 'diamond-seal',
+    label: 'Sceau diamant',
+    category: 'diamond',
+    build: ({ initials, name, tagline: tl }) =>
+      scene([
+        { t: 'circle', cx: CX, cy: 325, r: 300, stroke: 'primary', lw: 3 },
+        { t: 'circle', cx: CX, cy: 325, r: 274, stroke: 'accent', lw: 1.2 },
+        text({ text: initials, x: CX, y: 372, size: 170, font: 'elegant', color: 'primary', tracking: 0.06 }),
+        ...brilliantOutline(472, 398, 56, 1.6),
+        ...(name
+          ? [{ t: 'arcText', text: name, cx: CX, cy: 325, r: 236, size: 38, font: 'elegant', color: 'primary', side: 'top', spread: 140, upper: true } as ArcTextItem]
+          : []),
+        ...(tl
+          ? [{ t: 'arcText', text: tl, cx: CX, cy: 325, r: 236, size: 30, font: 'sans', color: 'accent', side: 'bottom', spread: 110, upper: true } as ArcTextItem]
+          : []),
+      ]),
+  },
+  {
+    // Nom en italique serif, diamant en signature, sous-titre.
+    id: 'diamond-signature',
+    label: 'Signature diamant',
+    category: 'diamond',
+    build: ({ name, tagline: tl }) =>
+      scene([
+        text({ text: name, x: CX, y: 320, size: 175, font: 'elegantItalic', color: 'primary', maxWidth: 940 }),
+        ...brilliantOutline(471, 352, 58, 1.6),
+        ...tagline(tl, 500, 'accent', 34),
+      ]),
+  },
+  {
+    // Premier mot en grand, second encadré de deux diamants, sous-titre.
+    id: 'diamond-duo',
+    label: 'Diamant duo',
+    category: 'diamond',
+    build: ({ name, tagline: tl }) => {
+      const [first, rest] = splitName(name)
+      const items: LogoItem[] = [
+        text({ text: first, x: CX, y: 285, size: 170, font: 'elegant', color: 'primary', tracking: 0.12, upper: true, maxWidth: 940 }),
+      ]
+      if (rest) {
+        items.push(
+          // Le mot est borné à 300 px de large : les diamants restent au-delà.
+          ...brilliantOutline(CX - 232, 336, 44, 1.6),
+          text({ text: rest, x: CX, y: 378, size: 60, font: 'elegant', color: 'accent', tracking: 0.5, upper: true, maxWidth: 300 }),
+          ...brilliantOutline(CX + 188, 336, 44, 1.6),
+        )
+      } else {
+        items.push(...brilliantOutline(471, 330, 58, 1.6))
+      }
+      items.push(...tagline(tl, 470, 'primary', 32))
+      return scene(items)
+    },
+  },
+
   // ═══ Monogrammes ═══
+  {
+    // Inspiré des logos « luxury driver » : deux initiales entrelacées en
+    // grand serif doré, filet, nom en capitales très espacées.
+    id: 'luxury-monogram',
+    label: 'Monogramme luxe',
+    category: 'monogram',
+    build: ({ initials, name, tagline: tl }) => {
+      const letters = [...initials]
+      const items: LogoItem[] = []
+      if (letters.length >= 2) {
+        items.push(
+          text({ text: letters[0]!, x: CX - 70, y: 350, size: 360, font: 'elegant', color: 'accent' }),
+          text({ text: letters.slice(1).join(''), x: CX + 75, y: 350, size: 360, font: 'elegantItalic', color: 'accent' }),
+        )
+      } else {
+        items.push(text({ text: initials, x: CX, y: 350, size: 360, font: 'elegant', color: 'accent' }))
+      }
+      items.push(
+        rule(400, 430, 'primary', 1.5),
+        ...nameCaps(name, 500, 62, 'sans', 0.5),
+        ...tagline(tl, 575, 'primary', 30),
+      )
+      return scene(items)
+    },
+  },
   {
     id: 'seal',
     label: 'Sceau',
@@ -588,17 +739,6 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
         rule(270, 120, 'accent', 3),
         ...nameCaps(name, 410, 96, 'serif', 0.16),
         ...tagline(tl, 500, 'primary', 32),
-      ]),
-  },
-  {
-    id: 'gem',
-    label: 'Diamant',
-    category: 'symbol',
-    build: ({ name, tagline: tl }) =>
-      scene([
-        icon(LOGO_ICONS.gem, 400, 10, 200, { fill: undefined, stroke: 'accent', lw: 3 }),
-        text({ text: name, x: CX, y: 400, size: 140, font: 'elegant', color: 'primary', tracking: 0.1, maxWidth: 940 }),
-        ...tagline(tl, 490, 'primary', 30),
       ]),
   },
 ]

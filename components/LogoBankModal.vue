@@ -34,11 +34,13 @@ const fields = reactive({
   tagline: props.title?.trim() || DEFAULT_LOGO_TAGLINE,
 })
 const accentKey = ref(LOGO_ACCENTS[0]!.key)
+// Or plat par défaut : le dégradé métal reste disponible en option.
+const metallic = ref(false)
 const category = ref<LogoCategory | 'all'>('all')
 
 const colors = computed<LogoColors>(() => {
   const accent = LOGO_ACCENTS.find((a) => a.key === accentKey.value)?.color
-  return { primary: props.fgColor, accent: accent ?? props.fgColor, inverse: props.bgColor }
+  return { primary: props.fgColor, accent: accent ?? props.fgColor, inverse: props.bgColor, metallic: metallic.value }
 })
 
 const templates = computed(() =>
@@ -71,7 +73,7 @@ onMounted(async () => {
 })
 
 watch(
-  [() => fields.initials, () => fields.name, () => fields.tagline, accentKey, () => props.bgColor, () => props.fgColor],
+  [() => fields.initials, () => fields.name, () => fields.tagline, accentKey, metallic, () => props.bgColor, () => props.fgColor],
   () => {
     if (!fontsLoaded.value) return
     if (timer) clearTimeout(timer)
@@ -126,6 +128,10 @@ function pick(id: string) {
         <span class="inline-block h-3.5 w-3.5 rounded-full ring-1 ring-slate-300" :style="{ background: a.color ?? fgColor }"></span>
         {{ a.label }}
       </button>
+      <label class="ml-auto flex cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-700">
+        <input v-model="metallic" type="checkbox" class="accent-brand-600" data-testid="logo-metallic" />
+        Effet métal
+      </label>
     </div>
 
     <div class="mt-3 flex gap-1 border-b border-slate-200">
