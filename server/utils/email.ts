@@ -424,12 +424,12 @@ export const emailTemplates = {
       : ''
     const action = opts.autoSent
       ? `${button(opts.dashboardUrl, 'Voir la demande')}
-         <p style="font-size:13px;color:#6C7889">Paiement immédiat activé : le devis a été envoyé automatiquement au client. Tu seras prévenu dès son paiement — aucune action attendue de ta part.</p>`
+         <p style="font-size:13px;color:#6C7889">Paiement immédiat activé : le devis a été envoyé automatiquement au client. Vous serez prévenu dès son paiement — aucune action attendue de votre part.</p>`
       : opts.directAccept
         ? `${button(opts.dashboardUrl, 'Accepter ou refuser la réservation')}
-         <p style="font-size:13px;color:#6C7889">En acceptant, la course est <strong>confirmée immédiatement</strong> — règlement sur place. Le client est prévenu par email. Tu peux aussi ajuster le prix : le client devra alors accepter le nouveau tarif.</p>`
+         <p style="font-size:13px;color:#6C7889">En acceptant, la course est <strong>confirmée immédiatement</strong> — règlement sur place. Le client est prévenu par email. Vous pouvez aussi ajuster le prix : le client devra alors accepter le nouveau tarif.</p>`
         : `${button(opts.dashboardUrl, 'Valider ou refuser le devis')}
-         <p style="font-size:13px;color:#6C7889">Le client recevra le lien de réservation dès que tu auras validé le devis.</p>`
+         <p style="font-size:13px;color:#6C7889">Le client recevra le lien de réservation dès que vous aurez validé le devis.</p>`
     return {
       subject: `Nouvelle demande de course — ${opts.customerName}`,
       html: wrap(
@@ -441,7 +441,7 @@ export const emailTemplates = {
          <p>Prix calculé : <strong style="font-size:20px">${formatMoney(opts.amountCents, opts.currency)}</strong></p>
          ${opts.paymentLabel ? `<p style="font-size:13px;color:#3C4A5A">💶 Règlement prévu : <strong>${esc(opts.paymentLabel)}</strong></p>` : ''}
          ${opts.notes ? `<p style="font-size:13px;color:#6C7889">Note du client : ${esc(opts.notes)}</p>` : ''}
-         ${opts.hasConflict ? '<p style="color:#96691E"><strong>⚠️ Conflit calendrier détecté</strong> — vérifie ton planning avant de valider.</p>' : ''}
+         ${opts.hasConflict ? '<p style="color:#96691E"><strong>⚠️ Conflit calendrier détecté</strong> — vérifiez votre planning avant de valider.</p>' : ''}
          ${action}`,
       ),
     }
@@ -463,7 +463,7 @@ export const emailTemplates = {
     // action du chauffeur) — l'email est alors sa seule notification.
     autoConfirmed?: boolean
     // True quand c'est le chauffeur lui-même qui vient d'accepter la demande
-    // (l'email sert de trace : « tu as accepté », pas « le client a confirmé »).
+    // (l'email sert de trace : « vous avez accepté », pas « le client a confirmé »).
     acceptedByDriver?: boolean
     // True si la course confirmée chevauche un autre événement du calendrier
     // (paiement déjà encaissé : on confirme mais on alerte le chauffeur).
@@ -478,7 +478,7 @@ export const emailTemplates = {
          <strong>${dateStr}</strong> a été <strong>confirmée
          automatiquement</strong> (créneau libre).</p>`
       : opts.acceptedByDriver
-        ? `<p>Tu as accepté la réservation de <strong>${esc(opts.customerName)}</strong> :
+        ? `<p>Vous avez accepté la réservation de <strong>${esc(opts.customerName)}</strong> :
            la course du <strong>${dateStr}</strong> est confirmée.</p>`
         : `<p><strong>${esc(opts.customerName)}</strong> a confirmé sa course du <strong>${dateStr}</strong>.</p>`
     return {
@@ -488,9 +488,9 @@ export const emailTemplates = {
         `${helloDriver(opts.driverFirstName)}
          ${intro}
          <p>${paiement}</p>
-         ${opts.conflictWarning ? '<p style="color:#96691E"><strong>⚠️ Attention :</strong> cette course chevauche un autre événement de ton calendrier. Vérifie ton planning et contacte le client si besoin.</p>' : ''}
-         ${contactBlock('Ton client', { name: opts.customerName, phone: opts.customerPhone, email: opts.customerEmail })}
-         <p style="font-size:13px;color:#6C7889">Le créneau est bloqué dans ton calendrier.</p>
+         ${opts.conflictWarning ? '<p style="color:#96691E"><strong>⚠️ Attention :</strong> cette course chevauche un autre événement de votre calendrier. Vérifiez votre planning et contactez le client si besoin.</p>' : ''}
+         ${contactBlock('Votre client', { name: opts.customerName, phone: opts.customerPhone, email: opts.customerEmail })}
+         <p style="font-size:13px;color:#6C7889">Le créneau est bloqué dans votre calendrier.</p>
          ${button(opts.dashboardUrl, 'Voir mes réservations')}`,
       ),
     }
@@ -513,7 +513,7 @@ export const emailTemplates = {
         `${helloDriver(opts.driverFirstName)}
          <p><strong>${esc(opts.customerName)}</strong> a annulé sa réservation prévue le <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong>.</p>
          <p>${refundStr}</p>
-         <p>Le créneau est libéré dans ton calendrier.</p>`,
+         <p>Le créneau est libéré dans votre calendrier.</p>`,
       ),
     }
   },
@@ -547,7 +547,7 @@ export const emailTemplates = {
     return {
       subject: `⏰ Course dans ~2 h — ${opts.customerName} (${formatRideTime(opts.scheduledAt, opts.timezone)})`,
       html: wrap(
-        'Ta course approche ⏰',
+        'Votre course approche ⏰',
         `${helloDriver(opts.driverFirstName)}
          <p>Prise en charge le <strong>${formatRideDateTime(opts.scheduledAt, opts.timezone)}</strong>.</p>
          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0">
@@ -653,16 +653,16 @@ export const emailTemplates = {
   },
   driverWelcomePending(opts: { displayName: string; dashboardUrl: string }) {
     return {
-      subject: 'Bienvenue — ton profil chauffeur est en cours de validation',
+      subject: 'Bienvenue — votre profil chauffeur est en cours de validation',
       html: wrap(
         `Bienvenue ${opts.displayName} 👋`,
-        `<p>Merci pour ton inscription. Ton profil a bien été reçu et est
+        `<p>Merci pour votre inscription. Votre profil a bien été reçu et est
           <strong>en cours de vérification</strong> par notre équipe.</p>
-         <p>En attendant la validation, tu peux dès maintenant accéder à ton espace
-          pour compléter et personnaliser ton profil (présentation, véhicule, tarifs, zone…).</p>
+         <p>En attendant la validation, vous pouvez dès maintenant accéder à votre espace
+          pour compléter et personnaliser votre profil (présentation, véhicule, tarifs, zone…).</p>
          ${button(opts.dashboardUrl, 'Accéder à mon espace')}
-         <p style="font-size:13px;color:#6C7889">Dès que ton profil sera approuvé, ta page
-          publique de réservation sera mise en ligne et tu en seras informé par email.</p>`,
+         <p style="font-size:13px;color:#6C7889">Dès que votre profil sera approuvé, votre page
+          publique de réservation sera mise en ligne et vous en serez informé par email.</p>`,
       ),
     }
   },
@@ -671,51 +671,51 @@ export const emailTemplates = {
   // le profil est en attente de validation — un seul email à l'inscription.
   verifyEmail(opts: { displayName: string; verifyUrl: string; dashboardUrl: string }) {
     return {
-      subject: 'Confirme ton adresse email — Ridewiz',
+      subject: 'Confirmez votre adresse email — Ridewiz',
       html: wrap(
         `Bienvenue ${esc(opts.displayName)} 👋`,
-        `<p>Merci pour ton inscription. Avant tout, <strong>confirme ton adresse
-          email</strong> pour sécuriser ton compte et recevoir tes notifications de
+        `<p>Merci pour votre inscription. Avant tout, <strong>confirmez votre adresse
+          email</strong> pour sécuriser votre compte et recevoir vos notifications de
           course :</p>
          ${button(opts.verifyUrl, 'Confirmer mon adresse email')}
          <p style="font-size:13px;color:#6C7889">Ce lien est valable 7 jours. Si le bouton
-          ne fonctionne pas, copie ce lien dans ton navigateur :<br />
+          ne fonctionne pas, copiez ce lien dans votre navigateur :<br />
           <a href="${opts.verifyUrl}" style="color:#B5793F;word-break:break-all">${opts.verifyUrl}</a></p>
          <hr style="border:none;border-top:1px solid #EFE7D8;margin:20px 0" />
-         <p style="font-size:13px;color:#6C7889">En parallèle, ton profil est
-          <strong>en cours de vérification</strong> par notre équipe. Tu peux dès
-          maintenant <a href="${opts.dashboardUrl}" style="color:#B5793F">accéder à ton
+         <p style="font-size:13px;color:#6C7889">En parallèle, votre profil est
+          <strong>en cours de vérification</strong> par notre équipe. Vous pouvez dès
+          maintenant <a href="${opts.dashboardUrl}" style="color:#B5793F">accéder à votre
           espace</a> pour le compléter (présentation, véhicule, tarifs, zone…). Dès qu'il
-          sera approuvé, ta page publique sera mise en ligne.</p>`,
+          sera approuvé, votre page publique sera mise en ligne.</p>`,
       ),
     }
   },
   // Renvoi du lien de confirmation (depuis la bannière de l'espace chauffeur).
   verifyEmailResend(opts: { verifyUrl: string }) {
     return {
-      subject: 'Confirme ton adresse email — Ridewiz',
+      subject: 'Confirmez votre adresse email — Ridewiz',
       html: wrap(
-        'Confirme ton adresse email',
-        `<p>Voici ton nouveau lien pour confirmer ton adresse email :</p>
+        'Confirmez votre adresse email',
+        `<p>Voici votre nouveau lien pour confirmer votre adresse email :</p>
          ${button(opts.verifyUrl, 'Confirmer mon adresse email')}
          <p style="font-size:13px;color:#6C7889">Ce lien est valable 7 jours. Si le bouton
-          ne fonctionne pas, copie ce lien dans ton navigateur :<br />
+          ne fonctionne pas, copiez ce lien dans votre navigateur :<br />
           <a href="${opts.verifyUrl}" style="color:#B5793F;word-break:break-all">${opts.verifyUrl}</a></p>`,
       ),
     }
   },
   driverApproved(opts: { displayName: string; publicUrl: string; dashboardUrl: string }) {
     return {
-      subject: 'Ton profil chauffeur est validé ✅',
+      subject: 'Votre profil chauffeur est validé ✅',
       html: wrap(
-        'Ton profil est validé ✅',
-        `<p>Bonne nouvelle ${opts.displayName} ! Ton profil a été approuvé.</p>
-         <p>Ta page publique de réservation est désormais en ligne :</p>
+        'Votre profil est validé ✅',
+        `<p>Bonne nouvelle ${opts.displayName} ! Votre profil a été approuvé.</p>
+         <p>Votre page publique de réservation est désormais en ligne :</p>
          <p><a href="${opts.publicUrl}" style="color:#B5793F;font-weight:600">${opts.publicUrl}</a></p>
          ${button(opts.publicUrl, 'Voir ma page publique')}
-         <p style="font-size:13px;color:#6C7889">Partage ce lien avec tes clients pour
-          recevoir tes premières demandes de course. Gère tout depuis
-          <a href="${opts.dashboardUrl}" style="color:#B5793F">ton espace</a>.</p>`,
+         <p style="font-size:13px;color:#6C7889">Partagez ce lien avec vos clients pour
+          recevoir vos premières demandes de course. Gérez tout depuis
+          <a href="${opts.dashboardUrl}" style="color:#B5793F">votre espace</a>.</p>`,
       ),
     }
   },
@@ -727,12 +727,12 @@ export const emailTemplates = {
           contactez-nous à <a href="mailto:${opts.supportEmail}" style="color:#B5793F">${opts.supportEmail}</a>.</p>`
       : `<p style="font-size:13px;color:#6C7889">Pour toute question ou pour demander la réactivation, répondez à cet email.</p>`
     return {
-      subject: 'Ton compte a été suspendu',
+      subject: 'Votre compte a été suspendu',
       html: wrap(
         'Compte suspendu',
         `<p>Bonjour ${esc(opts.displayName)},</p>
-         <p>Ton compte chauffeur a été <strong>suspendu</strong>. Ta page publique
-          n'est plus accessible et tu ne reçois plus de nouvelles demandes de course
+         <p>Votre compte chauffeur a été <strong>suspendu</strong>. Votre page publique
+          n'est plus accessible et vous ne recevez plus de nouvelles demandes de course
           le temps de cette suspension.</p>
          ${support}`,
       ),
@@ -741,15 +741,15 @@ export const emailTemplates = {
   // Compte chauffeur réactivé après une suspension : tout repart normalement.
   accountReactivated(opts: { displayName: string; publicUrl: string; dashboardUrl: string }) {
     return {
-      subject: 'Ton compte est réactivé ✅',
+      subject: 'Votre compte est réactivé ✅',
       html: wrap(
         'Compte réactivé ✅',
         `<p>Bonjour ${esc(opts.displayName)},</p>
-         <p>Bonne nouvelle : ton compte chauffeur a été <strong>réactivé</strong>.
-          Ta page publique est de nouveau en ligne et tu peux recevoir des réservations.</p>
+         <p>Bonne nouvelle : votre compte chauffeur a été <strong>réactivé</strong>.
+          Votre page publique est de nouveau en ligne et vous pouvez recevoir des réservations.</p>
          ${button(opts.publicUrl, 'Voir ma page publique')}
-         <p style="font-size:13px;color:#6C7889">Retrouve ton activité dans
-          <a href="${opts.dashboardUrl}" style="color:#B5793F">ton espace</a>.</p>`,
+         <p style="font-size:13px;color:#6C7889">Retrouvez votre activité dans
+          <a href="${opts.dashboardUrl}" style="color:#B5793F">votre espace</a>.</p>`,
       ),
     }
   },
@@ -757,15 +757,15 @@ export const emailTemplates = {
   // de passe et activer son compte, puis complète son profil dans son espace.
   driverInvitation(opts: { firstName: string; inviteUrl: string }) {
     return {
-      subject: 'Tu es invité à rejoindre Ridewiz 🚗',
+      subject: 'Vous êtes invité à rejoindre Ridewiz 🚗',
       html: wrap(
         `Bienvenue ${esc(opts.firstName)} 👋`,
-        `<p>Tu as été invité à créer ton espace chauffeur sur <strong>Ridewiz</strong>.</p>
-         <p>Clique ci-dessous pour <strong>définir ton mot de passe</strong> et activer ton
-            compte. Tu pourras ensuite compléter ton profil (véhicule, tarifs, zone…)
-            directement depuis ton espace.</p>
+        `<p>Vous avez été invité à créer votre espace chauffeur sur <strong>Ridewiz</strong>.</p>
+         <p>Cliquez ci-dessous pour <strong>définir votre mot de passe</strong> et activer votre
+            compte. Vous pourrez ensuite compléter votre profil (véhicule, tarifs, zone…)
+            directement depuis votre espace.</p>
          ${button(opts.inviteUrl, 'Créer mon compte')}
-         <p style="font-size:13px;color:#6C7889">Ce lien est valable 14 jours. Si tu n'es pas
+         <p style="font-size:13px;color:#6C7889">Ce lien est valable 14 jours. Si vous n'êtes pas
             concerné par cette invitation, ignorez simplement cet email.</p>`,
       ),
     }
@@ -776,15 +776,15 @@ export const emailTemplates = {
   setupCode(opts: { firstName: string; code: string; ttlMinutes: number }) {
     const digits = esc(opts.code)
     return {
-      subject: `${opts.code} — ton code Ridewiz`,
+      subject: `${opts.code} — votre code Ridewiz`,
       html: wrap(
         `Bonjour ${esc(opts.firstName)} 👋`,
-        `<p>Voici ton code pour ouvrir la configuration de ton espace Ridewiz :</p>
+        `<p>Voici votre code pour ouvrir la configuration de votre espace Ridewiz :</p>
          <p style="margin:24px 0;text-align:center">
            <span style="display:inline-block;padding:14px 22px;border-radius:12px;background:#FBF7F0;border:1px solid #E4DCCC;font-size:32px;letter-spacing:10px;font-weight:700;color:#16283D">${digits}</span>
          </p>
          <p style="font-size:13px;color:#6C7889">Ce code est valable ${opts.ttlMinutes} minutes et ne sert qu'à cette page.
-            Si tu n'es pas à l'origine de cette demande, ignore simplement cet email.</p>`,
+            Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.</p>`,
       ),
     }
   },
@@ -824,12 +824,12 @@ export const emailTemplates = {
   },
   passwordReset(opts: { resetUrl: string }) {
     return {
-      subject: 'Réinitialisation de ton mot de passe',
+      subject: 'Réinitialisation de votre mot de passe',
       html: wrap(
         'Réinitialisation de mot de passe',
-        `<p>Tu as demandé la réinitialisation de ton mot de passe.</p>
+        `<p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
          ${button(opts.resetUrl, 'Choisir un nouveau mot de passe')}
-         <p style="font-size:13px;color:#6C7889">Ce lien est valable 1 heure. Si tu n'as pas fait cette demande, ignore cet email.</p>`,
+         <p style="font-size:13px;color:#6C7889">Ce lien est valable 1 heure. Si vous n'avez pas fait cette demande, ignorez cet email.</p>`,
       ),
     }
   },
@@ -840,14 +840,14 @@ export const emailTemplates = {
       ? `<a href="mailto:${opts.supportEmail}" style="color:#B5793F">${opts.supportEmail}</a>`
       : 'notre équipe'
     return {
-      subject: 'Ton mot de passe a été modifié',
+      subject: 'Votre mot de passe a été modifié',
       html: wrap(
         'Mot de passe modifié ✅',
-        `<p>Ton mot de passe vient d'être modifié avec succès. Tu peux désormais
-          te connecter avec ton nouveau mot de passe.</p>
+        `<p>Votre mot de passe vient d'être modifié avec succès. Vous pouvez désormais
+          vous connecter avec votre nouveau mot de passe.</p>
          ${button(opts.loginUrl, 'Se connecter')}
-         <p style="font-size:13px;color:#96691E"><strong>Ce n'était pas toi ?</strong>
-          Réinitialise immédiatement ton mot de passe et contacte ${support}.</p>`,
+         <p style="font-size:13px;color:#96691E"><strong>Ce n'était pas vous ?</strong>
+          Réinitialisez immédiatement votre mot de passe et contactez ${support}.</p>`,
       ),
     }
   },
@@ -961,8 +961,8 @@ export const emailTemplates = {
          <p>${opts.customerName ? `<strong>${esc(opts.customerName)}</strong>` : 'Un client'} a noté sa course${opts.bookingRef ? ` (réf. ${esc(opts.bookingRef)})` : ''} :</p>
          <p style="font-size:26px;letter-spacing:3px;color:#B5793F;margin:6px 0 2px">${stars} <span style="font-size:15px;letter-spacing:0;color:#6C7889">${opts.rating}/5</span></p>
          <div style="margin:14px 0;padding:14px 16px;background:#FBF7F0;border:1px solid #EFE7D8;border-radius:12px;color:#16283D;white-space:pre-line">${esc(opts.comment)}</div>
-         <p style="font-size:13px;color:#6C7889">Ce retour est <strong>privé</strong> : il n'est publié ni sur ta fiche Google ni sur ta page Ridewiz.
-          Les clients qui donnent 5 étoiles sont, eux, redirigés directement vers ta page d'avis publique.</p>`,
+         <p style="font-size:13px;color:#6C7889">Ce retour est <strong>privé</strong> : il n'est publié ni sur votre fiche Google ni sur votre page Ridewiz.
+          Les clients qui donnent 5 étoiles sont, eux, redirigés directement vers votre page d'avis publique.</p>`,
       ),
     }
   },
@@ -1010,13 +1010,13 @@ export const emailTemplates = {
     const upcomingBlock = opts.upcomingCount
       ? `<p style="margin:18px 0 6px;font-weight:600;color:#0E1B2C">📅 ${opts.upcomingCount} course${opts.upcomingCount > 1 ? 's' : ''} à venir cette semaine</p>
          <table style="width:100%;border-collapse:collapse">${upcomingRows}</table>
-         ${opts.upcomingCount > opts.upcoming.length ? `<p style="font-size:12px;color:#9A8B72;margin-top:6px">…et ${opts.upcomingCount - opts.upcoming.length} autre(s). Tout est dans ton espace.</p>` : ''}`
-      : `<p style="margin:18px 0 6px;color:#5B6B7E">Aucune course programmée cette semaine pour l'instant. Partage ta page pour recevoir de nouvelles demandes !</p>`
+         ${opts.upcomingCount > opts.upcoming.length ? `<p style="font-size:12px;color:#9A8B72;margin-top:6px">…et ${opts.upcomingCount - opts.upcoming.length} autre(s). Tout est dans votre espace.</p>` : ''}`
+      : `<p style="margin:18px 0 6px;color:#5B6B7E">Aucune course programmée cette semaine pour l'instant. Partagez votre page pour recevoir de nouvelles demandes !</p>`
 
     return {
-      subject: `Ta semaine Ridewiz — ${opts.upcomingCount} course${opts.upcomingCount > 1 ? 's' : ''} à venir`,
+      subject: `Votre semaine Ridewiz — ${opts.upcomingCount} course${opts.upcomingCount > 1 ? 's' : ''} à venir`,
       html: wrap(
-        'Ton point hebdo 📊',
+        'Votre point hebdo 📊',
         `${helloDriver(opts.driverFirstName)}
          <div style="background:#FBF7F0;border:1px solid #EFE7D8;border-radius:12px;padding:16px;margin:14px 0">
            <p style="margin:0;font-size:13px;color:#9A8B72">Semaine écoulée</p>
@@ -1139,8 +1139,8 @@ export const emailTemplates = {
   }) {
     const body = opts.needsApproval
       ? `<p><strong>${esc(opts.customerName)}</strong> demande à déplacer sa course. La course
-            étant proche, <strong>ta validation est requise</strong> — tu peux accepter ou refuser.</p>`
-      : `<p><strong>${esc(opts.customerName)}</strong> a déplacé sa course. Ton calendrier est déjà à jour.</p>`
+            étant proche, <strong>votre validation est requise</strong> — vous pouvez accepter ou refuser.</p>`
+      : `<p><strong>${esc(opts.customerName)}</strong> a déplacé sa course. Votre calendrier est déjà à jour.</p>`
     return {
       subject: opts.needsApproval
         ? `Demande de modification d'horaire — ${opts.customerName}`
@@ -1241,15 +1241,15 @@ export function invoiceEmail(opts: {
   const subject = `Facture n°${opts.number} — ${opts.totalLabel}`
   const body = `
     <p style="margin:0 0 14px">Bonjour ${esc(opts.clientName)},</p>
-    <p style="margin:0 0 14px">Tu trouveras en pièce jointe la facture
+    <p style="margin:0 0 14px">Vous trouverez en pièce jointe la facture
     <strong>n°${esc(opts.number)}</strong> d'un montant de <strong>${esc(opts.totalLabel)}</strong>.</p>
     ${
       opts.paymentTerms
         ? `<div style="margin:18px 0;padding:14px 16px;background:#FBF7F0;border:1px solid #EFE7D8;border-radius:12px;font-size:14px">${esc(opts.paymentTerms)}</div>`
         : ''
     }
-    <p style="margin:18px 0 0;font-size:14px">Pour toute question, réponds simplement à cet email${
-      opts.issuerEmail ? ` ou écris à <a href="mailto:${esc(opts.issuerEmail)}" style="color:#B5793F">${esc(opts.issuerEmail)}</a>` : ''
+    <p style="margin:18px 0 0;font-size:14px">Pour toute question, répondez simplement à cet email${
+      opts.issuerEmail ? ` ou écrivez à <a href="mailto:${esc(opts.issuerEmail)}" style="color:#B5793F">${esc(opts.issuerEmail)}</a>` : ''
     }.</p>
     <p style="margin:14px 0 0;font-size:14px">${esc(opts.issuerName)}</p>`
   return { subject, html: wrap(`Facture n°${esc(opts.number)}`, body) }
