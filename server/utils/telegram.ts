@@ -162,8 +162,8 @@ export function bookingConfirmedMessage(opts: {
     if (opts.pickupAddress) lines.push(`Départ : ${escHtml(opts.pickupAddress)}`)
   }
   lines.push(paiement)
-  if (opts.conflictWarning) lines.push(`⚠️ <b>Chevauchement calendrier détecté</b> — vérifie ton planning.`)
-  lines.push(`Le créneau est bloqué dans ton calendrier.`)
+  if (opts.conflictWarning) lines.push(`⚠️ <b>Chevauchement calendrier détecté</b> — vérifiez votre planning.`)
+  lines.push(`Le créneau est bloqué dans votre calendrier.`)
   return { text: lines.join('\n') }
 }
 
@@ -202,7 +202,7 @@ export function preRideAlertMessage(opts: {
   }
   if (opts.paymentNote) lines.push(opts.paymentNote)
   if (opts.bookingId) {
-    lines.push(`Au moment de partir, touche <b>« Je pars »</b> : le client est prévenu et peut te suivre.`)
+    lines.push(`Au moment de partir, touchez <b>« Je pars »</b> : le client est prévenu et peut vous suivre.`)
   }
 
   const navButtons: InlineButton[] = []
@@ -231,10 +231,10 @@ export function departAckMessage(opts: { customerName: string; bookingId: string
 } {
   return {
     text: [
-      `🚗 <b>C'est parti !</b> ${escHtml(opts.customerName)} est prévenu que tu es en route.`,
+      `🚗 <b>C'est parti !</b> ${escHtml(opts.customerName)} est prévenu que vous êtes en route.`,
       ``,
-      `📍 Pour qu'il te suive sur la carte : partage ta <b>position en direct</b> dans cette conversation — 📎 → <b>Position</b> → <b>Partager ma position en direct</b> (1 h).`,
-      `Tu peux ensuite repasser sur Waze/Maps : Telegram continue le partage en arrière-plan.`,
+      `📍 Pour qu'il vous suive sur la carte : partagez votre <b>position en direct</b> dans cette conversation — 📎 → <b>Position</b> → <b>Partager ma position en direct</b> (1 h).`,
+      `Vous pouvez ensuite repasser sur Waze/Maps : Telegram continue le partage en arrière-plan.`,
     ].join('\n'),
     buttons: [
       [{ text: '🅿️ Je suis sur place', callback_data: `track:arrive:${opts.bookingId}` }],
@@ -249,7 +249,7 @@ export function arriveAckMessage(opts: { bookingId: string }): {
   buttons: InlineButton[][]
 } {
   return {
-    text: `🅿️ Bien noté — tu es sur place. Le client le voit sur sa page de suivi.`,
+    text: `🅿️ Bien noté — vous êtes sur place. Le client le voit sur sa page de suivi.`,
     buttons: [[{ text: '🧍 Client à bord', callback_data: `track:pickup:${opts.bookingId}` }]],
   }
 }
@@ -257,14 +257,14 @@ export function arriveAckMessage(opts: { bookingId: string }): {
 /** Après « Client à bord » : le suivi continue vers la destination. */
 export function pickupAckMessage(): { text: string } {
   return {
-    text: `🧍 Client à bord — bonne route ! Le suivi continue vers la destination (le client peut partager sa course à ses proches). Pense à « Marquer comme terminée » dans ton espace à l'arrivée.`,
+    text: `🧍 Client à bord — bonne route ! Le suivi continue vers la destination (le client peut partager sa course à ses proches). Pensez à « Marquer comme terminée » dans votre espace à l'arrivée.`,
   }
 }
 
 /** Première position en direct reçue et rattachée à une course. */
 export function liveLocationAckMessage(): { text: string } {
   return {
-    text: `📡 <b>Position en direct reçue</b> — ton client te suit maintenant sur la carte. Tu peux basculer sur Waze/Maps, le partage continue en arrière-plan.`,
+    text: `📡 <b>Position en direct reçue</b> — votre client vous suit maintenant sur la carte. Vous pouvez basculer sur Waze/Maps, le partage continue en arrière-plan.`,
   }
 }
 
@@ -291,9 +291,9 @@ export function rescheduleMessage(opts: {
     `Après : <b>${formatRideDateTime(opts.newScheduledAt, opts.timezone)}</b>`,
   ]
   if (opts.needsApproval) {
-    lines.push(`La course est proche : accepte ou refuse depuis ton espace.`)
+    lines.push(`La course est proche : acceptez ou refusez depuis votre espace.`)
   } else {
-    lines.push(`Ton calendrier est déjà à jour.`)
+    lines.push(`Votre calendrier est déjà à jour.`)
   }
   return { text: lines.join('\n') }
 }
