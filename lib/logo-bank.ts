@@ -13,7 +13,11 @@
 export const LOGO_W = 1000
 export const LOGO_H = 650
 
-export type LogoColorToken = 'primary' | 'accent' | 'inverse'
+/**
+ * `ink` = la plus sombre des deux couleurs de la carte (éléments / fond) : un
+ * diamant noir reste noir sur carte crème, et devient un contour or sur carte noire.
+ */
+export type LogoColorToken = 'primary' | 'accent' | 'inverse' | 'ink'
 
 /** Polices disponibles au rendu (cf. FONT_STACKS dans le composable). */
 export type LogoFont =
@@ -213,6 +217,9 @@ export const LOGO_ICONS = {
     'M100 52 C82 26 50 14 6 22 C34 28 58 38 76 52 Z M100 58 C78 46 48 42 10 48 C36 52 62 58 84 68 Z M100 66 C82 64 56 68 24 82 C50 78 74 80 96 90 Z',
   wingRight:
     'M0 52 C18 26 50 14 94 22 C66 28 42 38 24 52 Z M0 58 C22 46 52 42 90 48 C64 52 38 58 16 68 Z M0 66 C18 64 44 68 76 82 C50 78 26 80 4 90 Z',
+  // Diamant à facettes (plein) et ses arêtes (tracé), pour le modèle « Diamant serti ».
+  diamondBody: 'M18 32 L34 10 L66 10 L82 32 L50 92 Z',
+  diamondFacets: 'M18 32 L82 32 M34 10 L42 32 L50 92 M66 10 L58 32 L50 92 M34 10 L26 32 M66 10 L74 32',
   car: 'M6 64 L12 46 Q20 34 38 33 L62 33 Q78 34 86 44 L94 50 Q97 56 94 64 Z',
   // Vitres de la berline, découpées dans la carrosserie (couleur inverse).
   carWindows: 'M24 46 L30 38 L47 37 L47 46 Z M52 37 L64 37 Q72 38 78 46 L52 46 Z',
@@ -264,6 +271,31 @@ const icon = (d: string, x: number, y: number, size: number, extra: Partial<Path
 
 export const LOGO_TEMPLATES: LogoTemplate[] = [
   // ═══ Monogrammes ═══
+  {
+    // Inspiré des logos « luxury driver » : deux initiales entrelacées en
+    // grand serif doré, filet, nom en capitales très espacées.
+    id: 'luxury-monogram',
+    label: 'Monogramme luxe',
+    category: 'monogram',
+    build: ({ initials, name, tagline: tl }) => {
+      const letters = [...initials]
+      const items: LogoItem[] = []
+      if (letters.length >= 2) {
+        items.push(
+          text({ text: letters[0]!, x: CX - 70, y: 350, size: 360, font: 'elegant', color: 'accent' }),
+          text({ text: letters.slice(1).join(''), x: CX + 75, y: 350, size: 360, font: 'elegantItalic', color: 'accent' }),
+        )
+      } else {
+        items.push(text({ text: initials, x: CX, y: 350, size: 360, font: 'elegant', color: 'accent' }))
+      }
+      items.push(
+        rule(400, 430, 'primary', 1.5),
+        ...nameCaps(name, 500, 62, 'sans', 0.5),
+        ...tagline(tl, 575, 'primary', 30),
+      )
+      return scene(items)
+    },
+  },
   {
     id: 'seal',
     label: 'Sceau',
@@ -511,6 +543,24 @@ export const LOGO_TEMPLATES: LogoTemplate[] = [
   },
 
   // ═══ Symboles ═══
+  {
+    // Inspiré des logos « black premium » : diamant noir à facettes serti des
+    // initiales dorées, nom en capitales serif dorées, ligne premium dessous.
+    id: 'diamond-crest',
+    label: 'Diamant serti',
+    category: 'symbol',
+    build: ({ initials, name, tagline: tl }) =>
+      scene([
+        icon(LOGO_ICONS.diamondBody, 320, 0, 360, { fill: 'ink', stroke: 'accent', lw: 1.6 }),
+        icon(LOGO_ICONS.diamondFacets, 320, 0, 360, { fill: undefined, stroke: 'accent', lw: 1.3 }),
+        text({ text: initials, x: CX, y: 215, size: 140, font: 'caps', color: 'accent', tracking: 0.02, maxWidth: 200 }),
+        { t: 'poly', points: starPolygon(CX - 92, 118, 11, 5), fill: 'accent' },
+        { t: 'poly', points: starPolygon(CX + 92, 118, 11, 5), fill: 'accent' },
+        { t: 'poly', points: starPolygon(CX, 278, 9, 4), fill: 'accent' },
+        ...(name ? [text({ text: name, x: CX, y: 470, size: 104, font: 'caps', color: 'accent', tracking: 0.18, upper: true, maxWidth: 940 })] : []),
+        ...tagline(tl, 545, 'accent', 42),
+      ]),
+  },
   {
     id: 'crown',
     label: 'Couronne',

@@ -2,12 +2,14 @@
 // de l'éditeur et PNG final (fond transparent) qui devient le logo du chauffeur.
 // Les polices sont celles de la page (auto-hébergées par @nuxt/fonts) : le
 // canvas y accède directement, contrairement à un SVG chargé comme image.
-import type { LogoFont, LogoItem, LogoScene, TextItem } from '~/lib/logo-bank'
+import type { LogoColorToken, LogoFont, LogoItem, LogoScene, TextItem } from '~/lib/logo-bank'
 
 export interface LogoColors {
   primary: string
   accent: string
   inverse: string
+  /** Effet métal : l'accent est rendu en dégradé brossé (clair → teinte → sombre). */
+  metallic?: boolean
 }
 
 const FONT_STACKS: Record<LogoFont, { family: string; weight: number; style: 'normal' | 'italic' }> = {
@@ -40,8 +42,42 @@ export function ensureLogoFonts(): Promise<void> {
 
 type Ctx = CanvasRenderingContext2D
 
-function color(token: 'primary' | 'accent' | 'inverse', colors: LogoColors): string {
-  return colors[token]
+/** Mélange d'une couleur #RRGGBB avec du blanc (amount > 0) ou du noir (amount < 0). */
+function mix(hex: string, amount: number): string {
+  const n = parseInt(hex.replace('#', ''), 16)
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const target = amount > 0 ? 255 : 0
+    return Math.round(v + (target - v) * Math.abs(amount))
+  })
+  return `#${ch.map((v) => v.toString(16).padStart(2, '0')).join('')}`
+}
+
+interface Bounds {
+  y0: number
+  y1: number
+}
+
+/**
+ * Style de remplissage/trait d'un jeton. L'accent « métal » est un dégradé
+ * vertical calé sur la hauteur de l'élément : reflet clair en haut, teinte au
+ * milieu, ombre en bas — l'effet or brossé des logos haut de gamme.
+ */
+function luminance(hex: string): number {
+  const n = parseInt(hex.replace('#', ''), 16)
+  return 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)
+}
+
+function paint(ctx: Ctx, token: LogoColorToken, colors: LogoColors, b: Bounds): string | CanvasGradient {
+  if (token === 'ink') return luminance(colors.primary) <= luminance(colors.inverse) ? colors.primary : colors.inverse
+  if (token !== 'accent' || !colors.metallic) return colors[token]
+  const y0 = Math.min(b.y0, b.y1)
+  const y1 = Math.max(b.y0, b.y1) + (b.y1 === b.y0 ? 1 : 0)
+  const g = ctx.createLinearGradient(0, y0, 0, y1)
+  g.addColorStop(0, mix(colors.accent, 0.55))
+  g.addColorStop(0.42, colors.accent)
+  g.addColorStop(0.58, mix(colors.accent, 0.3))
+  g.addColorStop(1, mix(colors.accent, -0.4))
+  return g
 }
 
 /** Largeur d'un texte avec interlettrage (le corps réel peut avoir été réduit par maxWidth). */
@@ -63,7 +99,7 @@ function drawText(ctx: Ctx, it: TextItem, colors: LogoColors) {
     tracking = (it.tracking ?? 0) * size
     width = measureTracked(ctx, chars, tracking)
   }
-  ctx.fillStyle = color(it.color, colors)
+  ctx.fillStyle = paint(ctx, it.color, colors, { y0: it.y - size * 0.75, y1: it.y })
   ctx.textBaseline = 'alphabetic'
   ctx.textAlign = 'left'
   let x = it.x - width / 2
@@ -78,7 +114,7 @@ function drawArcText(ctx: Ctx, it: Extract<LogoItem, { t: 'arcText' }>, colors: 
   const chars = [...value]
   if (!chars.length) return
   ctx.font = fontString(it.font, it.size)
-  ctx.fillStyle = color(it.color, colors)
+  ctx.fillStyle = paint(ctx, it.color, colors, { y0: it.cy - it.r, y1: it.cy + it.r })
   ctx.textBaseline = 'alphabetic'
   ctx.textAlign = 'center'
   // Répartition des glyphes proportionnelle à leur largeur sur l'arc.
@@ -110,54 +146,61 @@ function drawItem(ctx: Ctx, it: LogoItem, colors: LogoColors) {
     case 'arcText':
       drawArcText(ctx, it, colors)
       return
-    case 'circle':
+    case 'circle': {
+      const b = { y0: it.cy - it.r, y1: it.cy + it.r }
       ctx.beginPath()
       ctx.arc(it.cx, it.cy, it.r, 0, Math.PI * 2)
       if (it.fill) {
-        ctx.fillStyle = color(it.fill, colors)
+        ctx.fillStyle = paint(ctx, it.fill, colors, b)
         ctx.fill()
       }
       if (it.stroke) {
-        ctx.strokeStyle = color(it.stroke, colors)
+        ctx.strokeStyle = paint(ctx, it.stroke, colors, b)
         ctx.lineWidth = it.lw ?? 2
         ctx.stroke()
       }
       return
-    case 'poly':
+    }
+    case 'poly': {
+      const ys = it.points.map((p) => p[1])
+      const b = { y0: Math.min(...ys), y1: Math.max(...ys) }
       ctx.beginPath()
       it.points.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)))
       if (!it.open) ctx.closePath()
       if (it.fill) {
-        ctx.fillStyle = color(it.fill, colors)
+        ctx.fillStyle = paint(ctx, it.fill, colors, b)
         ctx.fill()
       }
       if (it.stroke) {
-        ctx.strokeStyle = color(it.stroke, colors)
+        ctx.strokeStyle = paint(ctx, it.stroke, colors, b)
         ctx.lineWidth = it.lw ?? 2
         ctx.lineJoin = 'round'
         ctx.stroke()
       }
       return
+    }
     case 'line':
       ctx.beginPath()
       ctx.moveTo(it.x1, it.y1)
       ctx.lineTo(it.x2, it.y2)
-      ctx.strokeStyle = color(it.stroke, colors)
+      ctx.strokeStyle = paint(ctx, it.stroke, colors, { y0: Math.min(it.y1, it.y2) - it.lw, y1: Math.max(it.y1, it.y2) + it.lw })
       ctx.lineWidth = it.lw
       ctx.lineCap = 'round'
       ctx.stroke()
       return
     case 'path': {
       const path = new Path2D(it.d)
+      // Le dégradé est calculé dans le repère local (0-100) du tracé.
+      const b = { y0: 0, y1: 100 }
       ctx.save()
       ctx.translate(it.x, it.y)
       ctx.scale(it.size / 100, it.size / 100)
       if (it.fill) {
-        ctx.fillStyle = color(it.fill, colors)
+        ctx.fillStyle = paint(ctx, it.fill, colors, b)
         ctx.fill(path)
       }
       if (it.stroke) {
-        ctx.strokeStyle = color(it.stroke, colors)
+        ctx.strokeStyle = paint(ctx, it.stroke, colors, b)
         // L'épaisseur est exprimée en unités du repère 0-100.
         ctx.lineWidth = it.lw ?? 2
         ctx.lineJoin = 'round'
