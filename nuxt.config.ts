@@ -158,9 +158,11 @@ export default defineNuxtConfig({
 
   // PWA — l'espace chauffeur s'installe sur l'écran d'accueil (Android : invite
   // native, iOS : Partager → « Sur l'écran d'accueil »), sans store. Le manifeste
-  // n'est lié que par le layout dashboard et le service worker n'est enregistré
-  // que sur /dashboard (plugins/pwa.client.ts) : la page publique d'un chauffeur
-  // reste un site classique pour ses clients. Icônes générées depuis favicon.svg.
+  // est injecté côté serveur (server/plugins/pwa-manifest.ts) pour être présent
+  // dès le premier octet, y compris sur /dashboard/login ; le service worker est
+  // enregistré sur le même périmètre (plugins/pwa.client.ts). Hors /dashboard, ni
+  // l'un ni l'autre : la page publique d'un chauffeur reste un site classique
+  // pour ses clients. Icônes générées depuis favicon.svg.
   pwa: {
     // Nouvelle version = bandeau « Actualiser » (PwaUpdateBanner), jamais de
     // rechargement automatique en pleine saisie.

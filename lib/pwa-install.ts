@@ -7,6 +7,20 @@
 
 export type InstallPlatform = 'ios' | 'android' | 'desktop'
 
+// Périmètre de l'app chauffeur — identique au `scope` du manifeste. Le service
+// worker n'est enregistré que là (plugins/pwa.client.ts) et le manifeste n'est
+// lié que là (server/plugins/pwa-manifest.ts) : la page publique d'un chauffeur
+// reste un site classique pour ses passagers.
+const DRIVER_APP_PATH = /^\/dashboard(?:[/?#]|$)/
+
+/**
+ * Vrai si ce chemin fait partie de l'espace chauffeur installable. Le `/` final
+ * compte : « /dashboardeur » n'est pas le dashboard.
+ */
+export function isDriverAppPath(path: string): boolean {
+  return DRIVER_APP_PATH.test(path)
+}
+
 /**
  * Plateforme d'installation déduite du user-agent. iPadOS se présente comme un
  * Mac de bureau : on le reconnaît à son écran tactile (maxTouchPoints > 1).

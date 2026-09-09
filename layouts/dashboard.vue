@@ -4,8 +4,10 @@ const { user, session, clear, fetch: refreshSession } = useUserSession()
 
 // Ajout à l'écran d'accueil iOS : barre d'état par défaut (le dashboard est
 // clair, un texte blanc y serait illisible). Le nom « Ridewiz » vient du head
-// global (nuxt.config) ; le manifeste PWA est lié par <NuxtPwaManifest /> dans
-// ce layout seulement : la page publique des chauffeurs n'est pas une app.
+// global (nuxt.config) et le manifeste PWA est servi dans le HTML par
+// server/plugins/pwa-manifest.ts : lié depuis ce layout, il manquait à
+// /dashboard/login (layout `default`), où Chrome ne proposait donc jamais
+// d'installer l'app.
 useHead({
   meta: [{ name: 'apple-mobile-web-app-status-bar-style', content: 'default' }],
 })
@@ -76,8 +78,6 @@ async function logout() {
   <!-- pb mobile : dégage la barre basse (56px + safe-area) ET le bouton flottant
        « Partager » qui la surplombe, pour qu'aucun contenu ne reste masqué en fin de scroll. -->
   <div class="min-h-screen bg-slate-50 pb-[calc(9.5rem+env(safe-area-inset-bottom))] sm:flex sm:pb-0">
-    <!-- <link rel="manifest"> dans <head> (aucun DOM rendu ici) -->
-    <NuxtPwaManifest />
     <!-- Sidebar desktop -->
     <aside class="hidden w-60 shrink-0 border-r border-slate-200 bg-white p-5 sm:block">
       <div class="flex items-center gap-2.5">

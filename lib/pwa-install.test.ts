@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectInstallPlatform, installSnoozeUntil, isInstallSnoozed } from './pwa-install'
+import { detectInstallPlatform, installSnoozeUntil, isDriverAppPath, isInstallSnoozed } from './pwa-install'
 
 const IPHONE =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
@@ -9,6 +9,32 @@ const ANDROID_CHROME =
   'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36'
 const WINDOWS_CHROME =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+
+describe('isDriverAppPath', () => {
+  // Ce périmètre décide de deux choses invisibles mais critiques : où le service
+  // worker s'enregistre, et où le <link rel="manifest"> est servi. Sans manifeste
+  // dans le HTML, Chrome ne propose jamais « Installer l'application » — le
+  // chauffeur n'obtient qu'un raccourci ouvert dans un onglet.
+  it('couvre tout l\'espace chauffeur, connexion comprise', () => {
+    expect(isDriverAppPath('/dashboard')).toBe(true)
+    expect(isDriverAppPath('/dashboard/login')).toBe(true)
+    expect(isDriverAppPath('/dashboard/courses')).toBe(true)
+    expect(isDriverAppPath('/dashboard/parametres?onglet=general')).toBe(true)
+    expect(isDriverAppPath('/dashboard#application')).toBe(true)
+  })
+
+  it('laisse les pages publiques hors du périmètre', () => {
+    // start_url pointe sur /dashboard : un passager qui ajouterait la page de
+    // son chauffeur à son écran d'accueil tomberait sur l'écran de connexion.
+    expect(isDriverAppPath('/')).toBe(false)
+    expect(isDriverAppPath('/paul-vtc')).toBe(false)
+    expect(isDriverAppPath('/inscription')).toBe(false)
+    expect(isDriverAppPath('/avis/paul-vtc')).toBe(false)
+    expect(isDriverAppPath('/admin')).toBe(false)
+    // Un slug qui commence par « dashboard » n'est pas le dashboard.
+    expect(isDriverAppPath('/dashboardeur')).toBe(false)
+  })
+})
 
 describe('detectInstallPlatform', () => {
   it('reconnaît iPhone et iPad', () => {
