@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { loadActiveDriverBySlug } from '~/server/utils/driver'
 import { notifyDriver } from '~/server/utils/notify-driver'
+import { reviewFeedbackPush } from '~/lib/driver-push'
 import { emailTemplates } from '~/server/utils/email'
 import { driverFirstName } from '~/server/utils/telegram'
 
@@ -47,6 +48,7 @@ export default defineEventHandler(async (event) => {
         (bookingRef ? `\nCourse réf. ${escTg(bookingRef)}` : '') +
         `\n\n« ${escTg(comment)} »\n\nCe retour n'est pas publié en ligne.`,
     },
+    push: reviewFeedbackPush({ rating, customerName: name ?? null }),
   })
   return { ok: true }
 })

@@ -2,6 +2,7 @@ import { prisma } from './prisma'
 import { signClientToken } from './tokens'
 import { sendEmail, emailTemplates } from './email'
 import { notifyDriver } from './notify-driver'
+import { preRidePush } from '~/lib/driver-push'
 import { driverBookingMode } from './driver'
 import { preRideAlertMessage, driverFirstName } from './telegram'
 import { googleMapsNavUrl, wazeNavUrl } from '~/lib/nav-links'
@@ -122,6 +123,14 @@ export async function sendPreRideAlerts(now: Date = new Date()): Promise<{ sent:
         wazeUrl,
         paymentNote: paymentNoteEmoji,
         // Active le bouton « 🚗 Je pars » (suivi de course côté client).
+        bookingId: b.id,
+      }),
+      push: preRidePush({
+        customerName: req.customerName,
+        scheduledAt: b.scheduledAt,
+        timezone: b.driver.timezone,
+        pickupAddress: pickupDisplay,
+        paymentNote,
         bookingId: b.id,
       }),
     })

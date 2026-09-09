@@ -60,6 +60,7 @@ export default defineNuxtConfig({
       swr: false,
       headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'public, max-age=0, must-revalidate' },
     },
+    '/push-sw.js': { swr: false, headers: { 'Cache-Control': 'public, max-age=0, must-revalidate' } },
   },
 
   typescript: {
@@ -132,6 +133,11 @@ export default defineNuxtConfig({
     inseeApiKey: process.env.INSEE_API_KEY || '',
     // Secret du déclencheur de tâches planifiées (rappels J-1)
     cronSecret: process.env.CRON_SECRET || '',
+    // Notifications push (PWA) : clés VAPID. Générer une fois avec
+    // `npx web-push generate-vapid-keys`. Sans clés, les push sont journalisés.
+    vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || '',
+    // Contact déclaré aux services push (mailto: ou https:).
+    vapidSubject: process.env.VAPID_SUBJECT || 'mailto:contact@ridewiz.fr',
     public: {
       appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:3000',
       // Email de contact/support affiché dans certains messages (ex: « ce n'était
@@ -144,6 +150,8 @@ export default defineNuxtConfig({
       // Clé client du CDN d'images de véhicules (imagin.studio). Par défaut : clé démo
       // gratuite. Remplacer par votre propre clé pour la production (sans changer le code).
       imaginCustomer: process.env.IMAGIN_CUSTOMER || 'hrjavascript-mastery',
+      // Clé publique VAPID : le navigateur s'en sert pour s'abonner aux push.
+      vapidPublicKey: process.env.VAPID_PUBLIC_KEY || '',
     },
   },
 
@@ -154,9 +162,11 @@ export default defineNuxtConfig({
 
   // PWA — l'espace chauffeur s'installe sur l'écran d'accueil (Android : invite
   // native, iOS : Partager → « Sur l'écran d'accueil »), sans store. Le manifeste
-  // n'est lié que par le layout dashboard et le service worker n'est enregistré
-  // que sur /dashboard (plugins/pwa.client.ts) : la page publique d'un chauffeur
-  // reste un site classique pour ses clients. Icônes générées depuis favicon.svg.
+  // est injecté côté serveur (server/plugins/pwa-manifest.ts) pour être présent
+  // dès le premier octet, y compris sur /dashboard/login ; le service worker est
+  // enregistré sur le même périmètre (plugins/pwa.client.ts). Hors /dashboard, ni
+  // l'un ni l'autre : la page publique d'un chauffeur reste un site classique
+  // pour ses clients. Icônes générées depuis favicon.svg.
   pwa: {
     // Nouvelle version = bandeau « Actualiser » (PwaUpdateBanner), jamais de
     // rechargement automatique en pleine saisie.
@@ -203,6 +213,9 @@ export default defineNuxtConfig({
       inlineWorkboxRuntime: true,
       cleanupOutdatedCaches: true,
       clientsClaim: true,
+      // Gestionnaires push (affichage, tap, renouvellement d'abonnement) :
+      // fichier statique importé par le service worker généré.
+      importScripts: ['push-sw.js'],
     },
     devOptions: { enabled: false },
   },

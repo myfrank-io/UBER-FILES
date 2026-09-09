@@ -6,6 +6,7 @@ import { assessReschedule, applyReschedule } from '~/server/utils/reschedule'
 import { requiresDriverApproval } from '~/lib/reschedule'
 import { sendEmail, emailTemplates } from '~/server/utils/email'
 import { notifyDriver } from '~/server/utils/notify-driver'
+import { reschedulePush } from '~/lib/driver-push'
 import { rescheduleMessage, driverFirstName } from '~/server/utils/telegram'
 
 // Report d'horaire d'une réservation confirmée, à l'initiative du client (jeton
@@ -137,6 +138,13 @@ export default defineEventHandler(async (event) => {
         timezone: tz,
         needsApproval: true,
       }),
+      push: reschedulePush({
+        customerName: req.customerName,
+        newScheduledAt,
+        timezone: tz,
+        needsApproval: true,
+        bookingId: booking.id,
+      }),
     })
     try {
       await sendEmail({
@@ -173,6 +181,13 @@ export default defineEventHandler(async (event) => {
       newScheduledAt,
       timezone: tz,
       needsApproval: false,
+    }),
+    push: reschedulePush({
+      customerName: req.customerName,
+      newScheduledAt,
+      timezone: tz,
+      needsApproval: false,
+      bookingId: booking.id,
     }),
   })
   try {

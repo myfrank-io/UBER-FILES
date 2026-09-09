@@ -10,6 +10,7 @@
 // report « Plus tard », règle d'affichage) vit dans usePwaInstall.
 import type { Ref } from 'vue'
 import { useRegisterSW } from 'virtual:pwa-register/vue'
+import { isDriverAppPath } from '~/lib/pwa-install'
 
 // Événement Chromium, non standardisé (absent des typings DOM).
 type BeforeInstallPromptEvent = Event & {
@@ -30,7 +31,6 @@ export interface PwaInstallApi {
   applyUpdate: () => Promise<void>
 }
 
-const DASHBOARD_PREFIX = '/dashboard'
 // Une app installée reste ouverte des jours sans navigation complète : on
 // vérifie nous-mêmes s'il y a une nouvelle version, au retour au premier plan
 // et toutes les heures.
@@ -65,7 +65,7 @@ export default defineNuxtPlugin(() => {
 
   let registered = false
   function registerIfDashboard(path: string) {
-    if (registered || !path.startsWith(DASHBOARD_PREFIX) || !('serviceWorker' in navigator)) return
+    if (registered || !isDriverAppPath(path) || !('serviceWorker' in navigator)) return
     registered = true
     const sw = useRegisterSW({
       immediate: true,
