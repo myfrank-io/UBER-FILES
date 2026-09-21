@@ -324,10 +324,17 @@ const filteredDrivers = computed(() => {
           SumUp : {{ d.sumupConnected ? 'connecté' : 'non connecté' }} · {{ d.bookings }} course(s)
           <span v-if="SETUP_BADGE[d.setupStatus]" class="ml-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" :class="SETUP_BADGE[d.setupStatus].cls">{{ SETUP_BADGE[d.setupStatus].label }}</span>
         </p>
-        <div class="mt-3 flex gap-2 border-t border-slate-100 pt-3">
+        <!-- Grille 2 colonnes, pas une rangée : à quatre actions, une seule
+             ligne ne laisse que ~70 px par bouton sur un téléphone, moins que
+             ce que « Suspendre » réclame. Les boutons étant en
+             `whitespace-nowrap`, ils refusaient de rétrécir et débordaient de
+             la carte. En grille, chacun occupe la moitié de la largeur — de
+             quoi rester lisible et garder une cible tactile confortable, que le
+             chauffeur ait deux actions (sans compte) ou quatre. -->
+        <div class="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
           <NuxtLink
             :to="`/admin/drivers/${d.id}`"
-            class="inline-flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 px-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            class="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 px-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             Détail →
           </NuxtLink>
@@ -337,7 +344,7 @@ const filteredDrivers = computed(() => {
           <button
             v-if="d.hasAccount"
             type="button"
-            class="inline-flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-xl border border-brand-300 px-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+            class="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-xl border border-brand-300 px-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-50"
             :disabled="enteringId === d.id"
             title="Accéder à son espace chauffeur"
             @click="enterSpace(d.id)"
@@ -348,7 +355,7 @@ const filteredDrivers = computed(() => {
           <button
             v-if="d.hasAccount"
             type="button"
-            class="inline-flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 px-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            class="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 px-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             :disabled="linkingId === d.id"
             title="Lien de configuration guidée (à copier, rien n’est envoyé)"
             @click="openSetupLink(d)"
@@ -357,14 +364,14 @@ const filteredDrivers = computed(() => {
           </button>
           <button
             v-if="d.status !== 'ACTIVE'"
-            class="inline-flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-xl border border-green-300 px-2.5 text-sm font-semibold text-green-700 hover:bg-green-50"
+            class="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-xl border border-green-300 px-2.5 text-sm font-semibold text-green-700 hover:bg-green-50"
             @click="setStatus(d.id, 'ACTIVE')"
           >
             Activer
           </button>
           <button
             v-else
-            class="inline-flex min-h-[44px] flex-1 items-center justify-center whitespace-nowrap rounded-xl border border-red-200 px-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+            class="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-xl border border-red-200 px-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
             @click="setStatus(d.id, 'SUSPENDED')"
           >
             Suspendre
