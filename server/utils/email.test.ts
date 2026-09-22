@@ -499,47 +499,65 @@ describe('emailTemplates compte & sécurité', () => {
   })
 })
 
-describe('nfcCardOrderEmail — livraison', () => {
-  const order = {
-    driverName: 'Job Kerkar',
-    slug: 'job-kerkar',
-    qtyReview: 10,
-    qtyBusiness: 10,
-    name: 'Job',
-    title: 'Chauffeur Privé',
-    phone: '07.45.20.55.65',
-    reviewQrUrl: 'https://ridewiz.fr/avis/job-kerkar',
-    googleReviewUrl: 'https://g.page/r/abc',
-    cardUrl: 'https://ridewiz.fr/carte/job-kerkar',
-    publicPageUrl: 'https://ridewiz.fr/job-kerkar',
-    cardPublished: true,
-    bgColor: '#F6F1E9',
-    fgColor: '#111111',
-    attachmentNames: ['cartes-avis-google-impression-job-kerkar.pdf'],
-  }
+describe('nfcCardOrderEmail', () => {
+  const adresse = ['Job Kerkar', '12 rue des Lilas', '75011 Paris', '06 12 34 56 78']
 
-  it('imprime l’adresse quand elle est complète', () => {
+  it('annonce la commande dans l’objet, un produit par ligne', () => {
     const tpl = nfcCardOrderEmail({
-      ...order,
-      shippingLines: ['Job Kerkar', '12 rue des Lilas', '75011 Paris', '06 12 34 56 78'],
+      qtyReview: 100,
+      qtyBusiness: 50,
+      shippingLines: adresse,
       shippingComplete: true,
     })
-    expect(tpl.html).toContain('Livraison')
+    expect(tpl.subject).toBe('Frédéric - nouvelle commande 100 cartes avis Google + 50 cartes de visite')
+    expect(tpl.html).toContain('Bonjour Frédéric,')
+    expect(tpl.html).toContain('100 cartes avis Google')
+    expect(tpl.html).toContain('50 cartes de visite')
+    expect(tpl.html).toContain('deux QR codes différents')
+    expect(tpl.html).toContain('en pièces jointes')
+    expect(tpl.html).toContain('Je me tiens à ta disposition')
+  })
+
+  it('ne parle que du produit commandé, et d’un seul QR quand il n’y en a qu’un', () => {
+    const tpl = nfcCardOrderEmail({
+      qtyReview: 0,
+      qtyBusiness: 1,
+      shippingLines: adresse,
+      shippingComplete: true,
+    })
+    expect(tpl.subject).toBe('Frédéric - nouvelle commande 1 carte de visite')
+    expect(tpl.html).not.toContain('avis Google')
+    expect(tpl.html).toContain('un seul QR code')
+  })
+
+  it('porte l’adresse et la mention « livraison classique »', () => {
+    const tpl = nfcCardOrderEmail({
+      qtyReview: 10,
+      qtyBusiness: 10,
+      shippingLines: adresse,
+      shippingComplete: true,
+    })
+    expect(tpl.html).toContain('livraison classique')
     expect(tpl.html).toContain('12 rue des Lilas')
     expect(tpl.html).toContain('75011 Paris')
     expect(tpl.html).not.toContain('Ne pas expédier')
   })
 
   it('alerte franchement quand l’adresse manque', () => {
-    const tpl = nfcCardOrderEmail({ ...order, shippingLines: [], shippingComplete: false })
-    expect(tpl.html).toContain('Adresse de livraison incomplète')
-    expect(tpl.html).toContain('Aucune adresse renseignée')
-    expect(tpl.html).toContain('Ne pas expédier')
+    const tpl = nfcCardOrderEmail({
+      qtyReview: 10,
+      qtyBusiness: 10,
+      shippingLines: [],
+      shippingComplete: false,
+    })
+    expect(tpl.html).toContain('aucune adresse renseignée')
+    expect(tpl.html).toContain('Ne pas expédier avant confirmation')
   })
 
   it('montre le peu qu’on sait d’une adresse partielle, et échappe les saisies', () => {
     const tpl = nfcCardOrderEmail({
-      ...order,
+      qtyReview: 10,
+      qtyBusiness: 0,
       shippingLines: ['<script>alert(1)</script>', 'Paris'],
       shippingComplete: false,
     })
@@ -547,5 +565,21 @@ describe('nfcCardOrderEmail — livraison', () => {
     expect(tpl.html).toContain('Paris')
     expect(tpl.html).not.toContain('<script>')
     expect(tpl.html).toContain('&lt;script&gt;')
+  })
+
+  // Ce qui a été retiré à la demande de l'admin : l'habillage Ridewiz (c'est un
+  // email de travail avec l'imprimeur), les liens de paramétrage et le contenu
+  // du verso, tous deux déjà lisibles dans les PDF joints.
+  it('reste un email ordinaire, sans habillage ni paramétrage', () => {
+    const tpl = nfcCardOrderEmail({
+      qtyReview: 10,
+      qtyBusiness: 10,
+      shippingLines: adresse,
+      shippingComplete: true,
+    })
+    expect(tpl.html).not.toContain('Ridewiz')
+    expect(tpl.html).not.toContain('votre signature')
+    expect(tpl.html).not.toContain('http')
+    expect(tpl.html).not.toContain('Verso')
   })
 })

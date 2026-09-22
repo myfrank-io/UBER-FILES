@@ -1163,82 +1163,73 @@ export const emailTemplates = {
  * pièces jointes ; le corps rappelle quantités, textes de la carte de visite,
  * et surtout les URL à programmer sur les puces NFC (identiques aux QR).
  */
+// Prénom du contact production, celui qui reçoit la commande (adresse dans
+// `nfcCardOrderEmail` de la config). Isolé ici : le jour où ce n'est plus lui,
+// une seule ligne change.
+const NFC_ORDER_CONTACT = 'Frédéric'
+
+/** « 100 cartes avis Google », « 1 carte de visite » — un libellé par produit commandé. */
+function nfcOrderLines(qtyReview: number, qtyBusiness: number): string[] {
+  const lines: string[] = []
+  if (qtyReview > 0) lines.push(`${qtyReview} carte${qtyReview > 1 ? 's' : ''} avis Google`)
+  if (qtyBusiness > 0) lines.push(`${qtyBusiness} carte${qtyBusiness > 1 ? 's' : ''} de visite`)
+  return lines
+}
+
+/**
+ * Commande envoyée à la production, avec les PDF en pièces jointes.
+ *
+ * Volontairement SANS l'habillage Ridewiz : c'est un email de travail entre
+ * nous et l'imprimeur, pas un message client. D'où une mise en page ordinaire,
+ * et rien d'autre que ce dont la production a besoin — ni liens de
+ * paramétrage, ni contenu du verso, qui se lisent déjà dans les PDF joints.
+ */
 export function nfcCardOrderEmail(opts: {
-  driverName: string
-  slug: string
   qtyReview: number
   qtyBusiness: number
-  name: string
-  title: string
-  phone: string
-  /** URL encodée dans le QR / à programmer sur la puce de la carte « avis ». */
-  reviewQrUrl: string
-  /** Lien Google direct (fiche connectée ou lien manuel), null si non configuré. */
-  googleReviewUrl: string | null
-  /** URL encodée dans le QR / à programmer sur la puce de la carte de visite. */
-  cardUrl: string
-  publicPageUrl: string
-  cardPublished: boolean
-  bgColor: string
-  fgColor: string
   /** Adresse de livraison mise en lignes (vide = aucune adresse connue). */
   shippingLines: string[]
   /** Vrai quand les six champs sont là : le colis peut partir tel quel. */
   shippingComplete: boolean
-  attachmentNames: string[]
 }): { subject: string; html: string } {
-  const row = (label: string, value: string) =>
-    `<tr><td style="padding:6px 10px 6px 0;color:#9A8B72;font-size:13px;white-space:nowrap;vertical-align:top">${label}</td><td style="padding:6px 0;font-size:14px">${value}</td></tr>`
-  const link = (url: string) => `<a href="${esc(url)}" style="color:#B5793F;word-break:break-all">${esc(url)}</a>`
-  const parts = [
-    opts.qtyReview > 0 ? `${opts.qtyReview} avis Google` : '',
-    opts.qtyBusiness > 0 ? `${opts.qtyBusiness} cartes de visite` : '',
-  ].filter(Boolean)
-  const subject = `Cartes NFC — ${opts.driverName} : ${parts.join(' + ') || 'design'}`
+  const lines = nfcOrderLines(opts.qtyReview, opts.qtyBusiness)
+  const subject = `${NFC_ORDER_CONTACT} - nouvelle commande ${lines.join(' + ')}`
 
-  const body = `
-    <p style="margin:0 0 14px">Design validé depuis l'admin Ridewiz pour <strong>${esc(opts.driverName)}</strong> (/${esc(opts.slug)}).
-    Les fichiers d'impression et la prévisualisation sont en pièces jointes.</p>
+  // Un QR par design, pas un par carte : c'est la question qui revient à chaque
+  // commande, autant y répondre avant qu'elle soit posée.
+  const note =
+    lines.length > 1
+      ? 'tu as simplement besoin de deux QR codes différents, un par design — pas d’un QR code différent par carte.'
+      : 'tu as simplement besoin d’un seul QR code pour tout le tirage — pas d’un QR code différent par carte.'
 
-    <h2 style="margin:20px 0 6px;font-size:15px;color:#0E1B2C">Quantités</h2>
-    <table style="border-collapse:collapse">
-      ${row('Avis Google', `<strong>${opts.qtyReview}</strong> carte(s)`)}
-      ${row('Carte de visite', `<strong>${opts.qtyBusiness}</strong> carte(s)`)}
-    </table>
+  const livraison = opts.shippingComplete
+    ? `<p style="margin:0 0 16px"><strong>Livraison</strong> (livraison classique) :<br>${opts.shippingLines
+        .map(esc)
+        .join('<br>')}</p>`
+    : `<p style="margin:0 0 16px"><strong>Livraison</strong> (livraison classique) :<br>${
+        opts.shippingLines.length
+          ? `${opts.shippingLines.map(esc).join('<br>')}<br><strong>Adresse de livraison incomplète — ne pas expédier avant confirmation.</strong>`
+          : '<strong>Adresse de livraison incomplète : aucune adresse renseignée. Ne pas expédier avant confirmation.</strong>'
+      }</p>`
 
-    <h2 style="margin:20px 0 6px;font-size:15px;color:#0E1B2C">URL à programmer (puces NFC = QR codes)</h2>
-    <table style="border-collapse:collapse">
-      ${row('Carte avis Google', link(opts.reviewQrUrl))}
-      ${row('Lien Google direct', opts.googleReviewUrl ? link(opts.googleReviewUrl) : '<em style="color:#b45309">Aucune fiche Google connectée : le tunnel affichera un message sans redirection.</em>')}
-      ${row('Carte de visite', `${link(opts.cardUrl)}${opts.cardPublished ? '' : ' <em style="color:#b45309">(carte non publiée pour l’instant)</em>'}`)}
-      ${row('Page publique', link(opts.publicPageUrl))}
-    </table>
+  const html = `
+  <div style="font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:14px;line-height:1.6;color:#222222">
+    <p style="margin:0 0 16px">Bonjour ${NFC_ORDER_CONTACT},</p>
 
-    <h2 style="margin:20px 0 6px;font-size:15px;color:#0E1B2C">Livraison</h2>
-    ${
-      opts.shippingComplete
-        ? `<p style="margin:0;font-size:14px;line-height:1.5">${opts.shippingLines.map(esc).join('<br>')}</p>`
-        : `<div style="margin:0;padding:12px 14px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:12px;font-size:14px;color:#92400E">
-             <strong>Adresse de livraison incomplète.</strong>${
-               opts.shippingLines.length
-                 ? ` Ce qui est connu :<br>${opts.shippingLines.map(esc).join('<br>')}`
-                 : ' Aucune adresse renseignée.'
-             }<br>Ne pas expédier avant confirmation.
-           </div>`
-    }
+    <p style="margin:0 0 16px">Nouvelle commande de cartes.</p>
 
-    <h2 style="margin:20px 0 6px;font-size:15px;color:#0E1B2C">Verso carte de visite</h2>
-    <table style="border-collapse:collapse">
-      ${row('Nom', esc(opts.name) || '—')}
-      ${row('Titre', esc(opts.title) || '—')}
-      ${row('Téléphone', esc(opts.phone) || '—')}
-      ${row('Couleurs', `fond <code>${esc(opts.bgColor)}</code> · éléments <code>${esc(opts.fgColor)}</code>`)}
-    </table>
+    <p style="margin:0 0 16px"><strong>Quantités :</strong><br>${lines.map(esc).join('<br>')}</p>
 
-    <p style="margin:20px 0 0;font-size:13px;color:#9A8B72">Pièces jointes : ${opts.attachmentNames.map(esc).join(', ')}.
-    Fichiers d'impression : format CR80 54 × 85,6 mm + 2 mm de fond perdu, page 1 recto, page 2 verso, QR code réel inclus.</p>`
+    <p style="margin:0 0 16px">Note : ${note}</p>
 
-  return { subject, html: wrap(`Cartes NFC pour ${esc(opts.driverName)}`, body) }
+    <p style="margin:0 0 16px">Tu trouveras les fichiers pour l’impression et la prévisualisation en pièces jointes.</p>
+
+    ${livraison}
+
+    <p style="margin:0">Je me tiens à ta disposition si tu as la moindre question.</p>
+  </div>`
+
+  return { subject, html }
 }
 
 /**
