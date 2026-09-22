@@ -1,7 +1,8 @@
 // PDF des cartes NFC physiques (pdf-lib, pur JavaScript : aucun navigateur
 // headless sur Vercel). Deux sorties :
 //   - le fichier d'IMPRESSION d'un produit : une page recto, une page verso, au
-//     format carte + fond perdu (BLEED sur chaque bord), bords droits, vrai QR ;
+//     format carte + fond perdu (BLEED sur chaque bord), bords droits, SANS QR
+//     (il est personnalisé carte par carte à la production) ;
 //   - la PRÉVISUALISATION : une page A4 par produit, recto et verso côte à côte
 //     avec coins arrondis, telle que la carte est affichée dans l'admin.
 //
@@ -237,16 +238,21 @@ class CardCanvas {
     this.nfcIcon()
   }
 
-  back(product: NfcCardProduct, matrix: QrMatrix) {
+  /**
+   * Verso. `matrix` à `null` laisse l'emplacement du QR vide : c'est le cas du
+   * fichier d'impression, où le QR est ajouté carte par carte à la production.
+   * Tout le reste — textes, logo Google — garde exactement la même position.
+   */
+  back(product: NfcCardProduct, matrix: QrMatrix | null) {
     if (product === 'review') {
       REVIEW_BACK_TEXT.forEach((line, i) => this.text(line, REVIEW_BACK_TEXT_VALUES[i]!))
-      this.qr(matrix)
+      if (matrix) this.qr(matrix)
       this.googleLogo()
       return
     }
     this.text(BUSINESS_NAME_LINE, this.input.name)
     this.text(BUSINESS_TITLE_LINE, this.input.title)
-    this.qr(matrix)
+    if (matrix) this.qr(matrix)
     this.text(BUSINESS_PHONE_LINE, this.input.phone)
   }
 }
@@ -270,12 +276,13 @@ async function prepare(input: NfcCardRenderInput) {
 
 /**
  * Fichier d'impression d'un produit : page 1 recto, page 2 verso, chacune au
- * format carte + fond perdu, fond plein jusqu'au bord, vrai QR code.
+ * format carte + fond perdu, fond plein jusqu'au bord, SANS QR code — le QR
+ * étant propre à chaque carte, il est posé à la production ; son emplacement
+ * reste vide, toutes les autres positions étant inchangées.
  */
 export async function generateNfcCardPrintPdf(input: NfcCardRenderInput, product: NfcCardProduct): Promise<Uint8Array> {
   const { pdf, fonts, logoImage } = await prepare(input)
   pdf.setTitle(`Cartes ${NFC_CARD_PRODUCT_LABELS[product]} — ${input.driverName} (impression)`)
-  const matrix = qrMatrix(input.urls[product])
   const pageW = (CARD_W + 2 * BLEED) * MM
   const pageH = (CARD_H + 2 * BLEED) * MM
 
@@ -284,7 +291,7 @@ export async function generateNfcCardPrintPdf(input: NfcCardRenderInput, product
     const canvas = new CardCanvas(page, BLEED, BLEED, 1, fonts, input, logoImage)
     canvas.background(false, BLEED)
     if (side === 'front') canvas.front()
-    else canvas.back(product, matrix)
+    else canvas.back(product, null)
   }
   return pdf.save()
 }
@@ -337,7 +344,7 @@ export async function generateNfcCardPreviewPdf(
     page.drawText(
       safeText(
         fonts.regular,
-        `Format CR80 ${CARD_W} × ${CARD_H} mm, aperçu à l'échelle ${scale}. Fichier d'impression : recto/verso avec ${BLEED} mm de fond perdu.`,
+        `Format CR80 ${CARD_W} × ${CARD_H} mm, aperçu à l'échelle ${scale}. Fichier d'impression : recto/verso avec ${BLEED} mm de fond perdu, sans le QR code.`,
       ),
       { x: left * MM, y: (297 - top - cardH - 10) * MM, size: 8, font: fonts.regular, color: muted },
     )
