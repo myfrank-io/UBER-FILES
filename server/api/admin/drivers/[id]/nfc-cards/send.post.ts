@@ -6,7 +6,6 @@ import {
   buildNfcCardRenderInput,
   loadOrCreateNfcCardDesign,
   nfcCardFileName,
-  nfcCardLinks,
   nfcDriverSelect,
   nfcShipping,
   serializeNfcCardDesign,
@@ -24,7 +23,7 @@ export default defineEventHandler(async (event) => {
 
   const driver = await prisma.driver.findUnique({
     where: { id },
-    select: { ...nfcDriverSelect, cardProfile: { select: { published: true } } },
+    select: nfcDriverSelect,
   })
   if (!driver) throw createError({ statusCode: 404, statusMessage: 'Chauffeur introuvable.' })
 
@@ -55,31 +54,17 @@ export default defineEventHandler(async (event) => {
     content: Buffer.from(await generateNfcCardPreviewPdf(input, products)).toString('base64'),
   })
 
-  const links = nfcCardLinks(config.public.appBaseUrl, driver)
   const to = config.nfcCardOrderEmail
   const { sent } = await sendEmail({
     to,
     attachments,
     ...nfcCardOrderEmail({
-      driverName: driver.displayName,
-      slug: driver.slug,
       qtyReview: design.qtyReview,
       qtyBusiness: design.qtyBusiness,
-      name: design.name ?? '',
-      title: design.title ?? '',
-      phone: design.phone ?? '',
-      reviewQrUrl: links.review,
-      googleReviewUrl: links.googleReviewUrl,
-      cardUrl: links.business,
-      publicPageUrl: links.publicPageUrl,
-      cardPublished: Boolean(driver.cardProfile?.published),
-      bgColor: design.bgColor,
-      fgColor: design.fgColor,
       // L'adresse manquante n'empêche PAS l'envoi (les cartes peuvent partir
       // chez l'admin), mais l'email le dit en toutes lettres.
       shippingLines: formatShippingLines(nfcShipping(design)),
       shippingComplete: shippingComplete(nfcShipping(design)),
-      attachmentNames: attachments.map((a) => a.filename),
     }),
   })
   if (!sent && config.resendApiKey) {
