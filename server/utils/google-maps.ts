@@ -1,7 +1,16 @@
 // Service Google Maps Platform — appelé UNIQUEMENT côté serveur (la clé n'est jamais
 // exposée au navigateur). Couvre Places Autocomplete et Routes (distance/durée).
-// Repli : si aucune clé n'est configurée, on estime via la formule de haversine pour
-// rester développable/testable sans clé.
+//
+// RÈGLE DE DÉGRADATION : une panne Google ne doit JAMAIS bloquer une réservation.
+// Le repli (Base Adresse Nationale pour les adresses, haversine pour les
+// distances) s'applique dans les deux cas — aucune clé configurée, ET clé
+// configurée mais appel en échec. Une clé expirée, un dépassement de quota ou une
+// facturation suspendue se traduisent donc par des adresses un peu moins précises,
+// jamais par un formulaire qui refuse de partir.
+//
+// Toute panne est journalisée (`[maps]`) : un repli silencieux est invisible en
+// production, et c'est précisément ce qui a laissé passer une semaine de
+// réservations perdues.
 import { allowedMapsUrl, parseMapsPlaceUrl } from '~/lib/place-search'
 
 export interface RouteResult {
@@ -22,6 +31,28 @@ export interface PlacePrediction {
 export interface LatLng {
   lat: number
   lng: number
+}
+
+/**
+ * Journalise un échec Google avant de se rabattre. Sans cette trace, un repli
+ * ne se voit nulle part : ni dans les erreurs d'exécution (rien n'est levé), ni
+ * à l'écran (le client voit juste « aucune suggestion »).
+ */
+function logMapsFailure(api: string, detail: unknown): void {
+  const message =
+    detail instanceof Error ? detail.message : typeof detail === 'string' ? detail : String(detail)
+  console.warn(`[maps] ${api} indisponible, repli activé : ${message.slice(0, 300)}`)
+}
+
+/** Corps d'une réponse en échec, tronqué — de quoi identifier la cause réelle. */
+async function failureDetail(res: Response): Promise<string> {
+  let body = ''
+  try {
+    body = (await res.text()).slice(0, 300)
+  } catch {
+    // Corps illisible : le statut suffit.
+  }
+  return `HTTP ${res.status}${body ? ` — ${body}` : ''}`
 }
 
 const EARTH_RADIUS_M = 6_371_000
@@ -50,23 +81,32 @@ export async function computeRoute(
 ): Promise<RouteResult> {
   if (!apiKey) return haversineRoute(from, to)
 
-  const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
-    },
-    body: JSON.stringify({
-      origin: { location: { latLng: { latitude: from.lat, longitude: from.lng } } },
-      destination: { location: { latLng: { latitude: to.lat, longitude: to.lng } } },
-      travelMode: 'DRIVE',
-      routingPreference: 'TRAFFIC_AWARE',
-    }),
-  })
+  let res: Response
+  try {
+    res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
+      },
+      body: JSON.stringify({
+        origin: { location: { latLng: { latitude: from.lat, longitude: from.lng } } },
+        destination: { location: { latLng: { latitude: to.lat, longitude: to.lng } } },
+        travelMode: 'DRIVE',
+        routingPreference: 'TRAFFIC_AWARE',
+      }),
+    })
+  } catch (err) {
+    logMapsFailure('routes', err)
+    return haversineRoute(from, to)
+  }
 
   if (!res.ok) {
     // En cas d'échec API, on dégrade proprement plutôt que de bloquer le devis.
+    // Le devis part alors sur une distance à vol d'oiseau majorée : utilisable,
+    // mais moins juste — d'où la trace, pour que ça ne dure pas des semaines.
+    logMapsFailure('routes', await failureDetail(res))
     return haversineRoute(from, to)
   }
 
@@ -99,21 +139,30 @@ export async function computeLiveRoute(
 ): Promise<LiveRouteResult> {
   if (!apiKey) return haversineRoute(from, to)
 
-  const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
-    },
-    body: JSON.stringify({
-      origin: { location: { latLng: { latitude: from.lat, longitude: from.lng } } },
-      destination: { location: { latLng: { latitude: to.lat, longitude: to.lng } } },
-      travelMode: 'DRIVE',
-      routingPreference: 'TRAFFIC_AWARE',
-    }),
-  })
-  if (!res.ok) return haversineRoute(from, to)
+  let res: Response
+  try {
+    res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
+      },
+      body: JSON.stringify({
+        origin: { location: { latLng: { latitude: from.lat, longitude: from.lng } } },
+        destination: { location: { latLng: { latitude: to.lat, longitude: to.lng } } },
+        travelMode: 'DRIVE',
+        routingPreference: 'TRAFFIC_AWARE',
+      }),
+    })
+  } catch (err) {
+    logMapsFailure('routes (suivi)', err)
+    return haversineRoute(from, to)
+  }
+  if (!res.ok) {
+    logMapsFailure('routes (suivi)', await failureDetail(res))
+    return haversineRoute(from, to)
+  }
 
   const data = (await res.json()) as {
     routes?: {
@@ -147,19 +196,31 @@ export async function autocompletePlaces(
   if (input.trim().length < 3) return []
   if (!apiKey) return autocompleteBan(input)
 
-  const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': apiKey,
-    },
-    body: JSON.stringify({
-      input,
-      languageCode: 'fr',
-      regionCode: 'FR',
-    }),
-  })
-  if (!res.ok) return []
+  let res: Response
+  try {
+    res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+      },
+      body: JSON.stringify({
+        input,
+        languageCode: 'fr',
+        regionCode: 'FR',
+      }),
+    })
+  } catch (err) {
+    logMapsFailure('autocomplete', err)
+    return autocompleteBan(input)
+  }
+  // Clé expirée, quota dépassé, API désactivée, facturation suspendue : l'API v1
+  // répond par un vrai code d'erreur HTTP. On se rabat sur la BAN — sans quoi le
+  // client reste sans suggestion et ne peut pas réserver.
+  if (!res.ok) {
+    logMapsFailure('autocomplete', await failureDetail(res))
+    return autocompleteBan(input)
+  }
 
   const data = (await res.json()) as {
     suggestions?: { placePrediction?: { text?: { text?: string }; placeId?: string } }[]
@@ -209,23 +270,60 @@ export async function geocodeAddress(
   address: string,
   apiKey: string | undefined,
 ): Promise<(LatLng & { formatted: string }) | null> {
-  if (apiKey) {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-      address,
-    )}&region=fr&key=${apiKey}`
-    const res = await fetch(url)
-    if (res.ok) {
-      const data = (await res.json()) as {
-        results?: { geometry: { location: { lat: number; lng: number } }; formatted_address: string }[]
-      }
-      const r = data.results?.[0]
-      if (r) return { lat: r.geometry.location.lat, lng: r.geometry.location.lng, formatted: r.formatted_address }
-    }
+  if (!apiKey) return geocodeBan(address)
+
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+    address,
+  )}&region=fr&key=${apiKey}`
+  let res: Response
+  try {
+    res = await fetch(url)
+  } catch (err) {
+    logMapsFailure('geocode', err)
+    return geocodeBan(address)
+  }
+  if (!res.ok) {
+    logMapsFailure('geocode', await failureDetail(res))
+    return geocodeBan(address)
+  }
+
+  const data = (await res.json()) as {
+    status?: string
+    error_message?: string
+    results?: { geometry: { location: { lat: number; lng: number } }; formatted_address: string }[]
+  }
+
+  // PIÈGE DE L'API LEGACY : contrairement à Places v1, le Geocoding historique
+  // répond HTTP 200 même quand la clé est refusée — la panne n'est QUE dans le
+  // corps (`REQUEST_DENIED`, `OVER_QUERY_LIMIT`…). Un contrôle sur `res.ok`
+  // seul laisse donc passer une clé morte pour une adresse introuvable.
+  // `ZERO_RESULTS` est la seule absence légitime : l'adresse n'existe pas, la
+  // BAN ne fera pas mieux.
+  const status = data.status ?? 'OK'
+  if (status !== 'OK' && status !== 'ZERO_RESULTS') {
+    logMapsFailure('geocode', `${status}${data.error_message ? ` — ${data.error_message}` : ''}`)
+    return geocodeBan(address)
+  }
+
+  const r = data.results?.[0]
+  if (r) {
+    return { lat: r.geometry.location.lat, lng: r.geometry.location.lng, formatted: r.formatted_address }
+  }
+  return null
+}
+
+/**
+ * Géocodage via la Base Adresse Nationale (data.gouv.fr) : gratuit, sans clé,
+ * et seule source utilisée quand Google n'est pas branché ou ne répond plus.
+ */
+async function geocodeBan(address: string): Promise<(LatLng & { formatted: string }) | null> {
+  const url = `https://api-adresse.data.gouv.fr/search/?limit=1&q=${encodeURIComponent(address)}`
+  let res: Response
+  try {
+    res = await fetch(url, { headers: { 'User-Agent': 'vtc-booking/1.0' } })
+  } catch {
     return null
   }
-  // Repli sans clé via la Base Adresse Nationale (même source que l'autocomplétion).
-  const url = `https://api-adresse.data.gouv.fr/search/?limit=1&q=${encodeURIComponent(address)}`
-  const res = await fetch(url, { headers: { 'User-Agent': 'vtc-booking/1.0' } })
   if (!res.ok) return null
   const data = (await res.json()) as {
     features?: { geometry?: { coordinates?: [number, number] }; properties?: { label?: string } }[]
